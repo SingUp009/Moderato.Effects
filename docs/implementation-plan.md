@@ -53,6 +53,14 @@ S1 の33ケースは、回帰テストとしてテストプロジェクトに移
 | P7 | **Analyzer**：Gen の中のすべての例外を捕まえる `catch`、`finally` / `catch` の中の `scope.Run`、`Result.Try` などのラムダの中での scope の使用、scope の持ち出し、入れ子の Gen での外側の scope の使用、ループの中での `Acquire` / `Defer`、処理を止めて待つ呼び出し、時計の直接使用（`Sync` / `Async` のラムダ、`Succeed` の引数を含む）、CS0315 の言い換え | D11, D13, D14, D16 |
 | P8 | **仕上げ**：README、サンプル、ベンチマーク、`PublicAPI.*.txt`、CHANGELOG、パッケージング | — |
 
+**P8 の結果**
+
+- 省略可能な引数を持つオーバーロード（`All` の `concurrency`、Retry / Repeat の `when`、`RunAsync` の `cancellationToken`）は、Moderato.Results と同じく RS0026 / RS0027 をメンバーごとに `[SuppressMessage]` で抑止し、理由を `Justification` に書いた。
+- サンプルを書いて、使い勝手の問題が2つ見つかった。どちらも README の注意点に書いた。
+  - 失敗しない Resource の `Use` から失敗しうる処理を返せない（G8 の `AndThen` と同じ問題）。変数の型を書いて広げる。
+  - コンパイラの CS8655 の不具合に、サンプルの `foreach` の中の `RunExitAsync(env)` がそのまま当たった。`CancellationToken.None` を渡して避けた。
+- ベンチマーク（`--job short`、参考値）：素の `Result` の連鎖が約 9 ns に対して、Effect の連鎖は約 350 ns / 272 B、Gen ブロックは約 550 ns / 736 B。Gen ブロックの Err は例外で巻き戻るため約 7 µs。`Effect.All` は8個の小さな非同期処理で `Task.WhenAll` の約6倍。安全性を優先した設計どおりで、README には「Gen の Err は例外のコストがかかる」とだけ書いた。最適化はリリース後に、ベンチマークを見ながら検討する。
+
 - P1〜P5 では、`IUnionCase` をテストの中で手書きして使う。Source Generator がなくても型安全に動くように設計してあるので（D13）、生成器を後に回して問題ない。手書きの実装が「生成器が出力すべきコードの正解」になり、P6 で答え合わせができる。
 - `Timeout` は、`RaceFirst` と同じ内部の仕組み（2つの処理を競わせ、負けた側をキャンセルして終了を待つ）で作る。その仕組みは P3 で作り、P4 の `Race` / `RaceFirst` で公開する。
 - Q11（追跡機能）の実装の約束（Fiber、Scope、Resource の生成と終了を1か所に集める）は、P1〜P4 の実装で守る。
@@ -116,5 +124,5 @@ bench/Moderato.Effects.Benchmarks/               BenchmarkDotNet（P8）
 ```
 
 - CI は Moderato.Results と同じく `dotnet test -c Release` を基本にする。
-- `PublicAPI.*.txt`（公開 API の変更を検出する Analyzer）は、API が固まる P8 で入れる。
+- `PublicAPI.*.txt`（公開 API の変更を検出する Analyzer）は、API が固まる P8 で入れる。P8 で入れた。最初のプレビュー版までは、すべて `PublicAPI.Unshipped.txt` にある。リリースの手順は `RELEASING.md`。
 - コードのコメントと README は英語（Moderato.Results と同じ）。設計メモと実装計画は日本語。

@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to this project are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- `Effect<T, E, R>`: a lazy, re-runnable description of work with its value, expected error and environment in the type. `Never` for effects that cannot fail or cannot succeed.
+- Factories on `Effect<R>`: `Succeed`, `Fail`, `FromResult`, `Sync`, `Async`, `FromResultAsync`, `Try`, `TryAsync`, `Access`, `AccessAsync`, `Env`.
+- `RunAsync` returning `Result<T, E>`, and `RunExitAsync` returning `Exit<T, E>` (`Ok`, `Err`, `Die`, `Interrupted`). `EmptyEnvironment` and `DefaultEnvironment`.
+- Operators: `Map`, `MapErr`, `AndThen`, `AndThrough`, `OrElse`, `Tap`, `TapErr`, `Match`, `UnwrapOr`, `UnwrapOrElse`, `Attempt`, `Widen`, `CatchCase`, `Catch`, `Provide`, `WidenEnv`, `OnThreadPool`, and LINQ query syntax.
+- Gen blocks: `Scope<E, R>.Gen` and `Effect.Gen`, with `Run`, `Get`, `Fail`, `Defer`, `Acquire` and `Fork` on the scope.
+- `Resource<T, E, R>` with `Resource.Make`, `Use`, `Map`, `AndThen` and LINQ query syntax.
+- `Effect.Sleep`, `Timeout`, `TimeoutResult` and `TimeoutError`.
+- `Concurrency`, `Effect.All` (2 to 8 effects or a sequence), `AllSettled`, `AllErrors`, `Race`, `RaceFirst`, and `Fiber<T, E, R>` with `Join`.
+- `Schedule` and `Schedule<TNeed>` (`Spaced`, `Exponential`, `Immediately`, `UpTo`, `During`, `WithMaxDelay`, `Jittered`), `Retry` and `Repeat` with a schedule or with an effect as the policy.
+- Failure model: suppressed failures in `Die.Suppressed`, and `EffectDiagnostics.UnobservedFailureHandler` for failures no outcome can carry.
+- Source generators: `[Error]` (`IUnionCase`, including the cases of cases), `[Environment]` and `[Expose<T>]` (`IHas<T>`), `[RestOf<E>]` (`IUnionRest`, for `Catch`).
+- Analyzers MEFF301 to MEFF309 for misuse of Gen blocks, use of the system clock inside effects, and `Catch` calls that do not compile.
+
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/commits/main

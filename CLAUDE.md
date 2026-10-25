@@ -27,4 +27,8 @@ Tests are first-class documentation.
 
 ```
 dotnet test -c Release
+dotnet run --project samples/Moderato.Effects.Samples
+dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*'
 ```
+
+`src/Moderato.Effects/PublicAPI.Unshipped.txt` tracks the public API; add new members there (RS0016). Release steps are in `RELEASING.md`.
