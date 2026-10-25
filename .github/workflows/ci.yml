@@ -10,7 +10,33 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      # Compiler warnings, the analyzers and the .editorconfig code style rules are all errors.
+      - run: dotnet build -c Release
+
+      # Naming and other style rules that the build does not enforce.
+      - run: dotnet format style --verify-no-changes --severity warn --no-restore
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - run: dotnet format whitespace --verify-no-changes
+
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -23,6 +49,16 @@ jobs:
 
       - name: Run the samples
         run: dotnet run --project samples/Moderato.Effects.Samples -c Release --no-build
+
+  pack:
+    needs: [lint, format, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
 
       - name: Check the tag matches <Version>
         if: startsWith(github.ref, 'refs/tags/v')
@@ -43,7 +79,7 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: pack
     runs-on: ubuntu-latest
     environment: nuget
     permissions:

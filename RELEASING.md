@@ -24,7 +24,7 @@ Merge the PR once CI is green.
   - **Title:** the same as the tag.
   - **Notes:** the version's changelog section.
   - Mark previews as **pre-release**.
-- [ ] Publishing the release starts CI. `build` checks the tag against `<Version>`, tests, packs and uploads the packages.
+- [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
 - [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects. Indexing can take 5 to 15 minutes.
 
