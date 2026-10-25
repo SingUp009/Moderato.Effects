@@ -15,7 +15,8 @@ namespace Moderato.Effects;
 public sealed class Scope<E, R>
 {
     private readonly RunContext _context;
-    private readonly Releases<R> _releases = new();
+    private readonly Cancellation _cancellation;
+    private readonly Releases<R> _releases;
     private ImmutableArray<Suppressed>.Builder? _suppressed;
     private int _omitted;
     private ExceptionDispatchInfo? _rethrown;
@@ -28,7 +29,9 @@ public sealed class Scope<E, R>
     private Scope(R env, RunContext context)
     {
         Env = env;
-        _context = context;
+        _cancellation = new Cancellation(context.CancellationToken);
+        _releases = new Releases<R>(_cancellation);
+        _context = _releases.BodyContext;
     }
 
     /// <summary>The environment the block runs with.</summary>
@@ -57,6 +60,11 @@ public sealed class Scope<E, R>
     /// <returns>The value.</returns>
     public ValueTask<T> Acquire<T>(Resource<T, E, R> resource)
         => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope._context, scope._releases));
+
+    /// <summary>Starts the effect as a fiber that runs alongside the block. When the block ends, the fiber is canceled and the block waits for it.</summary>
+    /// <param name="effect">The effect.</param>
+    /// <returns>The running fiber. Get its outcome with <c>scope.Run(fiber.Join())</c>.</returns>
+    public ValueTask<Fiber<T, F, R>> Fork<T, F>(Effect<T, F, R> effect) => Acquire<Fiber<T, F, R>>(effect.Fork());
 
     /// <summary>Returns the value of a result. An Err ends the block.</summary>
     /// <param name="result">The result.</param>
@@ -172,7 +180,14 @@ public sealed class Scope<E, R>
 
         _closed = true;
         if (_suppressed is { Count: > 0 } || _omitted > 0) outcome = outcome.After(_suppressed?.ToImmutable() ?? [], _omitted);
-        return await _releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);
+        try
+        {
+            return await _releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);
+        }
+        finally
+        {
+            _cancellation.Dispose();
+        }
     }
 
     private T Unwrap<T>(Outcome<T, E> outcome)

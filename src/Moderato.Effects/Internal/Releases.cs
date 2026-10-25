@@ -4,11 +4,35 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Internal;
 
-/// <summary>Runs release actions after a body has finished, in reverse order of registration.</summary>
-internal sealed class Releases<R>
+/// <summary>
+/// The lifetime of one scope (a Gen block or a <c>Use</c>): the token its body runs with, the release actions to run after it,
+/// and the defects of forked children that end it early.
+/// </summary>
+internal sealed class Releases<R>(Cancellation body)
 {
     private readonly List<Func<ExitCase, Effect<Unit, Never, R>>> _actions = [];
     private readonly Lock _lock = new();
+    private ImmutableArray<Outcome<Unit, Never>>.Builder? _childDefects;
+    private bool _bodyEnded;
+
+    /// <summary>The context the scope's body runs with.</summary>
+    internal RunContext BodyContext { get; } = new(body.Token);
+
+    /// <summary>
+    /// Records the defect of a forked child and cancels the body, so the scope ends with the child's defect (D10).
+    /// Returns false once the body has ended; the child's release reports the defect then.
+    /// </summary>
+    internal bool TryFailFromChild(Outcome<Unit, Never> defect)
+    {
+        lock (_lock)
+        {
+            if (_bodyEnded) return false;
+            (_childDefects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(defect);
+        }
+
+        body.TryCancel(CancellationReason.ChildDefect);
+        return true;
+    }
 
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release)
     {
@@ -21,6 +45,8 @@ internal sealed class Releases<R>
         Func<ExitCase, Effect<Unit, Never, R>>[] actions;
         lock (_lock)
         {
+            _bodyEnded = true;
+            if (_childDefects is { Count: > 0 }) body = AfterChildDefects(body, _childDefects.ToImmutable());
             if (_actions.Count == 0) return body;
             actions = [.. _actions];
             _actions.Clear();
@@ -48,6 +74,26 @@ internal sealed class Releases<R>
         }
 
         return defects.Count == 0 ? body : Combine(body, defects.ToImmutable());
+    }
+
+    /// <summary>The first child defect is the outcome; what the body did after being canceled for it is context.</summary>
+    private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
+    {
+        var first = defects[0];
+        var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
+        suppressed.AddRange(first.Suppressed);
+        foreach (var other in defects.AsSpan()[1..])
+        {
+            suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
+            suppressed.AddRange(other.Suppressed);
+        }
+
+        // A joined child's defect reaches the body too; it is the same failure, not a second one.
+        var sameDefect = body.Kind == OutcomeKind.Die && defects.Any(d => ReferenceEquals(d.Defect!.SourceException, body.Defect!.SourceException));
+        if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
+            suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
+        suppressed.AddRange(body.Suppressed);
+        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: first.Omitted + body.Omitted);
     }
 
     private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<ExceptionDispatchInfo> defects)

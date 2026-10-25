@@ -286,6 +286,17 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 
 **時計**：`Sleep` と `Timeout` は `where R : IHas<TimeProvider>` を要求する（D14）。
 
+**実装メモ（P4）**
+
+- Fiber は `Fiber<T, E, R>` にした。`scope.Run(fiber.Join())` と書けるように、`Join()` が `Effect<T, E, R>` を返す必要があるため。Gen の中では `scope.Fork(effect)`、それ以外では `effect.Fork()`（`Resource<Fiber<T, E, R>, Never, R>`）を使う。
+- Fork した子の Die で親をキャンセルするため、Gen のブロックと `Resource.Use` は、実行ごとに自分のキャンセルの単位（連動したトークン）を持つ。
+- 診断用ハンドラーは `EffectDiagnostics.UnobservedFailureHandler`（`Action<ExitCase>?`）。受け取るのは `Die` か `Failed`。`null` で既定（Console.Error に書く）に戻る。ハンドラーの例外は無視する。全体共通なので、ハンドラーを差し替えるテストは並列に動かせない。
+- `Race` / `RaceFirst` は2つの Effect を取る版だけにした。3つ以上は、必要になったら足す。
+- `AllErrors` は、Err では止まらず、Die だけで残りをキャンセルする。
+- `Concurrency.Sequential.WithMaxDegree(n)` は例外にする（順番に実行するものに上限を付けても意味がないため）。
+- `Effect.All([失敗しない Effect, AppError の Effect])` は E を推論できない（Never と AppError の両方が候補になる）。変数の型を書くか、Gen の中で `scope.Run` を使う。README に書く。
+- `Timeout` は P3 の専用の実装のままにした。`Race` と共通の部品は、キャンセルの単位（`Cancellation`）と主となる失敗の選び方。
+
 ### D11. Gen の詳細
 
 **形**：E と R から T を推論できるよう、次の2通りを用意する（C# ではメソッドの型引数を一部だけ書けないため、`Effect<R>.Gen<E>` の形は取れない）。

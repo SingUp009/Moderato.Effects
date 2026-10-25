@@ -38,21 +38,23 @@ public readonly struct Resource<T, E, R>
         static async ValueTask<Outcome<U, E>> UseAsync(
             Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire, Func<T, Effect<U, E, R>> use, R env, RunContext context)
         {
-            var releases = new Releases<R>();
-            Outcome<U, E> body;
+            using var cancellation = new Cancellation(context.CancellationToken);
+            var releases = new Releases<R>(cancellation);
+            var body = releases.BodyContext;
+            Outcome<U, E> outcome;
             try
             {
-                var acquired = await acquire(env, context, releases).ConfigureAwait(false);
-                body = acquired.Kind == OutcomeKind.Ok
-                    ? (await use(acquired.Value).Run(env, context).ConfigureAwait(false)).After(acquired)
+                var acquired = await acquire(env, body, releases).ConfigureAwait(false);
+                outcome = acquired.Kind == OutcomeKind.Ok
+                    ? (await use(acquired.Value).Run(env, body).ConfigureAwait(false)).After(acquired)
                     : acquired.WithValueType<U>();
             }
             catch (Exception exception)
             {
-                body = Defects.From<U, E>(exception, context);
+                outcome = Defects.From<U, E>(exception, body);
             }
 
-            return await releases.ReleaseAsync(body, env).ConfigureAwait(false);
+            return await releases.ReleaseAsync(outcome, env).ConfigureAwait(false);
         }
     }
 

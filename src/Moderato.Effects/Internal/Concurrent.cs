@@ -8,6 +8,8 @@ internal enum StopOn
     Nothing,
     Defect,
     Failure,
+    SuccessOrDefect,
+    Anything,
 }
 
 /// <summary>How one child of a group ended.</summary>
@@ -83,7 +85,8 @@ internal static class Concurrent
 
             var afterCancel = group.Token.IsCancellationRequested;
             ends[i] = new(outcome, afterCancel, Interlocked.Increment(ref order));
-            if (Stops(outcome.Kind, stopOn)) group.TryCancel(CancellationReason.SiblingFailure);
+            if (Stops(outcome.Kind, stopOn))
+                group.TryCancel(stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure);
         }
     }
 
@@ -91,6 +94,8 @@ internal static class Concurrent
     {
         StopOn.Failure => kind is OutcomeKind.Err or OutcomeKind.Die,
         StopOn.Defect => kind == OutcomeKind.Die,
+        StopOn.SuccessOrDefect => kind is OutcomeKind.Ok or OutcomeKind.Die,
+        StopOn.Anything => true,
         _ => false,
     };
 

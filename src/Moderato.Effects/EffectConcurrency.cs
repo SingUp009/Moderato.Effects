@@ -146,6 +146,71 @@ public static partial class Effect
         }));
     }
 
+    /// <summary>
+    /// Runs both effects at the same time and takes the first to succeed; the other is canceled and waited for. If one fails, the other
+    /// still gets its chance; if both fail, the first failure is the outcome. A defect on either side ends the race with that defect.
+    /// </summary>
+    /// <param name="first">One effect.</param>
+    /// <param name="second">The other effect.</param>
+    /// <returns>An effect with the winner's value.</returns>
+    public static Effect<T, E, R> Race<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
+    {
+        Func<R, RunContext, ValueTask<Outcome<T, E>>>[] runs = [first.Run, second.Run];
+        return new((env, context) => Guard(context, async () =>
+        {
+            var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.SuccessOrDefect).ConfigureAwait(false);
+            var winner = Earliest(ends, static end => end.Outcome.Kind == OutcomeKind.Ok && !end.AfterCancel);
+            return Settle(ends, winner, context);
+        }));
+    }
+
+    /// <summary>
+    /// Runs both effects at the same time and takes the first to finish, whether it succeeded or failed; the other is canceled
+    /// and waited for. A defect on the losing side still outranks the winner.
+    /// </summary>
+    /// <param name="first">One effect.</param>
+    /// <param name="second">The other effect.</param>
+    /// <returns>An effect with the outcome of the first to finish.</returns>
+    public static Effect<T, E, R> RaceFirst<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
+    {
+        Func<R, RunContext, ValueTask<Outcome<T, E>>>[] runs = [first.Run, second.Run];
+        return new((env, context) => Guard(context, async () =>
+        {
+            var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.Anything).ConfigureAwait(false);
+            var winner = Earliest(ends, static end => end.Outcome.Kind is OutcomeKind.Ok or OutcomeKind.Err && !end.AfterCancel);
+            return Settle(ends, winner, context);
+        }));
+    }
+
+    private static int? Earliest<T, E>(ChildEnd<T, E>[] ends, Func<ChildEnd<T, E>, bool> match)
+    {
+        int? earliest = null;
+        for (var i = 0; i < ends.Length; i++)
+        {
+            if (ends[i].Ran && match(ends[i]) && (earliest is not { } e || ends[i].Order < ends[e].Order)) earliest = i;
+        }
+
+        return earliest;
+    }
+
+    // An independent defect anywhere outranks the winner, so a loser's failing release is never dropped (G3).
+    private static Outcome<T, E> Settle<T, E>(ChildEnd<T, E>[] ends, int? winner, RunContext context)
+    {
+        var callerCanceled = context.CancellationToken.IsCancellationRequested;
+        var primary = Concurrent.PrimaryFailure(ends, callerCanceled);
+        // Nothing finished: the caller canceled before either side could start.
+        if (primary is null && winner is null) return Outcome<T, E>.Interrupted();
+        var decidedByFailure = primary is { } p
+            && (ends[p].Outcome.Kind == OutcomeKind.Die && ends[p].IsIndependentFailure
+                || ends[p].Outcome.Kind == OutcomeKind.Interrupted && callerCanceled
+                || winner is null);
+        if (decidedByFailure) return Concurrent.Fail<T, E, T, E>(ends, primary!.Value, static error => error);
+
+        var chosen = ends[winner!.Value].Outcome;
+        var (others, omitted) = Concurrent.Others(ends, winner);
+        return chosen.WithSuppressed(chosen.Suppressed.AddRange(others), chosen.Omitted + omitted);
+    }
+
     private static Func<R, RunContext, ValueTask<Outcome<T, E>>>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);

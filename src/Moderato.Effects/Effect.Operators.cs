@@ -166,6 +166,13 @@ public readonly partial struct Effect<T, E, R>
         return new((env, context) => run(env, context));
     }
 
+    /// <summary>
+    /// A resource that starts the effect as a fiber running alongside the caller. Releasing it cancels the fiber and waits for it.
+    /// In a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>.
+    /// </summary>
+    /// <returns>The resource of the running fiber.</returns>
+    public Resource<Fiber<T, E, R>, Never, R> Fork() => Fiber<T, E, R>.Fork(this);
+
     /// <summary>Starts the effect on the thread pool, so CPU-bound work does not hold up the caller's flow.</summary>
     /// <returns>The same effect, started on the thread pool.</returns>
     public Effect<T, E, R> OnThreadPool()
