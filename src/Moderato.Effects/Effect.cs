@@ -87,22 +87,7 @@ public readonly partial struct Effect<T, E, R>
         }
     }
 
-    private static Exit<T, E> ToExit(Outcome<T, E> outcome)
-    {
-        switch (outcome.Kind)
-        {
-            case OutcomeKind.Ok:
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
-                return new(new Ok<T>(outcome.Value));
-            case OutcomeKind.Err:
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
-                return new(new Err<E>(outcome.Error));
-            case OutcomeKind.Die:
-                return new(ExitCases.ToDie(outcome));
-            default:
-                return new(new Interrupted());
-        }
-    }
+    private static Exit<T, E> ToExit(Outcome<T, E> outcome) => Exits.From(outcome);
 
     // One key, overwritten: an exception thrown again by a later run must not accumulate stale entries.
     private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed)

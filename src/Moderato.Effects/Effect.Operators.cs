@@ -166,6 +166,24 @@ public readonly partial struct Effect<T, E, R>
         return new((env, context) => run(env, context));
     }
 
+    /// <summary>Starts the effect on the thread pool, so CPU-bound work does not hold up the caller's flow.</summary>
+    /// <returns>The same effect, started on the thread pool.</returns>
+    public Effect<T, E, R> OnThreadPool()
+    {
+        var run = Run;
+        return new((env, context) => new(Task.Run(async () =>
+        {
+            try
+            {
+                return await run(env, context).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<T, E>(exception, context);
+            }
+        })));
+    }
+
     /// <summary>Continues with this effect's outcome. Exceptions from <paramref name="next"/> are defects.</summary>
     internal Effect<U, F, R> Then<U, F>(Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next)
     {
