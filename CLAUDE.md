@@ -7,6 +7,7 @@ Effect System for C# on .NET 11 / C# 15 unions. Builds on Moderato.Results.
 - `docs/design.md`: design decisions (D1–D18). Read before changing behavior; ask before deviating from it.
 - `docs/implementation-plan.md`: phases (P0–P8). Stop after each phase for review.
 - `docs/requirements/`: requirements for sibling libraries.
+- The user guide (English) lives in the GitHub wiki, a separate repository. Keep it in step with the API; the README only links to it.
 
 ## Code conventions
 
