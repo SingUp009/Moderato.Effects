@@ -70,6 +70,19 @@ GetUserProfile
  └── WriteAuditLog  → IAuditLogger
 ```
 
+**結果（P2 後）:** `interface IProfileDeps : IHas<...>` を4つ束ね、`static class Profiles<R> where R : IProfileDeps` に置けば、各関数の型は `Effect<T, E, R>` のままで増えない。R の表し方は変えない。見つかった点は2つ。
+
+1. 失敗しない `Effect<User?, Never, R>` の後に失敗しうる処理を `AndThen` でつなげない（E が Never から変わらない）。Gen で書けば自然に書ける（`return user ?? throw scope.Fail(new NotFound(id));`）。README ではこの書き方を勧める。
+2. ループの中で、`CancellationToken` に `default`（省略した既定値を含む）を渡す呼び出しの結果の union を switch すると、全ケースを書いても CS8655（null が網羅されていない）が出る。ライブラリと無関係に再現する RC2 のコンパイラの不具合。変数や `CancellationToken.None` を渡せば出ない。最小の再現コードで上流に報告する。
+
+```csharp
+foreach (var id in new[] { 1, 2 })
+{
+    var result = Get(default);   // Get(CancellationToken ct) => Result<Profile, AppError>
+    _ = result switch { Ok<Profile> => "a", Err<AppError>(NotFound) => "b", Err<AppError>(Forbidden) => "c" }; // CS8655
+}
+```
+
 ### タイミングを制御したテスト（G9）
 
 並行処理と Scope では、成功する場合よりも、失敗同士が競合する場合のテストが重要。`TaskCompletionSource` と `FakeTimeProvider` でタイミングを制御する。`Thread.Sleep` に頼るテストは、マシンの負荷で結果が変わるので書かない。
