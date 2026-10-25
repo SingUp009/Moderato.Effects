@@ -14,6 +14,15 @@ Effect System for C# on .NET 11 / C# 15 unions. Builds on Moderato.Results.
 - XML doc comments: short and to the point. A one-line `<summary>` of what the member does, plus `<param>` and `<returns>` where they add information.
 - Match Moderato.Results: naming, `ArgumentNullException.ThrowIfNull` on delegates, `default` structs are invalid, `ConfigureAwait(false)` inside the library.
 
+## Test conventions
+
+Tests are first-class documentation.
+
+- Cover the happy path, edge cases (if any), and error paths of each behavior.
+- Use Given-When-Then, marked with `// Given`, `// When`, `// Then`.
+- Write the When step exactly as a user would call the API. Do not call internals or test helpers there.
+- Name tests `<Method>_<Condition>_<ExpectedResult>()`.
+
 ## Build
 
 ```
