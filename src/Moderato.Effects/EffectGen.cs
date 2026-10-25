@@ -1,7 +1,7 @@
 namespace Moderato.Effects;
 
-/// <summary>Creates effects from Gen blocks.</summary>
-public static class Effect
+/// <summary>Creates effects that need no type argument for the environment, or that infer it.</summary>
+public static partial class Effect
 {
     /// <summary>An effect that runs the block each time it runs. Write the parameter's type: <c>Effect.Gen(async (Scope&lt;AppError, R&gt; scope) =&gt; ...)</c>.</summary>
     /// <param name="body">The block.</param>

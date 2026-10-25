@@ -17,6 +17,9 @@ public sealed class Scope<E, R>
     private readonly RunContext _context;
     private readonly Releases<R> _releases = new();
     private ImmutableArray<Suppressed>.Builder? _suppressed;
+    private int _omitted;
+    private ExceptionDispatchInfo? _rethrown;
+    private bool _rethrownConsequential;
     private bool _failed;
     private E _error = default!;
     private int _busy;
@@ -150,19 +153,23 @@ public sealed class Scope<E, R>
         }
         catch (Exception exception)
         {
-            outcome = Defects.From<T, E>(exception, _context);
+            // A Die rethrown by Run keeps its own classification; the token may have been canceled only afterwards.
+            outcome = _rethrown is { } rethrown && ReferenceEquals(exception, rethrown.SourceException)
+                ? Outcome<T, E>.Die(rethrown, consequential: _rethrownConsequential)
+                : Defects.From<T, E>(exception, _context);
             // An Err that came first is kept as context for the defect or interruption that replaced it.
             if (_failed) AddSuppressed(new Suppressed(ExitCases.Failed(_error), Relation.Sequential));
         }
 
         _closed = true;
-        if (_suppressed is { Count: > 0 }) outcome = outcome.After(_suppressed.ToImmutable());
+        if (_suppressed is { Count: > 0 } || _omitted > 0) outcome = outcome.After(_suppressed?.ToImmutable() ?? [], _omitted);
         return await _releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);
     }
 
     private T Unwrap<T>(Outcome<T, E> outcome)
     {
-        if (!outcome.Suppressed.IsEmpty) AddSuppressed(outcome.Suppressed);
+        AddSuppressed(outcome.Suppressed);
+        _omitted += outcome.Omitted;
 
         switch (outcome.Kind)
         {
@@ -171,6 +178,8 @@ public sealed class Scope<E, R>
             case OutcomeKind.Err:
                 throw Record(outcome.Error);
             case OutcomeKind.Die:
+                _rethrown = outcome.Defect;
+                _rethrownConsequential = outcome.Consequential;
                 outcome.Defect!.Throw();
                 return default!;
             default:
@@ -211,9 +220,17 @@ public sealed class Scope<E, R>
 
     private void Leave() => Volatile.Write(ref _busy, 0);
 
-    private void AddSuppressed(Suppressed failure) => (_suppressed ??= ImmutableArray.CreateBuilder<Suppressed>()).Add(failure);
+    private void AddSuppressed(Suppressed failure)
+    {
+        _suppressed ??= ImmutableArray.CreateBuilder<Suppressed>();
+        if (_suppressed.Count < SuppressedLimit.Max) _suppressed.Add(failure);
+        else _omitted++;
+    }
 
-    private void AddSuppressed(ImmutableArray<Suppressed> failures) => (_suppressed ??= ImmutableArray.CreateBuilder<Suppressed>()).AddRange(failures);
+    private void AddSuppressed(ImmutableArray<Suppressed> failures)
+    {
+        foreach (var failure in failures) AddSuppressed(failure);
+    }
 }
 
 /// <summary>Scope operations that accept a case of the scope's error union.</summary>

@@ -8,6 +8,9 @@ public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppress
     /// <summary>Enables <c>Die(var exception)</c> patterns.</summary>
     /// <param name="exception">The defect.</param>
     public void Deconstruct(out Exception exception) => exception = Exception;
+
+    /// <summary>How many suppressed failures were left out of <see cref="Suppressed"/> because there were too many.</summary>
+    public int OmittedSuppressed { get; init; }
 }
 
 /// <summary>The run ended because the caller's token was canceled.</summary>

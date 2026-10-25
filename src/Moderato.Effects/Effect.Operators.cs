@@ -12,7 +12,7 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(mapper);
         return Then<U, E>((outcome, _, _) => new(outcome.Kind == OutcomeKind.Ok
-            ? Outcome<U, E>.Ok(mapper(outcome.Value)).After(outcome.Suppressed)
+            ? Outcome<U, E>.Ok(mapper(outcome.Value)).After(outcome)
             : outcome.WithValueType<U>()));
     }
 
@@ -23,7 +23,7 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(mapper);
         return Then<T, F>((outcome, _, _) => new(outcome.Kind == OutcomeKind.Err
-            ? Outcome<T, F>.Err(mapper(outcome.Error)).After(outcome.Suppressed)
+            ? Outcome<T, F>.Err(mapper(outcome.Error)).After(outcome)
             : outcome.WithErrorType<F>()));
     }
 
@@ -34,7 +34,7 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(binder);
         return Then<U, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(binder(outcome.Value).Run(env, context), next => next.After(outcome.Suppressed))
+            ? Steps.Then(binder(outcome.Value).Run(env, context), next => next.After(outcome))
             : new(outcome.WithValueType<U>()));
     }
 
@@ -46,8 +46,8 @@ public readonly partial struct Effect<T, E, R>
         ArgumentNullException.ThrowIfNull(check);
         return Then<T, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
             ? Steps.Then(check(outcome.Value).Run(env, context), next => (next.Kind == OutcomeKind.Ok
-                ? Outcome<T, E>.Ok(outcome.Value).After(next.Suppressed)
-                : next.WithValueType<T>()).After(outcome.Suppressed))
+                ? Outcome<T, E>.Ok(outcome.Value).After(next)
+                : next.WithValueType<T>()).After(outcome))
             : new(outcome));
     }
 
@@ -101,7 +101,7 @@ public readonly partial struct Effect<T, E, R>
         ArgumentNullException.ThrowIfNull(err);
         return Then<U, Never>((outcome, _, _) => new(outcome.Kind switch
         {
-            OutcomeKind.Ok => Outcome<U, Never>.Ok(ok(outcome.Value)).After(outcome.Suppressed),
+            OutcomeKind.Ok => Outcome<U, Never>.Ok(ok(outcome.Value)).After(outcome),
             OutcomeKind.Err => Handled(outcome, err(outcome.Error)),
             _ => outcome.WithTypes<U, Never>(),
         }));
@@ -126,7 +126,7 @@ public readonly partial struct Effect<T, E, R>
     /// <returns>An effect that cannot fail, whose value is the result.</returns>
     public Effect<Result<T, E>, Never, R> Attempt() => Then<Result<T, E>, Never>(static (outcome, _, _) => new(outcome.Kind switch
     {
-        OutcomeKind.Ok => Outcome<Result<T, E>, Never>.Ok(new Result<T, E>(new Ok<T>(outcome.Value))).After(outcome.Suppressed),
+        OutcomeKind.Ok => Outcome<Result<T, E>, Never>.Ok(new Result<T, E>(new Ok<T>(outcome.Value))).After(outcome),
         OutcomeKind.Err => Handled(outcome, new Result<T, E>(new Err<E>(outcome.Error))),
         _ => outcome.WithTypes<Result<T, E>, Never>(),
     }));
@@ -189,14 +189,14 @@ public readonly partial struct Effect<T, E, R>
             }
             catch (Exception exception)
             {
-                return new(Defects.From<U, F>(exception, context).After(outcome.Suppressed));
+                return new(Defects.From<U, F>(exception, context).After(outcome));
             }
         }
     }
 
     private static Outcome<T, Never> Recover<TState>(Outcome<T, E> outcome, Func<TState, E, T> fallback, TState state) => outcome.Kind switch
     {
-        OutcomeKind.Ok => Outcome<T, Never>.Ok(outcome.Value).After(outcome.Suppressed),
+        OutcomeKind.Ok => Outcome<T, Never>.Ok(outcome.Value).After(outcome),
         OutcomeKind.Err => Handled(outcome, fallback(state, outcome.Error)),
         _ => outcome.WithTypes<T, Never>(),
     };

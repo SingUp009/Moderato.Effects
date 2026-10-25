@@ -53,14 +53,16 @@ internal sealed class Releases<R>
     private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<ExceptionDispatchInfo> defects)
     {
         var releaseFailures = defects.Select(d => new Suppressed(ExitCases.Die(d), Relation.Sequential));
-        if (body.Kind == OutcomeKind.Die)
-            return Outcome<T, E>.Die(body.Defect!, body.Suppressed.AddRange(releaseFailures));
+        if (body.Kind == OutcomeKind.Die && !body.Consequential)
+            return Outcome<T, E>.Die(body.Defect!, body.Suppressed.AddRange(releaseFailures), omitted: body.Omitted);
 
+        // A release defect is independent, so it outranks a body defect that only followed from cancellation.
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
-        if (ExitCases.FailureOf(body) is { } bodyFailure) suppressed.Add(new Suppressed(bodyFailure, Relation.Sequential));
+        if (ExitCases.FailureOf(body) is { } bodyFailure)
+            suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));
         suppressed.AddRange(body.Suppressed);
         suppressed.AddRange(releaseFailures.Skip(1));
-        return Outcome<T, E>.Die(defects[0], suppressed.ToImmutable());
+        return Outcome<T, E>.Die(defects[0], suppressed.ToImmutable(), omitted: body.Omitted);
     }
 }
 
@@ -74,13 +76,16 @@ internal static class ExitCases
     {
         OutcomeKind.Ok => s_succeeded,
         OutcomeKind.Err => new Failed(outcome.Error),
-        OutcomeKind.Die => new Die(outcome.Defect!.SourceException, outcome.Suppressed),
+        OutcomeKind.Die => ToDie(outcome),
         _ => s_interrupted,
     };
 
     /// <summary>The outcome as a suppressed failure, or <see langword="null"/> if it succeeded.</summary>
     internal static ExitCase? FailureOf<T, E>(Outcome<T, E> outcome)
         => outcome.Kind == OutcomeKind.Ok ? null : (ExitCase?)From(outcome);
+
+    internal static Die ToDie<T, E>(Outcome<T, E> outcome)
+        => new(outcome.Defect!.SourceException, outcome.Suppressed) { OmittedSuppressed = outcome.Omitted };
 
     internal static ExitCase Die(ExceptionDispatchInfo defect) => new Die(defect.SourceException, []);
 

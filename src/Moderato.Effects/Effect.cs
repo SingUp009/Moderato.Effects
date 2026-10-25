@@ -98,7 +98,7 @@ public readonly partial struct Effect<T, E, R>
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Err<E>(outcome.Error));
             case OutcomeKind.Die:
-                return new(new Die(outcome.Defect!.SourceException, outcome.Suppressed));
+                return new(ExitCases.ToDie(outcome));
             default:
                 return new(new Interrupted());
         }

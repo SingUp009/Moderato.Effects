@@ -58,3 +58,41 @@ public sealed class Clock(DateTimeOffset now) : IHas<TimeProvider>
         public override DateTimeOffset GetUtcNow() => now;
     }
 }
+
+public sealed class TimeEnvironment(TimeProvider time) : IHas<TimeProvider>
+{
+    TimeProvider IHas<TimeProvider>.Service => time;
+}
+
+public partial union RequestError(NotFound, TimeoutError);
+
+public partial union RequestError : IUnionCase<RequestError, NotFound>, IUnionCase<RequestError, TimeoutError>
+{
+    static RequestError IUnionCase<RequestError, NotFound>.From(NotFound value) => value;
+
+    static RequestError IUnionCase<RequestError, TimeoutError>.From(TimeoutError value) => value;
+
+    static bool IUnionCase<RequestError, NotFound>.TryGet(RequestError self, out NotFound value)
+    {
+        if (self is NotFound found)
+        {
+            value = found;
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+
+    static bool IUnionCase<RequestError, TimeoutError>.TryGet(RequestError self, out TimeoutError value)
+    {
+        if (self is TimeoutError timeout)
+        {
+            value = timeout;
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+}
