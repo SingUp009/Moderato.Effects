@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Moderato.Effects\Moderato.Effects.csproj" />
+    <!-- The package brings the generators and analyzers along; a project reference has to name them. -->
+    <ProjectReference Include="..\..\src\Moderato.Effects.SourceGenerator\Moderato.Effects.SourceGenerator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
