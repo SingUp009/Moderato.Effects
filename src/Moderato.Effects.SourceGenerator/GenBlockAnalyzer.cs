@@ -46,8 +46,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         if (body is null) return;
 
         AnalyzeScopeUses(context, function, body, scopes);
-        AnalyzeCatchClauses(context, function, body);
-        AnalyzeBlockingWaits(context, function, body);
+        AnalyzeCatchClauses(context, body);
+        AnalyzeBlockingWaits(context, body);
     }
 
     private static void AnalyzeScopeUses(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body, ImmutableArray<IParameterSymbol> scopes)
@@ -108,7 +108,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         _ => false,
     };
 
-    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body)
+    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode body)
     {
         foreach (var clause in body.DescendantNodes(static n => !IsFunction(n)).OfType<CatchClauseSyntax>())
         {
@@ -131,7 +131,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     private static bool UsesScope(SemanticModel model, SyntaxNode node)
         => node.DescendantNodes().OfType<IdentifierNameSyntax>().Any(i => IsScope(model.GetTypeInfo(i).Type));
 
-    private static void AnalyzeBlockingWaits(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body)
+    private static void AnalyzeBlockingWaits(SyntaxNodeAnalysisContext context, SyntaxNode body)
     {
         foreach (var access in body.DescendantNodes(static n => !IsFunction(n)).OfType<MemberAccessExpressionSyntax>())
         {

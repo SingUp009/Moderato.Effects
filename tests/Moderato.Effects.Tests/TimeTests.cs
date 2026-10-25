@@ -54,7 +54,7 @@ public class SleepTests
 
 public class TimeoutTests
 {
-    private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan s_oneSecond = TimeSpan.FromSeconds(1);
 
     private static Effect<User, RequestError, TimeEnvironment> SlowFindUser(TimeSpan delay)
         => Scope<RequestError, TimeEnvironment>.Gen(async scope =>
@@ -71,7 +71,7 @@ public class TimeoutTests
         var findUser = SlowFindUser(TimeSpan.FromMilliseconds(500));
 
         // When
-        var running = findUser.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        var running = findUser.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
         time.Advance(TimeSpan.FromMilliseconds(500));
         var result = await running;
 
@@ -88,13 +88,13 @@ public class TimeoutTests
         var findUser = SlowFindUser(TimeSpan.FromMinutes(1));
 
         // When
-        var running = findUser.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = findUser.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var result = await running;
 
         // Then
         Assert.True(result.TryGetErr(out var error));
-        Assert.Equal(new TimeoutError(OneSecond), error.Value);
+        Assert.Equal(new TimeoutError(s_oneSecond), error.Value);
     }
 
     [Fact]
@@ -105,12 +105,12 @@ public class TimeoutTests
         var nap = Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1));
 
         // When
-        var running = nap.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = nap.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         Result<Unit, TimeoutError> result = await running;
 
         // Then
-        Assert.Equal<Result<Unit, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), result);
+        Assert.Equal<Result<Unit, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), result);
     }
 
     [Fact]
@@ -121,9 +121,9 @@ public class TimeoutTests
         Effect<Unit, string, TimeEnvironment> nap = Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1));
 
         // When
-        var running = nap.Timeout(OneSecond, onTimeout: t => $"gave up after {t.After.TotalSeconds}s")
+        var running = nap.Timeout(s_oneSecond, onTimeout: t => $"gave up after {t.After.TotalSeconds}s")
             .RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        time.Advance(s_oneSecond);
         var result = await running;
 
         // Then
@@ -138,13 +138,13 @@ public class TimeoutTests
         var findUser = SlowFindUser(TimeSpan.FromMinutes(1));
 
         // When
-        var running = findUser.TimeoutResult(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = findUser.TimeoutResult(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var result = await running;
 
         // Then
         Assert.True(result.TryGetOk(out var inner));
-        Assert.Equal<Result<User, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), inner);
+        Assert.Equal<Result<User, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), inner);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class TimeoutTests
         var findUser = SlowFindUser(TimeSpan.Zero);
 
         // When
-        var result = await findUser.TimeoutResult(OneSecond).RunAsync(new TimeEnvironment(new FakeTimeProvider()), TestContext.Current.CancellationToken);
+        var result = await findUser.TimeoutResult(s_oneSecond).RunAsync(new TimeEnvironment(new FakeTimeProvider()), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(result.TryGetOk(out var inner));
@@ -168,7 +168,7 @@ public class TimeoutTests
         Effect<User, RequestError, TimeEnvironment> findUser = Effect<TimeEnvironment>.Fail<RequestError>(new NotFound(7));
 
         // When
-        var result = await findUser.Timeout(OneSecond).RunAsync(new TimeEnvironment(new FakeTimeProvider()), TestContext.Current.CancellationToken);
+        var result = await findUser.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(new FakeTimeProvider()), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(result.TryGetErr(out var error));
@@ -189,12 +189,12 @@ public class TimeoutTests
         });
 
         // When
-        var running = work.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = work.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var result = await running;
 
         // Then
-        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), result);
+        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), result);
         Assert.Equal(["released"], log);
     }
 
@@ -211,15 +211,15 @@ public class TimeoutTests
         });
 
         // When
-        var running = stubborn.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = stubborn.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var returnedAtTheLimit = running.IsCompleted;
         gate.SetResult();
         var result = await running;
 
         // Then
         Assert.False(returnedAtTheLimit);
-        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), result);
+        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), result);
     }
 
     [Fact]
@@ -236,13 +236,13 @@ public class TimeoutTests
         });
 
         // When
-        var running = work.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = work.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         gate.SetResult();
         var result = await running;
 
         // Then
-        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), result);
+        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), result);
     }
 
     [Fact]
@@ -258,13 +258,13 @@ public class TimeoutTests
         });
 
         // When
-        var running = work.Timeout(OneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = work.Timeout(s_oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         gate.SetResult();
         var result = await running;
 
         // Then
-        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(OneSecond)), result);
+        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(s_oneSecond)), result);
     }
 
     [Fact]
@@ -280,14 +280,14 @@ public class TimeoutTests
         });
 
         // When
-        var running = work.Timeout(OneSecond).RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = work.Timeout(s_oneSecond).RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var exit = await running;
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.IsType<IOException>(die.Exception);
-        Assert.Equal([new Suppressed(new Failed(new TimeoutError(OneSecond)), Relation.Sequential)], die.Suppressed);
+        Assert.Equal([new Suppressed(new Failed(new TimeoutError(s_oneSecond)), Relation.Sequential)], die.Suppressed);
     }
 
     [Fact]
@@ -304,8 +304,8 @@ public class TimeoutTests
         var outer = Scope<TimeoutError, TimeEnvironment>.Gen(async scope => await scope.Run(inner) + 1);
 
         // When
-        var running = outer.Timeout(OneSecond).RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
-        time.Advance(OneSecond);
+        var running = outer.Timeout(s_oneSecond).RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(s_oneSecond);
         var exit = await running;
 
         // Then
@@ -328,8 +328,8 @@ public class TimeoutTests
         });
 
         // When
-        var running = work.Timeout(OneSecond).RunExitAsync(new TimeEnvironment(time), cts.Token).AsTask();
-        time.Advance(OneSecond);
+        var running = work.Timeout(s_oneSecond).RunExitAsync(new TimeEnvironment(time), cts.Token).AsTask();
+        time.Advance(s_oneSecond);
         await cts.CancelAsync();
         gate.SetResult();
         var exit = await running;
@@ -342,7 +342,7 @@ public class TimeoutTests
     public void Timeout_NegativeLimit_Throws()
     {
         // Given
-        var nap = Effect.Sleep<TimeEnvironment>(OneSecond);
+        var nap = Effect.Sleep<TimeEnvironment>(s_oneSecond);
 
         // When
         void Act() => nap.Timeout(TimeSpan.FromSeconds(-1));

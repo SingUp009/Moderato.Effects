@@ -412,7 +412,7 @@ public class WidenTests
 
 public class CatchCaseTests
 {
-    private static readonly User Guest = new(0, "guest");
+    private static readonly User s_guest = new(0, "guest");
 
     [Fact]
     public async Task CatchCase_TheCaughtCase_RecoversWithAnEffectThatCannotFail()
@@ -421,11 +421,11 @@ public class CatchCaseTests
         Effect<User, AppError, EmptyEnvironment> findUser = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
 
         // When
-        var result = await findUser.CatchCase((NotFound _) => Effect<EmptyEnvironment>.Succeed(Guest)).RunAsync(TestContext.Current.CancellationToken);
+        var result = await findUser.CatchCase((NotFound _) => Effect<EmptyEnvironment>.Succeed(s_guest)).RunAsync(TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(result.TryGetOk(out var user));
-        Assert.Same(Guest, user);
+        Assert.Same(s_guest, user);
     }
 
     [Fact]
@@ -435,7 +435,7 @@ public class CatchCaseTests
         Effect<User, AppError, EmptyEnvironment> findUser = Effect<EmptyEnvironment>.Fail<AppError>(new Forbidden("inactive"));
 
         // When
-        var result = await findUser.CatchCase((NotFound _) => Effect<EmptyEnvironment>.Succeed(Guest)).RunAsync(TestContext.Current.CancellationToken);
+        var result = await findUser.CatchCase((NotFound _) => Effect<EmptyEnvironment>.Succeed(s_guest)).RunAsync(TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(result.TryGetErr(out var error));

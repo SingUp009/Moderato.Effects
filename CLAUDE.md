@@ -28,6 +28,8 @@ Tests are first-class documentation.
 
 ```
 dotnet test -c Release
+dotnet format whitespace --verify-no-changes
+dotnet format style --verify-no-changes --severity warn
 dotnet run --project samples/Moderato.Effects.Samples
 dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*'
 ```

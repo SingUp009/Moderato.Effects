@@ -140,6 +140,7 @@ public static class Bank
     public static Effect<int, Overdrawn, EmptyEnvironment> Transfer(Transaction tx, int amount)
     {
         const int balance = 300;
+        Console.WriteLine($"  transfer {amount} in transaction {tx.Id}");
         return amount <= balance ? Effect<EmptyEnvironment>.Succeed(balance - amount) : Effect<EmptyEnvironment>.Fail(new Overdrawn(amount - balance));
     }
 }
