@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Moderato.Effects.SourceGenerator;
 
 namespace Moderato.Effects.SourceGenerator.Tests;
@@ -12,10 +13,12 @@ public sealed record Build(ImmutableArray<Diagnostic> Diagnostics, ImmutableDict
 
     public IEnumerable<string> Warnings => Diagnostics.Where(static d => d.Severity == DiagnosticSeverity.Warning).Select(static d => d.Id);
 
+    public IEnumerable<string> Ids => Diagnostics.Select(static d => d.Id);
+
     public Diagnostic Single(string id) => Assert.Single(Diagnostics, d => d.Id == id);
 }
 
-/// <summary>Builds user code the way the SDK does: with the library, Moderato.Results and the source generators.</summary>
+/// <summary>Builds user code the way the SDK does: with the library, Moderato.Results, the source generators and the analyzers.</summary>
 public static class Compiler
 {
     private static readonly CSharpParseOptions s_parseOptions = new(LanguageVersion.Preview);
@@ -49,6 +52,14 @@ public static class Compiler
         var generated = driver.GetRunResult().Results
             .SelectMany(static r => r.GeneratedSources)
             .ToImmutableDictionary(static s => s.HintName, static s => s.SourceText.ToString());
-        return new Build([.. generatorDiagnostics, .. output.GetDiagnostics()], generated);
+        var analyzerDiagnostics = output
+            .WithAnalyzers([new GenBlockAnalyzer(), new ClockAnalyzer(), new CatchAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult();
+        // Hidden diagnostics are IDE hints such as unnecessary usings; a build never shows them.
+        ImmutableArray<Diagnostic> shown = [.. generatorDiagnostics.Concat(output.GetDiagnostics()).Concat(analyzerDiagnostics)
+            .Where(static d => d.Severity != DiagnosticSeverity.Hidden)];
+        return new Build(shown, generated);
     }
 }

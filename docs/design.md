@@ -550,6 +550,24 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF201 | Error | `[RestOf<E>]` の E が union ではない |
 | MEFF202 | Error | E の case のうち、ちょうど1つを除いたものになっていない |
 
+**Analyzer（P7）**：指摘の文章は、Roslyn やほかの Analyzer にならって短い英文にする（生成器の診断も同じ）。Analyzer は生成器と同じアセンブリに入れる。
+
+| ID | 重要度 | 検出するもの | 文章 |
+|---|---|---|---|
+| MEFF301 | Warning | Gen の中で、scope を使う `try` を囲む、すべての例外を捕まえる `catch`（`when` なし、`throw;` で投げ直さないもの） | Catch clause swallows ScopeFailure; filter it out with 'when (ex is not ScopeFailure)' |
+| MEFF302 | Warning | `finally` と、すべての例外を捕まえる `catch` の中の `scope.Run` / `Get` / `Acquire` / `Fork` | '{0}' does not run after an Err; use 'scope.Defer' for cleanup |
+| MEFF303 | Warning | 入れ子の関数（ラムダ、ローカル関数、入れ子の Gen）の中での scope の使用（G2 / F21） | Scope '{0}' is used in a nested function; use it only in its own Gen block |
+| MEFF304 | Warning | scope のフィールドやプロパティへの代入、`return` | Scope '{0}' escapes its Gen block |
+| MEFF305 | Warning | ループの中の `scope.Acquire` / `Defer` / `Fork` | '{0}' in a loop holds each resource until the Gen block ends; use a nested Gen block or 'Use' |
+| MEFF306 | Warning | Gen の中の `.Result` / `.Wait()` / `GetAwaiter().GetResult()` | '{0}' blocks the thread; use 'await' |
+| MEFF307 | Info | Gen の中と `Effect<R>` の作る API の引数（ラムダと `Succeed` の値）での、時計の直接使用（D14 の一覧に `DateTime.Today` と `Stopwatch.StartNew` を加えた） | '{0}' reads the system clock; use {1} |
+| MEFF308 | Error | `Catch<TCase, F>` で、F が `[RestOf<E>]` ではない（CS0315 の言い換え） | '{0}' is not declared [RestOf<{1}>] |
+| MEFF309 | Error | `Catch<TCase, F>` で、F が除いた case と TCase が違う（CS0315 の言い換え） | '{0}' leaves out '{1}', not '{2}' |
+
+- `catch (FormatException)` のような型を指定した `catch` の中の `scope.Run` は、Err の後には実行されないので指摘しない（その `catch` は ScopeFailure を捕まえないため）。
+- scope をヘルパーメソッドの引数に渡すことは、同じ流れの中で使う限り安全なので指摘しない。
+- ライブラリのテストでは、誤用しても実行時に安全側に倒れることを示すテストに限り、`#pragma warning disable` で抑止している。
+
 ### D14. 標準サービス
 
 **原則**：ライブラリ自身の操作が必要とするものだけを、標準サービスとする。

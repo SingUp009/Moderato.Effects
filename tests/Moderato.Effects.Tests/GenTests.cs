@@ -374,6 +374,8 @@ public class SwallowedErrTests
         var commit = Effect<EmptyEnvironment>.Sync(() => ++commits);
         var effect = Scope<AppError, EmptyEnvironment>.Gen(async scope =>
         {
+            // These tests swallow ScopeFailure on purpose to show the runtime still keeps the Err.
+#pragma warning disable MEFF301
             try
             {
                 throw scope.Fail(new Forbidden("invalid order"));
@@ -381,6 +383,7 @@ public class SwallowedErrTests
             catch (Exception)
             {
             }
+#pragma warning restore MEFF301
 
             return await scope.Run(commit);
         });
@@ -401,6 +404,8 @@ public class SwallowedErrTests
         var effect = Scope<AppError, EmptyEnvironment>.Gen(async scope =>
         {
             await Task.Yield();
+            // These tests swallow ScopeFailure on purpose to show the runtime still keeps the Err.
+#pragma warning disable MEFF301
             try
             {
                 scope.Fail(new NotFound(1));
@@ -408,6 +413,7 @@ public class SwallowedErrTests
             catch (Exception)
             {
             }
+#pragma warning restore MEFF301
 
             return "looks fine";
         });
@@ -461,7 +467,10 @@ public class SwallowedErrTests
             }
             finally
             {
+                // Shows that a step in a finally block does not run after an Err.
+#pragma warning disable MEFF302
                 await scope.Run(rollback);
+#pragma warning restore MEFF302
             }
         });
 
@@ -657,7 +666,10 @@ public class ScopeMisuseTests
             return await outer.Run(Scope<Never, EmptyEnvironment>.Gen<int>(async inner =>
             {
                 await Task.Yield();
+                // Shows that the runtime rejects the outer scope inside a nested Gen block.
+#pragma warning disable MEFF303
                 throw outer.Fail(new Forbidden("from inside"));
+#pragma warning restore MEFF303
             }));
         });
 

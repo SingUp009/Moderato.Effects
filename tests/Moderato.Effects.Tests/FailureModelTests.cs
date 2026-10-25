@@ -34,7 +34,10 @@ public class FailureModelTests
             for (var i = 0; i < 150; i++)
             {
                 var n = i;
+                // Registers many releases on purpose to exceed the suppressed limit.
+#pragma warning disable MEFF305
                 scope.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw new IOException($"release {n}")));
+#pragma warning restore MEFF305
             }
 
             await Task.Yield();
