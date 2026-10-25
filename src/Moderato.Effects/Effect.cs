@@ -10,7 +10,7 @@ namespace Moderato.Effects;
 /// or fails with <typeparamref name="E"/>. Nothing runs until <see cref="RunAsync"/>; every run starts over. <c>default</c> is invalid.
 /// </summary>
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
-public readonly struct Effect<T, E, R>
+public readonly partial struct Effect<T, E, R>
 {
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? _run;
 
@@ -72,10 +72,11 @@ public readonly struct Effect<T, E, R>
         switch (outcome.Kind)
         {
             case OutcomeKind.Ok:
-                ReportSuppressedDefects(outcome.Suppressed);
+                // Results' Ok and Err have nowhere to carry suppressed failures, so defects among them would vanish silently.
+                UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Result<T, E>(new Ok<T>(outcome.Value)));
             case OutcomeKind.Err:
-                ReportSuppressedDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Result<T, E>(new Err<E>(outcome.Error)));
             case OutcomeKind.Die:
                 var exception = outcome.Defect!.SourceException;
@@ -91,24 +92,15 @@ public readonly struct Effect<T, E, R>
         switch (outcome.Kind)
         {
             case OutcomeKind.Ok:
-                ReportSuppressedDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Ok<T>(outcome.Value));
             case OutcomeKind.Err:
-                ReportSuppressedDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Err<E>(outcome.Error));
             case OutcomeKind.Die:
                 return new(new Die(outcome.Defect!.SourceException, outcome.Suppressed));
             default:
                 return new(new Interrupted());
-        }
-    }
-
-    // Results' Ok and Err have nowhere to carry suppressed failures, so defects among them would vanish silently.
-    private static void ReportSuppressedDefects(ImmutableArray<Suppressed> suppressed)
-    {
-        foreach (var failure in suppressed)
-        {
-            if (failure.Case is Die die) UnobservedFailures.Report(die.Exception);
         }
     }
 

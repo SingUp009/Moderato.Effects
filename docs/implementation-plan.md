@@ -16,7 +16,9 @@
 | S1 | `Effect` / `Effect<R>` / `Effect<T, E, R>` / `Scope<E, R>.Gen` / `Effect.Gen(...)` の共存と型推論。Never の2つの暗黙変換と LINQ の4通りの `SelectMany`。作る API、`scope.Run` / `Get`（case 版を含む）、`throw scope.Fail`、`Attempt`、`Widen`、`Sleep`、`Timeout`（union / Never）、`All`、`EmptyEnvironment` の `RunAsync(ct)` | **33ケースすべて期待どおり**（成功すべき28ケースが通り、失敗すべき5ケースがコンパイルエラーになる）。ただし設計を1点修正：`CatchCase` は拡張メソッドにし、`CatchCase((NotFound nf) => ...)` の形にする。ハンドラが Never の Effect を返す版のオーバーロードも必要（D13） |
 | S2 | netstandard2.0 の Source Generator が `union` を検出し、`partial union` にコードを足せるか | **できる**。Roslyn 4.14 で作った Generator が SDK の Roslyn 5.12 の上で動く。ただし、ソースの union には `[Union]` 属性が見えないので、検出は `IUnion` の実装で行う（D13） |
 
-S1 の33ケースは、P1 で回帰テストとしてテストプロジェクトに移す（型推論や変換の結果が、SDK の更新で変わっていないことを確かめるため）。
+S1 の33ケースは、回帰テストとしてテストプロジェクトに移す（型推論や変換の結果が、SDK の更新で変わっていないことを確かめるため）。
+- 成功すべきケースは、使う API ができた段階で、その段階のテストとして書く。P1 で、LINQ の4通り、`AndThen` の推論、`Widen`、`CatchCase`、`Result` からの変換、`EmptyEnvironment` の `RunAsync(ct)` を移した。Gen（P2）、`Sleep` / `Timeout`（P3）、`All`（P4）のケースは、それぞれの段階で移す。
+- コンパイルエラーになるべきケース（5件）は、実行するテストでは確かめられないので、Roslyn を使える `Moderato.Effects.SourceGenerator.Tests`（P6）で、コンパイルして診断を確かめるテストとして書く。
 
 それ以前に、設計の見直しの中で RC2 を使って確認したこと：
 
@@ -42,7 +44,7 @@ S1 の33ケースは、P1 で回帰テストとしてテストプロジェクト
 | P1 | **Effect 本体**：`Effect<T, E, R>`、内部の実行結果（`Outcome` / `RunContext`、D18）、`Never`、Never の2つの暗黙変換、`IHas<T>` / `Resolve`、`EmptyEnvironment` / `DefaultEnvironment`、作る API（`Effect<R>` の `Succeed` / `Fail` / `Sync` / `Async` / `FromResult(Async)` / `Try(Async)`（専用実装）/ `Access(Async)` / `Env`）、`RunAsync` / `RunExitAsync`、`Exit` / `ExitCase`、Results と同じ操作、`Attempt`、LINQ（Never のオーバーロードを含む）、`Provide` / `WidenEnv`、`IUnionCase` と `Widen<F>` / `CatchCase` | D1, D3, D5〜D7, D12, D16, D18 |
 | P2 | **Gen**：`Scope<E, R>`、`Scope<E, R>.Gen` / `Effect.Gen`、`Run` / `Get` / `Fail` / `Defer`、`ScopeFailure`（どの scope が投げたかを持つ）、Err の後に即座に巻き戻る仕組み、閉じた scope・同時に使った scope・入れ子の Gen での外側の scope の検出、`scope.CancellationToken` | D2, D4, D11 |
 | **安全な実行系** | | |
-| P3 | **リソースと失敗の扱い**：`Resource<T, E, R>`、`Make` / `Use` / LINQ、`scope.Acquire`、解放の規則（ExitCase の確定時点、解放処理の失敗の集約）、キャンセルの理由と、失敗の分類・優先順位（D18）、付属情報の Die の報告、`Sleep`、`Timeout` / `TimeoutResult` | D7〜D9, D14, D18 |
+| P3 | **リソースと失敗の扱い**：付属情報の上限（D18。付属情報を作る操作が P3 から出てくるため）、`Resource<T, E, R>`、`Make` / `Use` / LINQ、`scope.Acquire`、解放の規則（ExitCase の確定時点、解放処理の失敗の集約）、キャンセルの理由と、失敗の分類・優先順位（D18）、付属情報の Die の報告、`Sleep`、`Timeout` / `TimeoutResult` | D7〜D9, D14, D18 |
 | **構造化並行性** | | |
 | P4 | **並行処理**：`Concurrency`、`All` / `AllSettled` / `AllErrors`、`Race` / `RaceFirst`、`Fork` / `Fiber` / `Join`、`OnThreadPool`、診断用ハンドラー | D10 |
 | **開発体験** | | |

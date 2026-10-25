@@ -43,6 +43,15 @@ internal readonly struct Outcome<T, E>
         ? throw new InvalidOperationException("An Ok outcome cannot change its value type.")
         : new(Kind, default!, Error, Defect, Suppressed);
 
+    /// <summary>Carries a Die or Interrupted outcome over to other value and error types.</summary>
+    internal Outcome<U, F> WithTypes<U, F>() => Kind is OutcomeKind.Ok or OutcomeKind.Err
+        ? throw new InvalidOperationException("Only Die and Interrupted outcomes can change both types.")
+        : new(Kind, default!, default!, Defect, Suppressed);
+
+    /// <summary>Puts failures suppressed by earlier steps in front of this outcome's own.</summary>
+    internal Outcome<T, E> After(ImmutableArray<Suppressed> earlier)
+        => earlier.IsDefaultOrEmpty ? this : new(Kind, Value, Error, Defect, earlier.AddRange(Suppressed));
+
     /// <summary>Carries a non-Err outcome over to another error type.</summary>
     internal Outcome<T, F> WithErrorType<F>() => Kind == OutcomeKind.Err
         ? throw new InvalidOperationException("An Err outcome cannot change its error type.")
