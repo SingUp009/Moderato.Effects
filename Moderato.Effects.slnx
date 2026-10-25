@@ -4,6 +4,7 @@
     <Project Path="src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Moderato.Effects.SourceGenerator.Tests/Moderato.Effects.SourceGenerator.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.Tests/Moderato.Effects.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">

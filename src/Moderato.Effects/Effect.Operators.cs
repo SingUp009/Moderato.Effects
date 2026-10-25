@@ -131,6 +131,24 @@ public readonly partial struct Effect<T, E, R>
         _ => outcome.WithTypes<Result<T, E>, Never>(),
     }));
 
+    /// <summary>
+    /// Handles one case of the error union and removes it from the error type. Name the case and the union of the remaining cases,
+    /// declared with <c>[RestOf&lt;E&gt;]</c>: <c>Catch&lt;NotFound, AccessError&gt;(nf =&gt; ...)</c>.
+    /// </summary>
+    /// <param name="handler">Builds the recovery from the case.</param>
+    /// <returns>An effect whose error is the rest of the union.</returns>
+    public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) where F : IUnionRest<F, E, TCase>
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Then<T, F>((outcome, env, context) =>
+        {
+            if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
+            if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(Outcome<T, F>.Err(rest).After(outcome));
+            UnobservedFailures.ReportDefects(outcome.Suppressed);
+            return handler(caught).Run(env, context);
+        });
+    }
+
     /// <summary>Widens the error to a union that has it as a case.</summary>
     /// <returns>An effect with the union as its error.</returns>
     public Effect<T, F, R> Widen<F>() where F : IUnionCase<F, E> => MapErr(static error => F.From(error));

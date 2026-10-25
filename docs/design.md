@@ -527,6 +527,29 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 
 複数の case を一度に取り除く `Catch<A, B, F>` は、必要になったら追加する。それまでは `Catch` を2回つなげて書ける。
 
+**実装メモ（P6）**
+
+- 生成器は3つ（`ErrorGenerator` / `EnvironmentGenerator` / `RestOfGenerator`）。どれも Roslyn 4.14 に対して作り、SDK の新しいコンパイラの上で動く。
+- 生成器のテストは `Moderato.Effects.SourceGenerator.Tests` で、Roslyn 5.9.0（union をコンパイルできる最初の公開版）を使い、利用者のコードをテストの中でコンパイルして確かめる。S1 でコンパイルエラーになるべきとした5件と、jitter 付きの Schedule を `IHas<Random>` のない環境で使う場合も、ここでエラーコードまで確かめる。
+- 入れ子の union の case は、`(Middle)value` のように内側の union を経由して広げ、`self is Middle m && m is Inner found` のように順に狭める。
+- 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
+- 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
+- `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。
+- `[Environment]` で公開できない型を `[Expose<T>]` に指定したとき（MEFF104）と、同じ型が2回公開されるとき（MEFF103）は、何も生成しない。
+
+| ID | 重要度 | 内容 |
+|---|---|---|
+| MEFF001 | Error | `[Error]` / `[RestOf<E>]` の対象が partial union ではない |
+| MEFF002 | Error | ジェネリックな型には未対応 |
+| MEFF003 | Warning | 同じ case に届く道が複数ある |
+| MEFF004 | Error | 入れ子の型には未対応 |
+| MEFF101 | Error | `[Environment]` の対象が partial ではない |
+| MEFF102 | Error | `[Environment]` の対象にプライマリコンストラクタがない |
+| MEFF103 | Error | 同じ型のサービスを2つの引数が公開している |
+| MEFF104 | Error | `[Expose<T>]` の T として引数を公開できない |
+| MEFF201 | Error | `[RestOf<E>]` の E が union ではない |
+| MEFF202 | Error | E の case のうち、ちょうど1つを除いたものになっていない |
+
 ### D14. 標準サービス
 
 **原則**：ライブラリ自身の操作が必要とするものだけを、標準サービスとする。

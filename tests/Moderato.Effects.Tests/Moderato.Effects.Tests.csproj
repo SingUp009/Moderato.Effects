@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Moderato.Effects\Moderato.Effects.csproj" />
+    <ProjectReference Include="..\..\src\Moderato.Effects.SourceGenerator\Moderato.Effects.SourceGenerator.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
