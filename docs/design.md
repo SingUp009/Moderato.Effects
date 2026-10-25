@@ -392,7 +392,8 @@ Effect<R>.Try(() => ..., ex => new LegacyError(ex));
 
 - どの例外がどのエラー型に変わるかがシグネチャに出るので、予測しやすい。
 - 外部の API（JSON、HTTP、昔からあるライブラリなど）との境界で、関数として一度だけ定義するのが基本の使い方。必須ではなく、選択肢の1つ。
-- `Try` は `ScopeFailure` を必ず素通しする（`TException` が `Exception` の場合も同じ）。そのため、**`Effect<R>.Try` は Results の `Result.Try` を使わず、専用に実装する**（`catch (ScopeFailure) { throw; }` を先に置く。G2）。Results 側に `ScopeFailure` を認識させる設計にはしない（依存の向きを守る）。
+- `Try` は `ScopeFailure` を必ず素通しする（`TException` が `Exception` の場合も同じ）。
+  - 実装してみると、`Effect<R>.Try` の本体から scope を使う道はほぼない：`Try` の Effect は `scope.Run` の実行中に動くので、その中で scope を使うと「同時に使った」として検出され、`InvalidOperationException` になる（D11）。素通しは、その検出をすり抜けた場合に備える防御として残す（P2）。そのため、**`Effect<R>.Try` は Results の `Result.Try` を使わず、専用に実装する**（`catch (ScopeFailure) { throw; }` を先に置く。G2）。Results 側に `ScopeFailure` を認識させる設計にはしない（依存の向きを守る）。
 - `OperationCanceledException` の扱いは Results の `Result.Try` / `TryAsync` と同じ。
 
 **`Attempt()`：失敗を値として受け取る**（Effect-TS の `Effect.either`、cats-effect の `attempt` に相当）
