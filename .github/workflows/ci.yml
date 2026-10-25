@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 permissions:
@@ -20,6 +21,15 @@ jobs:
 
       - run: dotnet test -c Release
 
+      - name: Check the tag matches <Version>
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(dotnet msbuild src/Moderato.Effects -getProperty:Version)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$version</Version>"
+            exit 1
+          fi
+
       - run: dotnet pack src/Moderato.Effects -c Release -o artifacts
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -27,3 +37,33 @@ jobs:
           name: packages
           path: artifacts/
           if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write # NuGet Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: packages
+          path: artifacts
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          -s https://api.nuget.org/v3/index.json
+          -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          --skip-duplicate
