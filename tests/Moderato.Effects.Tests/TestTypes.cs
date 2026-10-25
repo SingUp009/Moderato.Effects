@@ -96,3 +96,54 @@ public partial union RequestError : IUnionCase<RequestError, NotFound>, IUnionCa
         return false;
     }
 }
+
+/// <summary>A clock that records each wait and lets it pass at once, so schedules can be checked without waiting.</summary>
+public sealed class RecordingClock : TimeProvider
+{
+    private readonly List<TimeSpan> _waits = [];
+    private long _now;
+
+    public IReadOnlyList<TimeSpan> Waits
+    {
+        get
+        {
+            lock (_waits) return [.. _waits];
+        }
+    }
+
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    public override long GetTimestamp() => Interlocked.Read(ref _now);
+
+    public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(GetTimestamp());
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        if (dueTime != Timeout.InfiniteTimeSpan)
+        {
+            lock (_waits) _waits.Add(dueTime);
+            Interlocked.Add(ref _now, dueTime.Ticks);
+            ThreadPool.QueueUserWorkItem(_ => callback(state));
+        }
+
+        return new IdleTimer();
+    }
+
+    private sealed class IdleTimer : ITimer
+    {
+        public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+        public void Dispose()
+        {
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}
+
+public sealed class RetryEnvironment(TimeProvider time, Random random) : IHas<TimeProvider>, IHas<Random>
+{
+    TimeProvider IHas<TimeProvider>.Service => time;
+
+    Random IHas<Random>.Service => random;
+}

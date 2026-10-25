@@ -665,6 +665,15 @@ PollStatus<R>(jobId).Repeat(Schedule.Spaced(TimeSpan.FromSeconds(1)).During(Time
 - 並列の指定は `Concurrency.Sequential / Parallel.WithMaxDegree(n)`（D10）。R3 の `AwaitOperation` と `maxConcurrent` と同じ考え方。
 - 時計の種類（UniTask の `DelayType` のような、ゲーム内の時間や実時間の区別）は、フレーム単位の時間と一緒に、リリース後に検討する。
 
+**実装メモ（P5）**
+
+- `UpTo` も `During` も付けない Schedule は、制限なしに続ける（Effect-TS と同じ）。
+- `During(total)` は、最初の試行を始めてからの経過時間を、次を試すかどうか決める時点で測る。経過時間が total 以上なら止める。
+- `.Jittered()` は、待ち時間に 0.8〜1.2 倍のばらつきを加える（Effect-TS の既定と同じ）。`WithMaxDelay` の上限は、ばらつきを加えた後にかける。
+- `RetryContext<E>.Attempt` は、失敗した試行を含めて、それまでに実行した回数（最初の失敗の後は 1）。`RepeatContext<T>.Repetition` も同じ数え方。
+- 方針（段2）が Die や Interrupted で終わったら（待っている間のキャンセルなど）、それが結果になる。最後の試行の Err は付属情報（Sequential）に残す。
+- 書き方の気づき：`attempt.AndThen<int>(n => 条件 ? Effect<R>.Succeed(n) : Effect<R>.Fail<AppError>(...))` のように、U を明示すると、条件演算子の両方の枝が Never からの暗黙変換で `Effect<int, AppError, R>` にそろう。U を書かないと推論できない。README に書く。
+
 ### D16. 外部との相互運用と実行 API
 
 **Effect を作る（外の世界 → Effect）**
