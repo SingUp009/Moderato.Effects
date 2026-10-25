@@ -75,7 +75,7 @@ internal static class ExitCases
     internal static ExitCase From<T, E>(Outcome<T, E> outcome) => outcome.Kind switch
     {
         OutcomeKind.Ok => s_succeeded,
-        OutcomeKind.Err => new Failed(outcome.Error),
+        OutcomeKind.Err => Failed(outcome.Error),
         OutcomeKind.Die => ToDie(outcome),
         _ => s_interrupted,
     };
@@ -89,7 +89,12 @@ internal static class ExitCases
 
     internal static ExitCase Die(ExceptionDispatchInfo defect) => new Die(defect.SourceException, []);
 
-    internal static ExitCase Failed(object? error) => new Failed(error);
+    /// <summary>A failure holding the error. A union error is unwrapped to the case it holds, so <c>Failed(NotFound n)</c> patterns match.</summary>
+    internal static ExitCase Failed(object? error)
+    {
+        while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;
+        return new Failed(error);
+    }
 
     internal static ExitCase Interrupted => s_interrupted;
 }

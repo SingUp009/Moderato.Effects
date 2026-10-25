@@ -220,6 +220,7 @@ var conn = await scope.Acquire(OpenConn<R>());
     ```
 
     解放処理の中でも `exit is Die(var ex)` のようにバグの中身を取り出せる。型パラメータが必要な場面が見つかったら見直す。
+    E が union のときは、`Failed` には union ではなく、union が持っている case を入れる（P3）。`exit is Failed(NotFound nf)` のように case で一致させるため。
   - **ExitCase は、利用本体が終わった時点で確定する**（G5）。解放処理の途中で別の解放処理が失敗しても、後の解放処理が受け取る ExitCase は変わらない。解放処理の失敗は別に集め、すべての解放が終わってから最終的な Exit を決める。トランザクションのように、別のリソースより先に成否を確定させたいものは、Resource を組み立てる順番で表す。
   - Gen の中では、解放処理だけを登録する `scope.Defer(exit => ...)` も使える（D11）。
 - **Layer**：独自には作らない。DI があるアプリでは DI が、それ以外では `Resource<AppEnv, E, RIn>` と `Provide` が、その役割を果たす（D17）。
@@ -825,7 +826,13 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 **付属情報が増え続けないようにする**
 
 - Retry の各試行の付属情報は、次の試行に持ち越さない（Err は再試行で処理済みのため）。付属情報の中の Die だけを、上の規則で報告する。
-- 1つの Outcome が持つ付属情報には上限を設ける（例：100件）。超えた分は件数だけを記録する。
+- 1つの Outcome が持つ付属情報には上限を設ける（100件）。超えた分は件数だけを記録し、`Die.OmittedSuppressed` で公開する（P3）。
+
+**実装メモ（P3）**
+
+- 「キャンセルが要求された後に起きた Die か」は、例外を Outcome に変えた時点のトークンで判定し、Outcome に印として持たせる。Gen が内側の Die を投げ直したときは、内側での判定を引き継ぐ（外側のトークンが後からキャンセルされていても、解放処理の Die を「キャンセルの結果」と誤って扱わないため）。
+- キャンセルを送る仕組みは、内部の `Cancellation`（親につながった CancellationTokenSource と理由）を共通の部品にする。「処理が先に終わった」と「ある理由でキャンセルした」のどちらか先に起きた方だけを確定する。
+- Timeout で中断された Gen ブロックの解放処理は、ExitCase として `Interrupted` を受け取る（ブロックの内側から見るとキャンセルで終わったため）。外側の Timeout がそれを `Err(TimeoutError)` に変える。
 
 ## 未決事項
 

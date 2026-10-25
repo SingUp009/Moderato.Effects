@@ -20,7 +20,7 @@ public sealed record Interrupted;
 public sealed record Succeeded;
 
 /// <summary>The scope finished with an expected error.</summary>
-/// <param name="Error">The error, with its type erased.</param>
+/// <param name="Error">The error, with its type erased. A union error is unwrapped to the case it holds.</param>
 public sealed record Failed(object? Error);
 
 /// <summary>How a scope finished, without its value or error types. Passed to release actions.</summary>

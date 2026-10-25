@@ -50,39 +50,13 @@ public sealed class Scope<E, R>
     /// <param name="effect">The effect.</param>
     /// <returns>The value.</returns>
     public ValueTask<T> Run<T>(Effect<T, E, R> effect)
-    {
-        Enter();
-        ValueTask<Outcome<T, E>> task;
-        try
-        {
-            ThrowIfFailed();
-            task = effect.Run(Env, _context);
-        }
-        catch
-        {
-            Leave();
-            throw;
-        }
+        => Step(effect, static (effect, scope) => effect.Run(scope.Env, scope._context));
 
-        if (!task.IsCompletedSuccessfully) return AwaitAsync(task);
-        Leave();
-        return new(Unwrap(task.Result));
-
-        async ValueTask<T> AwaitAsync(ValueTask<Outcome<T, E>> pending)
-        {
-            Outcome<T, E> outcome;
-            try
-            {
-                outcome = await pending.ConfigureAwait(false);
-            }
-            finally
-            {
-                Leave();
-            }
-
-            return Unwrap(outcome);
-        }
-    }
+    /// <summary>Acquires a resource and returns its value. It is released when the block ends, in reverse order of acquisition. An Err ends the block.</summary>
+    /// <param name="resource">The resource.</param>
+    /// <returns>The value.</returns>
+    public ValueTask<T> Acquire<T>(Resource<T, E, R> resource)
+        => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope._context, scope._releases));
 
     /// <summary>Returns the value of a result. An Err ends the block.</summary>
     /// <param name="result">The result.</param>
@@ -136,6 +110,41 @@ public sealed class Scope<E, R>
         finally
         {
             Leave();
+        }
+    }
+
+    private ValueTask<T> Step<T, TStep>(TStep step, Func<TStep, Scope<E, R>, ValueTask<Outcome<T, E>>> start)
+    {
+        Enter();
+        ValueTask<Outcome<T, E>> task;
+        try
+        {
+            ThrowIfFailed();
+            task = start(step, this);
+        }
+        catch
+        {
+            Leave();
+            throw;
+        }
+
+        if (!task.IsCompletedSuccessfully) return AwaitAsync(task);
+        Leave();
+        return new(Unwrap(task.Result));
+
+        async ValueTask<T> AwaitAsync(ValueTask<Outcome<T, E>> pending)
+        {
+            Outcome<T, E> outcome;
+            try
+            {
+                outcome = await pending.ConfigureAwait(false);
+            }
+            finally
+            {
+                Leave();
+            }
+
+            return Unwrap(outcome);
         }
     }
 
@@ -245,6 +254,17 @@ public static class ScopeExtensions
     {
         ArgumentNullException.ThrowIfNull(scope);
         return scope.Run(effect.Widen<E>());
+    }
+
+    /// <summary>Acquires a resource whose error is a case of the scope's error union. An Err ends the block.</summary>
+    /// <param name="scope">The scope.</param>
+    /// <param name="resource">The resource.</param>
+    /// <returns>The value.</returns>
+    public static ValueTask<T> Acquire<T, E, ECase, R>(this Scope<E, R> scope, Resource<T, ECase, R> resource)
+        where E : IUnionCase<E, ECase>
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        return scope.Acquire(resource.Widen<E>());
     }
 
     /// <summary>Returns the value of a result whose error is a case of the scope's error union. An Err ends the block.</summary>

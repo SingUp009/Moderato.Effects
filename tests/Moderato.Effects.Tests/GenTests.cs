@@ -444,8 +444,7 @@ public class SwallowedErrTests
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.IsType<InvalidOperationException>(die.Exception);
         var kept = Assert.Single(die.Suppressed);
-        Assert.Equal(Relation.Sequential, kept.Relation);
-        Assert.True(kept.Case is Failed { Error: AppError });
+        Assert.Equal(new Suppressed(new Failed(new NotFound(1)), Relation.Sequential), kept);
     }
 
     [Fact]
@@ -579,7 +578,7 @@ public class DeferTests
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.IsType<IOException>(die.Exception);
         var kept = Assert.Single(die.Suppressed);
-        Assert.True(kept.Case is Failed { Error: AppError });
+        Assert.True(kept.Case is Failed(Forbidden { Reason: "invalid order" }));
     }
 
     [Fact]

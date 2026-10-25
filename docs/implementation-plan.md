@@ -17,7 +17,7 @@
 | S2 | netstandard2.0 の Source Generator が `union` を検出し、`partial union` にコードを足せるか | **できる**。Roslyn 4.14 で作った Generator が SDK の Roslyn 5.12 の上で動く。ただし、ソースの union には `[Union]` 属性が見えないので、検出は `IUnion` の実装で行う（D13） |
 
 S1 の33ケースは、回帰テストとしてテストプロジェクトに移す（型推論や変換の結果が、SDK の更新で変わっていないことを確かめるため）。
-- 成功すべきケースは、使う API ができた段階で、その段階のテストとして書く。P1 で、LINQ の4通り、`AndThen` の推論、`Widen`、`CatchCase`、`Result` からの変換、`EmptyEnvironment` の `RunAsync(ct)` を移した。P2 で Gen のケース（`Scope<E, R>.Gen` / `Effect.Gen` の推論、`Run` に渡せる Effect の形、`Get` の case 版、`throw scope.Fail` による絞り込み、Gen の中の `Attempt` と `scope.Env.Resolve`）を移した。`Sleep` / `Timeout`（P3）、`All`（P4）のケースは、それぞれの段階で移す。
+- 成功すべきケースは、使う API ができた段階で、その段階のテストとして書く。P1 で、LINQ の4通り、`AndThen` の推論、`Widen`、`CatchCase`、`Result` からの変換、`EmptyEnvironment` の `RunAsync(ct)` を移した。P2 で Gen のケース（`Scope<E, R>.Gen` / `Effect.Gen` の推論、`Run` に渡せる Effect の形、`Get` の case 版、`throw scope.Fail` による絞り込み、Gen の中の `Attempt` と `scope.Env.Resolve`）を移した。P3 で `Sleep` と `Timeout`（union / Never）を移した。`All`（P4）のケースは P4 で移す。
 - コンパイルエラーになるべきケース（5件）は、実行するテストでは確かめられないので、Roslyn を使える `Moderato.Effects.SourceGenerator.Tests`（P6）で、コンパイルして診断を確かめるテストとして書く。
 
 それ以前に、設計の見直しの中で RC2 を使って確認したこと：
