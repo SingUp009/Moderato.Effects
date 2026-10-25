@@ -1,0 +1,300 @@
+#nullable enable
+const Moderato.Effects.Effect<T, E, R>.SuppressedDataKey = "Moderato.Effects.Suppressed" -> string!
+Moderato.Effects.Concurrency
+Moderato.Effects.Concurrency.Concurrency() -> void
+Moderato.Effects.Concurrency.Equals(Moderato.Effects.Concurrency other) -> bool
+Moderato.Effects.Concurrency.IsParallel.get -> bool
+Moderato.Effects.Concurrency.MaxDegree.get -> int?
+Moderato.Effects.Concurrency.WithMaxDegree(int maxDegree) -> Moderato.Effects.Concurrency
+Moderato.Effects.DefaultEnvironment
+Moderato.Effects.Die
+Moderato.Effects.Die.<Clone>$() -> Moderato.Effects.Die!
+Moderato.Effects.Die.Deconstruct(out System.Exception! exception) -> void
+Moderato.Effects.Die.Deconstruct(out System.Exception! Exception, out System.Collections.Generic.IReadOnlyList<Moderato.Effects.Suppressed!>! Suppressed) -> void
+Moderato.Effects.Die.Die(System.Exception! Exception, System.Collections.Generic.IReadOnlyList<Moderato.Effects.Suppressed!>! Suppressed) -> void
+Moderato.Effects.Die.Equals(Moderato.Effects.Die? other) -> bool
+Moderato.Effects.Die.Exception.get -> System.Exception!
+Moderato.Effects.Die.Exception.init -> void
+Moderato.Effects.Die.OmittedSuppressed.get -> int
+Moderato.Effects.Die.OmittedSuppressed.init -> void
+Moderato.Effects.Die.Suppressed.get -> System.Collections.Generic.IReadOnlyList<Moderato.Effects.Suppressed!>!
+Moderato.Effects.Die.Suppressed.init -> void
+Moderato.Effects.Effect
+Moderato.Effects.Effect<R>
+Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.AndThen<U>(System.Func<T, Moderato.Effects.Effect<U, E, R>>! binder) -> Moderato.Effects.Effect<U, E, R>
+Moderato.Effects.Effect<T, E, R>.AndThrough<U>(System.Func<T, Moderato.Effects.Effect<U, E, R>>! check) -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.Attempt() -> Moderato.Effects.Effect<Moderato.Results.Result<T, E>, Moderato.Effects.Never!, R>
+Moderato.Effects.Effect<T, E, R>.Catch<TCase, F>(System.Func<TCase, Moderato.Effects.Effect<T, F, R>>! handler) -> Moderato.Effects.Effect<T, F, R>
+Moderato.Effects.Effect<T, E, R>.Effect() -> void
+Moderato.Effects.Effect<T, E, R>.Fork() -> Moderato.Effects.Resource<Moderato.Effects.Fiber<T, E, R>!, Moderato.Effects.Never!, R>
+Moderato.Effects.Effect<T, E, R>.Map<U>(System.Func<T, U>! mapper) -> Moderato.Effects.Effect<U, E, R>
+Moderato.Effects.Effect<T, E, R>.MapErr<F>(System.Func<E, F>! mapper) -> Moderato.Effects.Effect<T, F, R>
+Moderato.Effects.Effect<T, E, R>.Match<U>(System.Func<T, U>! ok, System.Func<E, U>! err) -> Moderato.Effects.Effect<U, Moderato.Effects.Never!, R>
+Moderato.Effects.Effect<T, E, R>.OnThreadPool() -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.OrElse<F>(System.Func<E, Moderato.Effects.Effect<T, F, R>>! binder) -> Moderato.Effects.Effect<T, F, R>
+Moderato.Effects.Effect<T, E, R>.Provide<R2>(System.Func<R2, R>! build) -> Moderato.Effects.Effect<T, E, R2>
+Moderato.Effects.Effect<T, E, R>.RunAsync(R environment, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+Moderato.Effects.Effect<T, E, R>.RunExitAsync(R environment, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+Moderato.Effects.Effect<T, E, R>.Tap(System.Action<T>! action) -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.TapErr(System.Action<E>! action) -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.UnwrapOr(T fallback) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+Moderato.Effects.Effect<T, E, R>.UnwrapOrElse(System.Func<E, T>! fallback) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+Moderato.Effects.Effect<T, E, R>.Widen<F>() -> Moderato.Effects.Effect<T, F, R>
+Moderato.Effects.Effect<T, E, R>.WidenEnv<R2>() -> Moderato.Effects.Effect<T, E, R2>
+Moderato.Effects.EffectDiagnostics
+Moderato.Effects.EffectLinq
+Moderato.Effects.EffectScheduleExtensions
+Moderato.Effects.EffectTimeExtensions
+Moderato.Effects.EffectUnionExtensions
+Moderato.Effects.EmptyEnvironment
+Moderato.Effects.EnvironmentAttribute
+Moderato.Effects.EnvironmentAttribute.EnvironmentAttribute() -> void
+Moderato.Effects.EnvironmentRunExtensions
+Moderato.Effects.ErrorAttribute
+Moderato.Effects.ErrorAttribute.ErrorAttribute() -> void
+Moderato.Effects.Exit<T, E>
+Moderato.Effects.Exit<T, E>.Equals(Moderato.Effects.Exit<T, E> other) -> bool
+Moderato.Effects.Exit<T, E>.Exit() -> void
+Moderato.Effects.Exit<T, E>.Exit(Moderato.Effects.Die! die) -> void
+Moderato.Effects.Exit<T, E>.Exit(Moderato.Effects.Interrupted! interrupted) -> void
+Moderato.Effects.Exit<T, E>.Exit(Moderato.Results.Err<E> err) -> void
+Moderato.Effects.Exit<T, E>.Exit(Moderato.Results.Ok<T> ok) -> void
+Moderato.Effects.Exit<T, E>.HasValue.get -> bool
+Moderato.Effects.Exit<T, E>.TryGetValue(out Moderato.Effects.Die? die) -> bool
+Moderato.Effects.Exit<T, E>.TryGetValue(out Moderato.Effects.Interrupted? interrupted) -> bool
+Moderato.Effects.Exit<T, E>.TryGetValue(out Moderato.Results.Err<E> err) -> bool
+Moderato.Effects.Exit<T, E>.TryGetValue(out Moderato.Results.Ok<T> ok) -> bool
+Moderato.Effects.Exit<T, E>.Value.get -> object?
+Moderato.Effects.ExitCase
+Moderato.Effects.ExitCase.ExitCase() -> void
+Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Die! value) -> void
+Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Failed! value) -> void
+Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Interrupted! value) -> void
+Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Succeeded! value) -> void
+Moderato.Effects.ExitCase.Value.get -> object?
+Moderato.Effects.ExposeAttribute<T>
+Moderato.Effects.ExposeAttribute<T>.ExposeAttribute() -> void
+Moderato.Effects.Failed
+Moderato.Effects.Failed.<Clone>$() -> Moderato.Effects.Failed!
+Moderato.Effects.Failed.Deconstruct(out object? Error) -> void
+Moderato.Effects.Failed.Equals(Moderato.Effects.Failed? other) -> bool
+Moderato.Effects.Failed.Error.get -> object?
+Moderato.Effects.Failed.Error.init -> void
+Moderato.Effects.Failed.Failed(object? Error) -> void
+Moderato.Effects.Fiber<T, E, R>
+Moderato.Effects.Fiber<T, E, R>.Join() -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.HasExtensions
+Moderato.Effects.IHas<TService>
+Moderato.Effects.IHas<TService>.Service.get -> TService
+Moderato.Effects.Interrupted
+Moderato.Effects.Interrupted.<Clone>$() -> Moderato.Effects.Interrupted!
+Moderato.Effects.Interrupted.Equals(Moderato.Effects.Interrupted? other) -> bool
+Moderato.Effects.Interrupted.Interrupted() -> void
+Moderato.Effects.IUnionCase<TSelf, TCase>
+Moderato.Effects.IUnionCase<TSelf, TCase>.From(TCase value) -> TSelf
+Moderato.Effects.IUnionCase<TSelf, TCase>.TryGet(TSelf self, out TCase value) -> bool
+Moderato.Effects.IUnionRest<TSelf, TSource, TCase>
+Moderato.Effects.IUnionRest<TSelf, TSource, TCase>.TrySplit(TSource source, out TCase caught, out TSelf rest) -> bool
+Moderato.Effects.Never
+Moderato.Effects.Relation
+Moderato.Effects.Relation.Consequence = 2 -> Moderato.Effects.Relation
+Moderato.Effects.Relation.Parallel = 1 -> Moderato.Effects.Relation
+Moderato.Effects.Relation.Sequential = 0 -> Moderato.Effects.Relation
+Moderato.Effects.RepeatContext<T>
+Moderato.Effects.RepeatContext<T>.Deconstruct(out int Repetition, out T Value) -> void
+Moderato.Effects.RepeatContext<T>.Equals(Moderato.Effects.RepeatContext<T> other) -> bool
+Moderato.Effects.RepeatContext<T>.Gen<R>(System.Func<Moderato.Effects.Scope<Moderato.Effects.Never!, R>!, System.Threading.Tasks.ValueTask<bool>>! body) -> Moderato.Effects.Effect<bool, Moderato.Effects.Never!, R>
+Moderato.Effects.RepeatContext<T>.RepeatContext() -> void
+Moderato.Effects.RepeatContext<T>.RepeatContext(int Repetition, T Value) -> void
+Moderato.Effects.RepeatContext<T>.Repetition.get -> int
+Moderato.Effects.RepeatContext<T>.Repetition.init -> void
+Moderato.Effects.RepeatContext<T>.Value.get -> T
+Moderato.Effects.RepeatContext<T>.Value.init -> void
+Moderato.Effects.Resource
+Moderato.Effects.Resource<T, E, R>
+Moderato.Effects.Resource<T, E, R>.AndThen<U>(System.Func<T, Moderato.Effects.Resource<U, E, R>>! binder) -> Moderato.Effects.Resource<U, E, R>
+Moderato.Effects.Resource<T, E, R>.Map<U>(System.Func<T, U>! mapper) -> Moderato.Effects.Resource<U, E, R>
+Moderato.Effects.Resource<T, E, R>.MapErr<F>(System.Func<E, F>! mapper) -> Moderato.Effects.Resource<T, F, R>
+Moderato.Effects.Resource<T, E, R>.Resource() -> void
+Moderato.Effects.Resource<T, E, R>.Use<U>(System.Func<T, Moderato.Effects.Effect<U, E, R>>! use) -> Moderato.Effects.Effect<U, E, R>
+Moderato.Effects.Resource<T, E, R>.Widen<F>() -> Moderato.Effects.Resource<T, F, R>
+Moderato.Effects.ResourceLinq
+Moderato.Effects.RestOfAttribute<E>
+Moderato.Effects.RestOfAttribute<E>.RestOfAttribute() -> void
+Moderato.Effects.RetryContext<E>
+Moderato.Effects.RetryContext<E>.Attempt.get -> int
+Moderato.Effects.RetryContext<E>.Attempt.init -> void
+Moderato.Effects.RetryContext<E>.Deconstruct(out int Attempt, out E Error) -> void
+Moderato.Effects.RetryContext<E>.Equals(Moderato.Effects.RetryContext<E> other) -> bool
+Moderato.Effects.RetryContext<E>.Error.get -> E
+Moderato.Effects.RetryContext<E>.Error.init -> void
+Moderato.Effects.RetryContext<E>.Gen<R>(System.Func<Moderato.Effects.Scope<Moderato.Effects.Never!, R>!, System.Threading.Tasks.ValueTask<bool>>! body) -> Moderato.Effects.Effect<bool, Moderato.Effects.Never!, R>
+Moderato.Effects.RetryContext<E>.RetryContext() -> void
+Moderato.Effects.RetryContext<E>.RetryContext(int Attempt, E Error) -> void
+Moderato.Effects.Schedule
+Moderato.Effects.Schedule.During(System.TimeSpan total) -> Moderato.Effects.Schedule!
+Moderato.Effects.Schedule.Jittered() -> Moderato.Effects.Schedule<Moderato.Effects.IHas<System.Random!>!>!
+Moderato.Effects.Schedule.UpTo(int times) -> Moderato.Effects.Schedule!
+Moderato.Effects.Schedule.WithMaxDelay(System.TimeSpan max) -> Moderato.Effects.Schedule!
+Moderato.Effects.Schedule<TNeed>
+Moderato.Effects.Schedule<TNeed>.During(System.TimeSpan total) -> Moderato.Effects.Schedule<TNeed>!
+Moderato.Effects.Schedule<TNeed>.UpTo(int times) -> Moderato.Effects.Schedule<TNeed>!
+Moderato.Effects.Schedule<TNeed>.WithMaxDelay(System.TimeSpan max) -> Moderato.Effects.Schedule<TNeed>!
+Moderato.Effects.Scope<E, R>
+Moderato.Effects.Scope<E, R>.Acquire<T>(Moderato.Effects.Resource<T, E, R> resource) -> System.Threading.Tasks.ValueTask<T>
+Moderato.Effects.Scope<E, R>.CancellationToken.get -> System.Threading.CancellationToken
+Moderato.Effects.Scope<E, R>.Defer(System.Func<Moderato.Effects.ExitCase, Moderato.Effects.Effect<Moderato.Results.Unit, Moderato.Effects.Never!, R>>! release) -> void
+Moderato.Effects.Scope<E, R>.Env.get -> R
+Moderato.Effects.Scope<E, R>.Fail(E error) -> System.Exception!
+Moderato.Effects.Scope<E, R>.Fork<T, F>(Moderato.Effects.Effect<T, F, R> effect) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Fiber<T, F, R>!>
+Moderato.Effects.Scope<E, R>.Get<T>(Moderato.Results.Result<T, E> result) -> T
+Moderato.Effects.Scope<E, R>.Run<T>(Moderato.Effects.Effect<T, E, R> effect) -> System.Threading.Tasks.ValueTask<T>
+Moderato.Effects.ScopeExtensions
+Moderato.Effects.ScopeFailure
+Moderato.Effects.ScopeFailure.Error.get -> object?
+Moderato.Effects.Succeeded
+Moderato.Effects.Succeeded.<Clone>$() -> Moderato.Effects.Succeeded!
+Moderato.Effects.Succeeded.Equals(Moderato.Effects.Succeeded? other) -> bool
+Moderato.Effects.Succeeded.Succeeded() -> void
+Moderato.Effects.Suppressed
+Moderato.Effects.Suppressed.<Clone>$() -> Moderato.Effects.Suppressed!
+Moderato.Effects.Suppressed.Case.get -> Moderato.Effects.ExitCase
+Moderato.Effects.Suppressed.Case.init -> void
+Moderato.Effects.Suppressed.Deconstruct(out Moderato.Effects.ExitCase Case, out Moderato.Effects.Relation Relation) -> void
+Moderato.Effects.Suppressed.Equals(Moderato.Effects.Suppressed? other) -> bool
+Moderato.Effects.Suppressed.Relation.get -> Moderato.Effects.Relation
+Moderato.Effects.Suppressed.Relation.init -> void
+Moderato.Effects.Suppressed.Suppressed(Moderato.Effects.ExitCase Case, Moderato.Effects.Relation Relation) -> void
+Moderato.Effects.TimeoutError
+Moderato.Effects.TimeoutError.<Clone>$() -> Moderato.Effects.TimeoutError!
+Moderato.Effects.TimeoutError.After.get -> System.TimeSpan
+Moderato.Effects.TimeoutError.After.init -> void
+Moderato.Effects.TimeoutError.Deconstruct(out System.TimeSpan After) -> void
+Moderato.Effects.TimeoutError.Equals(Moderato.Effects.TimeoutError? other) -> bool
+Moderato.Effects.TimeoutError.TimeoutError(System.TimeSpan After) -> void
+override Moderato.Effects.Concurrency.Equals(object? obj) -> bool
+override Moderato.Effects.Concurrency.GetHashCode() -> int
+override Moderato.Effects.Concurrency.ToString() -> string!
+override Moderato.Effects.Die.Equals(object? obj) -> bool
+override Moderato.Effects.Die.GetHashCode() -> int
+override Moderato.Effects.Die.ToString() -> string!
+override Moderato.Effects.Exit<T, E>.Equals(object? obj) -> bool
+override Moderato.Effects.Exit<T, E>.GetHashCode() -> int
+override Moderato.Effects.Exit<T, E>.ToString() -> string!
+override Moderato.Effects.Failed.Equals(object? obj) -> bool
+override Moderato.Effects.Failed.GetHashCode() -> int
+override Moderato.Effects.Failed.ToString() -> string!
+override Moderato.Effects.Interrupted.Equals(object? obj) -> bool
+override Moderato.Effects.Interrupted.GetHashCode() -> int
+override Moderato.Effects.Interrupted.ToString() -> string!
+override Moderato.Effects.RepeatContext<T>.GetHashCode() -> int
+override Moderato.Effects.RetryContext<E>.GetHashCode() -> int
+override Moderato.Effects.Succeeded.Equals(object? obj) -> bool
+override Moderato.Effects.Succeeded.GetHashCode() -> int
+override Moderato.Effects.Succeeded.ToString() -> string!
+override Moderato.Effects.Suppressed.Equals(object? obj) -> bool
+override Moderato.Effects.Suppressed.GetHashCode() -> int
+override Moderato.Effects.Suppressed.ToString() -> string!
+override Moderato.Effects.TimeoutError.Equals(object? obj) -> bool
+override Moderato.Effects.TimeoutError.GetHashCode() -> int
+override Moderato.Effects.TimeoutError.ToString() -> string!
+static Moderato.Effects.Concurrency.operator !=(Moderato.Effects.Concurrency left, Moderato.Effects.Concurrency right) -> bool
+static Moderato.Effects.Concurrency.operator ==(Moderato.Effects.Concurrency left, Moderato.Effects.Concurrency right) -> bool
+static Moderato.Effects.Concurrency.Parallel.get -> Moderato.Effects.Concurrency
+static Moderato.Effects.Concurrency.Sequential.get -> Moderato.Effects.Concurrency
+static Moderato.Effects.DefaultEnvironment.Value.get -> Moderato.Effects.DefaultEnvironment!
+static Moderato.Effects.Die.operator !=(Moderato.Effects.Die? left, Moderato.Effects.Die? right) -> bool
+static Moderato.Effects.Die.operator ==(Moderato.Effects.Die? left, Moderato.Effects.Die? right) -> bool
+static Moderato.Effects.Effect.All<T, E, R>(System.Collections.Generic.IEnumerable<Moderato.Effects.Effect<T, E, R>>! effects, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<T[]!, E, R>
+static Moderato.Effects.Effect.All<T1, T2, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, T4, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Effect<T4, E, R> effect4, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3, T4), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, T4, T5, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Effect<T4, E, R> effect4, Moderato.Effects.Effect<T5, E, R> effect5, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3, T4, T5), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, T4, T5, T6, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Effect<T4, E, R> effect4, Moderato.Effects.Effect<T5, E, R> effect5, Moderato.Effects.Effect<T6, E, R> effect6, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3, T4, T5, T6), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, T4, T5, T6, T7, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Effect<T4, E, R> effect4, Moderato.Effects.Effect<T5, E, R> effect5, Moderato.Effects.Effect<T6, E, R> effect6, Moderato.Effects.Effect<T7, E, R> effect7, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3, T4, T5, T6, T7), E, R>
+static Moderato.Effects.Effect.All<T1, T2, T3, T4, T5, T6, T7, T8, E, R>(Moderato.Effects.Effect<T1, E, R> effect1, Moderato.Effects.Effect<T2, E, R> effect2, Moderato.Effects.Effect<T3, E, R> effect3, Moderato.Effects.Effect<T4, E, R> effect4, Moderato.Effects.Effect<T5, E, R> effect5, Moderato.Effects.Effect<T6, E, R> effect6, Moderato.Effects.Effect<T7, E, R> effect7, Moderato.Effects.Effect<T8, E, R> effect8, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<(T1, T2, T3, T4, T5, T6, T7, T8), E, R>
+static Moderato.Effects.Effect.AllErrors<T, E, R>(System.Collections.Generic.IEnumerable<Moderato.Effects.Effect<T, E, R>>! effects, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<T[]!, E[]!, R>
+static Moderato.Effects.Effect.AllSettled<T, E, R>(System.Collections.Generic.IEnumerable<Moderato.Effects.Effect<T, E, R>>! effects, Moderato.Effects.Concurrency concurrency = default(Moderato.Effects.Concurrency)) -> Moderato.Effects.Effect<Moderato.Effects.Exit<T, E>[]!, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect.Gen<T, E, R>(System.Func<Moderato.Effects.Scope<E, R>!, System.Threading.Tasks.ValueTask<T>>! body) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect.Race<T, E, R>(Moderato.Effects.Effect<T, E, R> first, Moderato.Effects.Effect<T, E, R> second) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect.RaceFirst<T, E, R>(Moderato.Effects.Effect<T, E, R> first, Moderato.Effects.Effect<T, E, R> second) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect.Sleep<R>(System.TimeSpan duration) -> Moderato.Effects.Effect<Moderato.Results.Unit, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Access<T>(System.Func<R, T>! read) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.AccessAsync<T>(System.Func<R, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! read) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Async<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! body) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Env.get -> Moderato.Effects.Effect<R, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Fail<E>(E error) -> Moderato.Effects.Effect<Moderato.Effects.Never!, E, R>
+static Moderato.Effects.Effect<R>.FromResult<T, E>(Moderato.Results.Result<T, E> result) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<R>.FromResultAsync<T, E>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>>! body) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<R>.Succeed<T>(T value) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Sync<T>(System.Func<T>! body) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
+static Moderato.Effects.Effect<R>.Try<T, E>(System.Func<T>! body, System.Func<System.Exception!, E>! map) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<R>.Try<TException, T, E>(System.Func<T>! body, System.Func<TException!, E>! map) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<R>.TryAsync<T, E>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! body, System.Func<System.Exception!, E>! map) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<R>.TryAsync<TException, T, E>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! body, System.Func<TException!, E>! map) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<T, E, R>.implicit operator Moderato.Effects.Effect<T, E, R>(Moderato.Effects.Effect<Moderato.Effects.Never!, E, R> effect) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<T, E, R>.implicit operator Moderato.Effects.Effect<T, E, R>(Moderato.Effects.Effect<T, Moderato.Effects.Never!, R> effect) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.Effect<T, E, R>.implicit operator Moderato.Effects.Effect<T, E, R>(Moderato.Results.Result<T, E> result) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectDiagnostics.UnobservedFailureHandler.get -> System.Action<Moderato.Effects.ExitCase>?
+static Moderato.Effects.EffectDiagnostics.UnobservedFailureHandler.set -> void
+static Moderato.Effects.EffectLinq.Select<T, E, R, U>(this Moderato.Effects.Effect<T, E, R> source, System.Func<T, U>! selector) -> Moderato.Effects.Effect<U, E, R>
+static Moderato.Effects.EffectLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Effect<T, E, R> source, System.Func<T, Moderato.Effects.Effect<U, E, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Effect<V, E, R>
+static Moderato.Effects.EffectLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Effect<T, E, R> source, System.Func<T, Moderato.Effects.Effect<U, Moderato.Effects.Never!, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Effect<V, E, R>
+static Moderato.Effects.EffectLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Effect<T, Moderato.Effects.Never!, R> source, System.Func<T, Moderato.Effects.Effect<U, E, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Effect<V, E, R>
+static Moderato.Effects.EffectLinq.SelectMany<T, E, R, U>(this Moderato.Effects.Effect<T, E, R> source, System.Func<T, Moderato.Effects.Effect<U, E, R>>! selector) -> Moderato.Effects.Effect<U, E, R>
+static Moderato.Effects.EffectLinq.SelectMany<T, R, U, V>(this Moderato.Effects.Effect<T, Moderato.Effects.Never!, R> source, System.Func<T, Moderato.Effects.Effect<U, Moderato.Effects.Never!, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Effect<V, Moderato.Effects.Never!, R>
+static Moderato.Effects.EffectScheduleExtensions.Repeat<T, E, R, TNeed>(this Moderato.Effects.Effect<T, E, R> effect, Moderato.Effects.Schedule<TNeed>! schedule, System.Func<T, bool>? when = null) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectScheduleExtensions.Repeat<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, Moderato.Effects.Schedule! schedule, System.Func<T, bool>? when = null) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectScheduleExtensions.Repeat<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<Moderato.Effects.RepeatContext<T>, Moderato.Effects.Effect<bool, Moderato.Effects.Never!, R>>! policy) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectScheduleExtensions.Retry<T, E, R, TNeed>(this Moderato.Effects.Effect<T, E, R> effect, Moderato.Effects.Schedule<TNeed>! schedule, System.Func<E, bool>? when = null) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectScheduleExtensions.Retry<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, Moderato.Effects.Schedule! schedule, System.Func<E, bool>? when = null) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectScheduleExtensions.Retry<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<Moderato.Effects.RetryContext<E>, Moderato.Effects.Effect<bool, Moderato.Effects.Never!, R>>! policy) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectTimeExtensions.Timeout<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectTimeExtensions.Timeout<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.TimeSpan after, System.Func<Moderato.Effects.TimeoutError!, E>! onTimeout) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectTimeExtensions.Timeout<T, R>(this Moderato.Effects.Effect<T, Moderato.Effects.Never!, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R>
+static Moderato.Effects.EffectTimeExtensions.Timeout<T, R>(this Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R>
+static Moderato.Effects.EffectTimeExtensions.TimeoutResult<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<Moderato.Results.Result<T, Moderato.Effects.TimeoutError!>, E, R>
+static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, E, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EmptyEnvironment.Value.get -> Moderato.Effects.EmptyEnvironment!
+static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+static Moderato.Effects.Exit<T, E>.operator !=(Moderato.Effects.Exit<T, E> left, Moderato.Effects.Exit<T, E> right) -> bool
+static Moderato.Effects.Exit<T, E>.operator ==(Moderato.Effects.Exit<T, E> left, Moderato.Effects.Exit<T, E> right) -> bool
+static Moderato.Effects.Failed.operator !=(Moderato.Effects.Failed? left, Moderato.Effects.Failed? right) -> bool
+static Moderato.Effects.Failed.operator ==(Moderato.Effects.Failed? left, Moderato.Effects.Failed? right) -> bool
+static Moderato.Effects.HasExtensions.Resolve<TService>(this Moderato.Effects.IHas<TService>! environment) -> TService
+static Moderato.Effects.Interrupted.operator !=(Moderato.Effects.Interrupted? left, Moderato.Effects.Interrupted? right) -> bool
+static Moderato.Effects.Interrupted.operator ==(Moderato.Effects.Interrupted? left, Moderato.Effects.Interrupted? right) -> bool
+static Moderato.Effects.RepeatContext<T>.operator !=(Moderato.Effects.RepeatContext<T> left, Moderato.Effects.RepeatContext<T> right) -> bool
+static Moderato.Effects.RepeatContext<T>.operator ==(Moderato.Effects.RepeatContext<T> left, Moderato.Effects.RepeatContext<T> right) -> bool
+static Moderato.Effects.Resource.Make<T, E, R>(Moderato.Effects.Effect<T, E, R> acquire, System.Func<T, Moderato.Effects.ExitCase, Moderato.Effects.Effect<Moderato.Results.Unit, Moderato.Effects.Never!, R>>! release) -> Moderato.Effects.Resource<T, E, R>
+static Moderato.Effects.Resource<T, E, R>.implicit operator Moderato.Effects.Resource<T, E, R>(Moderato.Effects.Resource<T, Moderato.Effects.Never!, R> resource) -> Moderato.Effects.Resource<T, E, R>
+static Moderato.Effects.ResourceLinq.Select<T, E, R, U>(this Moderato.Effects.Resource<T, E, R> source, System.Func<T, U>! selector) -> Moderato.Effects.Resource<U, E, R>
+static Moderato.Effects.ResourceLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Resource<T, E, R> source, System.Func<T, Moderato.Effects.Resource<U, E, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Resource<V, E, R>
+static Moderato.Effects.ResourceLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Resource<T, E, R> source, System.Func<T, Moderato.Effects.Resource<U, Moderato.Effects.Never!, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Resource<V, E, R>
+static Moderato.Effects.ResourceLinq.SelectMany<T, E, R, U, V>(this Moderato.Effects.Resource<T, Moderato.Effects.Never!, R> source, System.Func<T, Moderato.Effects.Resource<U, E, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Resource<V, E, R>
+static Moderato.Effects.ResourceLinq.SelectMany<T, E, R, U>(this Moderato.Effects.Resource<T, E, R> source, System.Func<T, Moderato.Effects.Resource<U, E, R>>! selector) -> Moderato.Effects.Resource<U, E, R>
+static Moderato.Effects.ResourceLinq.SelectMany<T, R, U, V>(this Moderato.Effects.Resource<T, Moderato.Effects.Never!, R> source, System.Func<T, Moderato.Effects.Resource<U, Moderato.Effects.Never!, R>>! selector, System.Func<T, U, V>! resultSelector) -> Moderato.Effects.Resource<V, Moderato.Effects.Never!, R>
+static Moderato.Effects.RetryContext<E>.operator !=(Moderato.Effects.RetryContext<E> left, Moderato.Effects.RetryContext<E> right) -> bool
+static Moderato.Effects.RetryContext<E>.operator ==(Moderato.Effects.RetryContext<E> left, Moderato.Effects.RetryContext<E> right) -> bool
+static Moderato.Effects.Schedule.Exponential(System.TimeSpan baseDelay, double factor = 2) -> Moderato.Effects.Schedule!
+static Moderato.Effects.Schedule.Immediately.get -> Moderato.Effects.Schedule!
+static Moderato.Effects.Schedule.Spaced(System.TimeSpan delay) -> Moderato.Effects.Schedule!
+static Moderato.Effects.Scope<E, R>.Gen<T>(System.Func<Moderato.Effects.Scope<E, R>!, System.Threading.Tasks.ValueTask<T>>! body) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.ScopeExtensions.Acquire<T, E, ECase, R>(this Moderato.Effects.Scope<E, R>! scope, Moderato.Effects.Resource<T, ECase, R> resource) -> System.Threading.Tasks.ValueTask<T>
+static Moderato.Effects.ScopeExtensions.Get<T, E, ECase, R>(this Moderato.Effects.Scope<E, R>! scope, Moderato.Results.Result<T, ECase> result) -> T
+static Moderato.Effects.ScopeExtensions.Run<T, E, ECase, R>(this Moderato.Effects.Scope<E, R>! scope, Moderato.Effects.Effect<T, ECase, R> effect) -> System.Threading.Tasks.ValueTask<T>
+static Moderato.Effects.Succeeded.operator !=(Moderato.Effects.Succeeded? left, Moderato.Effects.Succeeded? right) -> bool
+static Moderato.Effects.Succeeded.operator ==(Moderato.Effects.Succeeded? left, Moderato.Effects.Succeeded? right) -> bool
+static Moderato.Effects.Suppressed.operator !=(Moderato.Effects.Suppressed? left, Moderato.Effects.Suppressed? right) -> bool
+static Moderato.Effects.Suppressed.operator ==(Moderato.Effects.Suppressed? left, Moderato.Effects.Suppressed? right) -> bool
+static Moderato.Effects.TimeoutError.operator !=(Moderato.Effects.TimeoutError? left, Moderato.Effects.TimeoutError? right) -> bool
+static Moderato.Effects.TimeoutError.operator ==(Moderato.Effects.TimeoutError? left, Moderato.Effects.TimeoutError? right) -> bool
+~override Moderato.Effects.RepeatContext<T>.Equals(object obj) -> bool
+~override Moderato.Effects.RepeatContext<T>.ToString() -> string
+~override Moderato.Effects.RetryContext<E>.Equals(object obj) -> bool
+~override Moderato.Effects.RetryContext<E>.ToString() -> string

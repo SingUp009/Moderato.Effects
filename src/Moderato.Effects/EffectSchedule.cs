@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Moderato.Effects.Internal;
 
 namespace Moderato.Effects;
@@ -32,11 +33,15 @@ public readonly record struct RepeatContext<T>(int Repetition, T Value)
 /// </summary>
 public static class EffectScheduleExtensions
 {
+    private const string WhenJustification = "Overloads differ by schedule type; the 'when' filter is optional on each.";
+
     /// <summary>Tries again on Err, as the schedule says. When the tries run out, the last Err is the outcome.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="schedule">When and how many times to try again.</param>
     /// <param name="when">Which errors to retry. All of them by default.</param>
     /// <returns>An effect with the same types.</returns>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WhenJustification)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WhenJustification)]
     public static Effect<T, E, R> Retry<T, E, R>(this Effect<T, E, R> effect, Schedule schedule, Func<E, bool>? when = null)
         where R : IHas<TimeProvider>
     {
@@ -49,6 +54,8 @@ public static class EffectScheduleExtensions
     /// <param name="schedule">When and how many times to try again.</param>
     /// <param name="when">Which errors to retry. All of them by default.</param>
     /// <returns>An effect with the same types.</returns>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WhenJustification)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WhenJustification)]
     public static Effect<T, E, R> Retry<T, E, R, TNeed>(this Effect<T, E, R> effect, Schedule<TNeed> schedule, Func<E, bool>? when = null)
         where R : IHas<TimeProvider>, TNeed
     {
@@ -71,6 +78,8 @@ public static class EffectScheduleExtensions
     /// <param name="schedule">When and how many times to run again.</param>
     /// <param name="when">Which values to run again after. All of them by default.</param>
     /// <returns>An effect with the last value.</returns>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WhenJustification)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WhenJustification)]
     public static Effect<T, E, R> Repeat<T, E, R>(this Effect<T, E, R> effect, Schedule schedule, Func<T, bool>? when = null)
         where R : IHas<TimeProvider>
     {
@@ -83,6 +92,8 @@ public static class EffectScheduleExtensions
     /// <param name="schedule">When and how many times to run again.</param>
     /// <param name="when">Which values to run again after. All of them by default.</param>
     /// <returns>An effect with the last value.</returns>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WhenJustification)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WhenJustification)]
     public static Effect<T, E, R> Repeat<T, E, R, TNeed>(this Effect<T, E, R> effect, Schedule<TNeed> schedule, Func<T, bool>? when = null)
         where R : IHas<TimeProvider>, TNeed
     {
