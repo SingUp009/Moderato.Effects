@@ -3,12 +3,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects;
 
-/// <summary>
-/// Forked work that runs alongside its parent and never outlives the parent's scope: when the scope ends, the fiber is canceled
-/// and the scope waits for it. A defect in the fiber ends the parent with that defect. An Err shows only through <see cref="Join"/>;
-/// if the fiber is never joined, it goes to <see cref="EffectDiagnostics.UnobservedFailureHandler"/>.
-/// A fiber kept after its scope has ended was canceled by it; joining it then is interrupted.
-/// </summary>
+/// <summary>Forked work that its parent's scope cancels and awaits when it ends; its defect fails the parent, and its Err shows only through <see cref="Join"/> or, if unjoined, <see cref="EffectDiagnostics.UnobservedFailureHandler"/>.</summary>
 /// <typeparam name="T">The value.</typeparam>
 /// <typeparam name="E">The error.</typeparam>
 /// <typeparam name="R">The environment.</typeparam>
@@ -41,7 +36,7 @@ public sealed class Fiber<T, E, R>
         });
     }
 
-    /// <summary>Waits for the fiber and takes on its outcome. Canceling the waiter does not cancel the fiber.</summary>
+    /// <summary>Waits for the fiber and takes on its outcome; canceling the wait leaves the fiber running.</summary>
     /// <returns>An effect with the fiber's outcome.</returns>
     public Effect<T, E, R> Join() => new((_, context) => JoinAsync(context));
 

@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Finds code inside effects that reads the system clock instead of the environment's <c>TimeProvider</c> (D14).</summary>
+/// <summary>Finds effect code that reads the system clock instead of the environment's <c>TimeProvider</c> (D14).</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ClockAnalyzer : DiagnosticAnalyzer
 {

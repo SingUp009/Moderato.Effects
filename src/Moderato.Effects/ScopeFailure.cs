@@ -1,9 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>
-/// Unwinds a Gen block when an Err ends it, so its <c>finally</c> blocks and <c>using</c> declarations run.
-/// The Gen block turns it back into the Err. Do not catch it; exclude it with <c>catch (Exception ex) when (ex is not ScopeFailure)</c>.
-/// </summary>
+/// <summary>Unwinds a Gen block on an Err; do not catch it, or exclude it with <c>when (ex is not ScopeFailure)</c>.</summary>
 public sealed class ScopeFailure : Exception
 {
     internal ScopeFailure(object owner, object? error)

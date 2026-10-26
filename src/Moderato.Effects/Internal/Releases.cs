@@ -4,10 +4,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Internal;
 
-/// <summary>
-/// The lifetime of one scope (a Gen block or a <c>Use</c>): the token its body runs with, the release actions to run after it,
-/// and the defects of forked children that end it early.
-/// </summary>
+/// <summary>The lifetime of one scope (Gen block or <c>Use</c>): its body's token, its release actions and its children's defects.</summary>
 internal sealed class Releases<R>(Cancellation bodyCancellation)
 {
     private readonly List<Func<ExitCase, Effect<Unit, Never, R>>> actions = [];
@@ -18,10 +15,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     /// <summary>The context the scope's body runs with.</summary>
     internal RunContext BodyContext { get; } = new(bodyCancellation.Token);
 
-    /// <summary>
-    /// Records the defect of a forked child and cancels the body, so the scope ends with the child's defect (D10).
-    /// Returns false once the body has ended; the child's release reports the defect then.
-    /// </summary>
+    /// <summary>Records a forked child's defect and cancels the body (D10); false once the body has ended.</summary>
     internal bool TryFailFromChild(Outcome<Unit, Never> defect)
     {
         lock (gate)
@@ -92,7 +86,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             : outcome.WithSuppressed(outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
     }
 
-    /// <summary>The first child defect is the outcome; what the body did after being canceled for it is context.</summary>
+    /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
     private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
     {
         var first = defects[0];
@@ -167,7 +161,7 @@ internal static class ExitCases
 
     internal static ExitCase Die(ExceptionDispatchInfo defect) => new Die(defect.SourceException, []);
 
-    /// <summary>A failure holding the error. A union error is unwrapped to the case it holds, so <c>Failed(NotFound n)</c> patterns match.</summary>
+    /// <summary>A failure holding the error, a union unwrapped to its case so <c>Failed(NotFound n)</c> matches.</summary>
     internal static ExitCase Failed(object? error)
     {
         while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;

@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Implements <c>IHas&lt;T&gt;</c> on <c>[Environment]</c> types, once for each primary constructor parameter.</summary>
+/// <summary>Implements <c>IHas&lt;T&gt;</c> on <c>[Environment]</c> types, per primary constructor parameter.</summary>
 [Generator]
 public sealed class EnvironmentGenerator : IIncrementalGenerator
 {

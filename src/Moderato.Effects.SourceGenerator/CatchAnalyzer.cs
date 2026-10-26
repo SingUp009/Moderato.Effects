@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Explains why <c>Catch&lt;TCase, F&gt;</c> fails its constraint, which the compiler only reports as CS0315 (D13).</summary>
+/// <summary>Explains the CS0315 that <c>Catch&lt;TCase, F&gt;</c> fails with (D13).</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CatchAnalyzer : DiagnosticAnalyzer
 {

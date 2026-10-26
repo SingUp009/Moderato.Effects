@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Moderato.Effects.Internal;
 
-/// <summary>Runs an effect against a timer: the timer cancels the effect, and the result waits until the effect has finished.</summary>
+/// <summary>Runs an effect against a timer that cancels it, waiting for it to finish.</summary>
 internal static class Timeouts
 {
     internal static Effect<U, F, R> Create<T, E, U, F, R>(

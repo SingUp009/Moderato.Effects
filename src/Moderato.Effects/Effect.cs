@@ -5,10 +5,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects;
 
-/// <summary>
-/// A lazy description of work that needs an environment <typeparamref name="R"/>, succeeds with <typeparamref name="T"/>
-/// or fails with <typeparamref name="E"/>. Nothing runs until <see cref="RunAsync"/>; every run starts over. <c>default</c> is invalid.
-/// </summary>
+/// <summary>A lazy, rerunnable description of work that needs <typeparamref name="R"/> and ends with <typeparamref name="T"/> or <typeparamref name="E"/>; <c>default</c> is invalid.</summary>
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly partial struct Effect<T, E, R>
 {
@@ -36,9 +33,9 @@ public readonly partial struct Effect<T, E, R>
     /// <summary>An effect that ends in the result.</summary>
     public static implicit operator Effect<T, E, R>(Result<T, E> result) => Effect<R>.FromResult(result);
 
-    /// <summary>Runs the effect. Defects are rethrown as they were thrown; the caller's cancellation surfaces as <see cref="OperationCanceledException"/>.</summary>
+    /// <summary>Runs the effect, rethrowing defects as thrown and the caller's cancellation as <see cref="OperationCanceledException"/>.</summary>
     /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run. The effect sees a token derived from it, not this token itself.</param>
+    /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
     /// <returns>The value, or the expected error.</returns>
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken = default)
     {
@@ -54,7 +51,7 @@ public readonly partial struct Effect<T, E, R>
 
     /// <summary>Runs the effect and returns how it ended, without throwing.</summary>
     /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run. The effect sees a token derived from it, not this token itself.</param>
+    /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
     {
@@ -120,6 +117,6 @@ public readonly partial struct Effect<T, E, R>
         else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
     }
 
-    /// <summary>The <see cref="Exception.Data"/> key under which <see cref="RunAsync"/> attaches suppressed failures to a rethrown defect.</summary>
+    /// <summary>The <see cref="Exception.Data"/> key holding a rethrown defect's suppressed failures.</summary>
     public const string SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed";
 }

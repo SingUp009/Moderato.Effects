@@ -1,17 +1,11 @@
 namespace Moderato.Effects;
 
-/// <summary>
-/// Where failures go that no outcome can carry: defects dropped along with a handled Err, and Errs of forked work that was never joined.
-/// It is for diagnostics only and never changes an outcome.
-/// </summary>
+/// <summary>Receives failures no outcome can carry, for diagnostics only.</summary>
 public static class EffectDiagnostics
 {
     private static Action<ExitCase>? handler;
 
-    /// <summary>
-    /// Receives each unobserved failure: a <see cref="Die"/> or a <see cref="Failed"/>. <see langword="null"/> restores the default,
-    /// which writes to <see cref="Console.Error"/>. Exceptions thrown by the handler are ignored.
-    /// </summary>
+    /// <summary>Receives each unobserved <see cref="Die"/> or <see cref="Failed"/>; <see langword="null"/> restores the <see cref="Console.Error"/> default, and handler exceptions are ignored.</summary>
     public static Action<ExitCase>? UnobservedFailureHandler
     {
         get => Volatile.Read(ref handler);

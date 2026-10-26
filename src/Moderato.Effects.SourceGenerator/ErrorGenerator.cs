@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Implements <c>IUnionCase</c> on <c>[Error]</c> unions, for each case and each case of a case.</summary>
+/// <summary>Implements <c>IUnionCase</c> on <c>[Error]</c> unions for every reachable case.</summary>
 [Generator]
 public sealed class ErrorGenerator : IIncrementalGenerator
 {

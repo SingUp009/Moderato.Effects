@@ -128,7 +128,7 @@ internal static class Recurrence
     }
 }
 
-/// <summary>Turns a schedule into waits for one run of Retry or Repeat: its own start time and its own random number generator.</summary>
+/// <summary>Turns a schedule into waits for one run, with its own start time and random number generator.</summary>
 internal sealed class ScheduleClock<R> where R : IHas<TimeProvider>
 {
     private readonly ScheduleSpec spec;

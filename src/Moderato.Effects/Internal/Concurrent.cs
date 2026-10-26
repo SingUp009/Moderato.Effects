@@ -32,7 +32,7 @@ internal readonly record struct ChildEnd<T, E>(Outcome<T, E> Outcome, bool After
 /// <summary>Runs groups of effects under one cancellation unit and decides the group's outcome (D10, D18).</summary>
 internal static class Concurrent
 {
-    /// <summary>Runs every child and waits for all that started, including their releases.</summary>
+    /// <summary>Runs every child and waits for all that started, releases included.</summary>
     internal static async ValueTask<ChildEnd<T, E>[]> RunAsync<T, E, R>(
         Func<R, RunContext, ValueTask<Outcome<T, E>>>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
     {
@@ -100,10 +100,7 @@ internal static class Concurrent
         _ => false,
     };
 
-    /// <summary>
-    /// The failure that decides the group, if any: an independent Die first, then the caller's cancellation,
-    /// then the earliest independent Err; a Die that only followed from cancellation comes last (F26).
-    /// </summary>
+    /// <summary>The deciding failure: independent Die &gt; caller's cancellation &gt; earliest independent Err &gt; consequential Die (F26).</summary>
     internal static int? PrimaryFailure<T, E>(ChildEnd<T, E>[] ends, bool callerCanceled)
     {
         int? independentDie = null, independentErr = null, anyDie = null, interrupted = null;
@@ -136,7 +133,7 @@ internal static class Concurrent
     private static int Earlier<T, E>(ChildEnd<T, E>[] ends, int? current, int candidate)
         => current is { } c && ends[c].Order < ends[candidate].Order ? c : candidate;
 
-    /// <summary>The failures of every child but the primary, in the order they ended, followed by what each child had suppressed itself.</summary>
+    /// <summary>Every failure but the primary's, in order of ending, then what each child suppressed.</summary>
     internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Others<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
     {
         var builder = ImmutableArray.CreateBuilder<Suppressed>();
@@ -161,7 +158,7 @@ internal static class Concurrent
         return (builder.ToImmutable(), omitted);
     }
 
-    /// <summary>The primary child's failure, carrying the other children's failures as suppressed.</summary>
+    /// <summary>The primary child's failure, with the others' failures suppressed.</summary>
     internal static Outcome<U, F> Fail<T, E, U, F>(ChildEnd<T, E>[] ends, int primary, Func<E, F> error)
     {
         var (others, omitted) = Others(ends, primary);

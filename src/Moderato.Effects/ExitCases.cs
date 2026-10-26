@@ -2,14 +2,14 @@ namespace Moderato.Effects;
 
 /// <summary>The run ended because a defect (an unexpected exception) escaped.</summary>
 /// <param name="Exception">The defect.</param>
-/// <param name="Suppressed">Failures that happened alongside the defect and were not chosen as the outcome.</param>
+/// <param name="Suppressed">Failures alongside the defect that were not chosen as the outcome.</param>
 public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppressed)
 {
     /// <summary>Enables <c>Die(var exception)</c> patterns.</summary>
     /// <param name="exception">The defect.</param>
     public void Deconstruct(out Exception exception) => exception = Exception;
 
-    /// <summary>How many suppressed failures were left out of <see cref="Suppressed"/> because there were too many.</summary>
+    /// <summary>How many suppressed failures were left out for being too many.</summary>
     public int OmittedSuppressed { get; init; }
 }
 
@@ -20,10 +20,10 @@ public sealed record Interrupted;
 public sealed record Succeeded;
 
 /// <summary>The scope finished with an expected error.</summary>
-/// <param name="Error">The error, with its type erased. A union error is unwrapped to the case it holds.</param>
+/// <param name="Error">The type-erased error, a union unwrapped to its case.</param>
 public sealed record Failed(object? Error);
 
-/// <summary>How a scope finished, without its value or error types. Passed to release actions.</summary>
+/// <summary>How a scope finished, untyped; passed to release actions.</summary>
 public union ExitCase(Succeeded, Failed, Die, Interrupted);
 
 /// <summary>How a suppressed failure relates to the outcome that was kept.</summary>
@@ -40,11 +40,11 @@ public enum Relation
 }
 
 /// <summary>A failure that was not chosen as the outcome.</summary>
-/// <param name="Case">How it failed. Never <see cref="Succeeded"/>.</param>
+/// <param name="Case">How it failed, never <see cref="Succeeded"/>.</param>
 /// <param name="Relation">How it relates to the outcome that was kept.</param>
 public sealed record Suppressed(ExitCase Case, Relation Relation)
 {
-    /// <summary>How it failed. Never <see cref="Succeeded"/>.</summary>
+    /// <summary>How it failed, never <see cref="Succeeded"/>.</summary>
     public ExitCase Case { get; init; } = Case.Value is null or Succeeded
         ? throw new ArgumentException("A suppressed failure must be a Failed, Die or Interrupted case.", nameof(Case))
         : Case;

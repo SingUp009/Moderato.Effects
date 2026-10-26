@@ -1,6 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>How a group of effects runs. <c>default</c> is <see cref="Sequential"/>.</summary>
+/// <summary>How a group of effects runs; <c>default</c> = <see cref="Sequential"/>.</summary>
 public readonly struct Concurrency : IEquatable<Concurrency>
 {
     // 0 = sequential, -1 = unbounded, n > 0 = at most n at a time.
@@ -8,7 +8,7 @@ public readonly struct Concurrency : IEquatable<Concurrency>
 
     private Concurrency(int maxDegree) => this.maxDegree = maxDegree;
 
-    /// <summary>One at a time, in order, on the caller's flow. Safe for services that are not thread-safe.</summary>
+    /// <summary>One at a time, in order, on the caller's flow, so non-thread-safe services are safe.</summary>
     public static Concurrency Sequential => default;
 
     /// <summary>All at once, each started on the thread pool.</summary>
@@ -17,11 +17,11 @@ public readonly struct Concurrency : IEquatable<Concurrency>
     /// <summary>Whether the effects run at the same time.</summary>
     public bool IsParallel => maxDegree != 0;
 
-    /// <summary>The most effects that run at the same time, or <see langword="null"/> for no limit or for sequential.</summary>
+    /// <summary>The most effects running at once; <see langword="null"/> = unbounded or sequential.</summary>
     public int? MaxDegree => maxDegree > 0 ? maxDegree : null;
 
     /// <summary>Parallel, with at most <paramref name="maxDegree"/> effects running at the same time.</summary>
-    /// <param name="maxDegree">The limit. At least 1.</param>
+    /// <param name="maxDegree">The limit, ≥ 1.</param>
     /// <returns>The limited concurrency.</returns>
     public Concurrency WithMaxDegree(int maxDegree)
     {

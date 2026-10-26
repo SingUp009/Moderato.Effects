@@ -1,6 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>LINQ query syntax for <see cref="Effect{T, E, R}"/>. The first failure short-circuits. A step that cannot fail mixes with steps of any error type.</summary>
+/// <summary>LINQ query syntax for <see cref="Effect{T, E, R}"/>, short-circuiting on the first failure; a step that cannot fail mixes with any error type.</summary>
 public static class EffectLinq
 {
     /// <summary><c>select</c></summary>

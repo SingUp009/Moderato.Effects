@@ -1,6 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>An environment that provides <typeparamref name="TService"/>. Effects list what they need as <c>where R : IHas&lt;TService&gt;</c>.</summary>
+/// <summary>An environment providing <typeparamref name="TService"/>, required as <c>where R : IHas&lt;TService&gt;</c>.</summary>
 /// <typeparam name="TService">The service.</typeparam>
 public interface IHas<TService>
 {
@@ -30,7 +30,7 @@ public sealed class EmptyEnvironment
     public static EmptyEnvironment Value { get; } = new();
 }
 
-/// <summary>An environment that provides only the services the library itself uses: the system clock and the shared random number generator.</summary>
+/// <summary>An environment with only the system clock and the shared random number generator.</summary>
 public sealed class DefaultEnvironment : IHas<TimeProvider>, IHas<Random>
 {
     private DefaultEnvironment() { }

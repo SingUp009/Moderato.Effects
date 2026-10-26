@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Finds misuse of a scope inside its Gen block that the runtime can only catch late, or not at all (D11).</summary>
+/// <summary>Finds scope misuse in a Gen block that the runtime catches late or never (D11).</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 {

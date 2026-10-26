@@ -17,16 +17,13 @@ internal sealed record DiagnosticInfo(DiagnosticDescriptor Descriptor, Location?
     public Diagnostic ToDiagnostic() => Diagnostic.Create(Descriptor, Location, [.. Arguments.Items]);
 }
 
-/// <summary>Where and how a partial declaration of the target type is written. Names are escaped for code; the hint name is not.</summary>
+/// <summary>Where and how a partial declaration is written; only the hint name is unescaped.</summary>
 internal sealed record Declaration(string Namespace, string Keyword, string Name, string Hint)
 {
     public string Open() => Namespace.Length == 0 ? "" : $"namespace {Namespace};\n\n";
 }
 
-/// <summary>
-/// How one type is reached from a union through its cases: the cases on the way, ending with the type itself.
-/// <paramref name="HoldsNull"/> says a null value in the last union on the way belongs to this type (see <see cref="Shapes.NullCase"/>).
-/// </summary>
+/// <summary>The cases from a union down to one type; <paramref name="HoldsNull"/> means a null in the last union belongs to it.</summary>
 internal sealed record CasePath(EquatableArray<string> Steps, bool HoldsNull = false)
 {
     public string Target => Steps.Items[Steps.Length - 1];
@@ -46,7 +43,7 @@ internal static class Shapes
         => type.AllInterfaces.Any(static i => i.ToDisplayString() == "System.Runtime.CompilerServices.IUnion")
             || type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute");
 
-    /// <summary>The case types of a union: the parameter types of its public single-parameter constructors.</summary>
+    /// <summary>A union's case types = the parameter types of its public one-parameter constructors.</summary>
     public static ImmutableArray<ITypeSymbol> Cases(INamedTypeSymbol union)
         => [.. union.InstanceConstructors
             .Where(c => c.DeclaredAccessibility == Accessibility.Public && c.Parameters.Length == 1
@@ -120,28 +117,22 @@ internal static class Shapes
         return expression;
     }
 
-    /// <summary>The type as a pattern names it: a pattern cannot test for a nullable type, so the outer <c>?</c> goes.</summary>
+    /// <summary>The type as a pattern names it, without the outer <c>?</c>.</summary>
     public static string PatternType(string name) => name.EndsWith("?", StringComparison.Ordinal) ? name.Substring(0, name.Length - 1) : name;
 
-    /// <summary>
-    /// The direct case a null value belongs to: the only one whose type admits null. A type pattern never matches null,
-    /// so null is tested on its own; with no such case, or several, null matches none.
-    /// </summary>
+    /// <summary>The direct case a null value belongs to: the only one admitting null, else none.</summary>
     public static string? NullCase(IEnumerable<string> directCases)
     {
         var admitting = directCases.Where(static c => c.EndsWith("?", StringComparison.Ordinal)).Take(2).ToList();
         return admitting.Count == 1 ? admitting[0] : null;
     }
 
-    /// <summary>
-    /// MEFF005 for each direct case of <paramref name="union"/> that admits null. A union holds only its value, so a null case and
-    /// an uninitialized union are the same; the generated code still treats null as that case (see <see cref="NullCase"/>).
-    /// </summary>
+    /// <summary>MEFF005 for each direct case of <paramref name="union"/> that admits null, which is indistinguishable from <c>default</c>.</summary>
     public static IEnumerable<DiagnosticInfo> NullableCases(INamedTypeSymbol union, Location location)
         => Cases(union).Select(Name).Where(static c => c.EndsWith("?", StringComparison.Ordinal))
             .Select(c => DiagnosticInfo.Create(Diagnostics.NullableCase, location, union.Name, c.Substring(c.LastIndexOf('.') + 1)));
 
-    /// <summary>A pattern test that narrows <paramref name="value"/> through the cases of <paramref name="path"/> to a null value in its last union.</summary>
+    /// <summary>A pattern narrowing <paramref name="value"/> along <paramref name="path"/> to a null in its last union.</summary>
     public static string NarrowToNull(CasePath path, string value)
     {
         var tests = new List<string>();

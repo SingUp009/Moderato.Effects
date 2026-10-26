@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Implements <c>IUnionRest</c> on <c>[RestOf&lt;E&gt;]</c> unions, so <c>Catch</c> can remove the one case of E they leave out.</summary>
+/// <summary>Implements <c>IUnionRest</c> on <c>[RestOf&lt;E&gt;]</c> unions for <c>Catch</c>.</summary>
 [Generator]
 public sealed class RestOfGenerator : IIncrementalGenerator
 {

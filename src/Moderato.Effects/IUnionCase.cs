@@ -1,6 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>A union <typeparamref name="TSelf"/> that has <typeparamref name="TCase"/> as a case. <c>[Error]</c> unions get this from the source generator.</summary>
+/// <summary>A union <typeparamref name="TSelf"/> with case <typeparamref name="TCase"/>, generated for <c>[Error]</c> unions.</summary>
 /// <typeparam name="TSelf">The union.</typeparam>
 /// <typeparam name="TCase">The case.</typeparam>
 public interface IUnionCase<TSelf, TCase> where TSelf : IUnionCase<TSelf, TCase>
