@@ -252,6 +252,22 @@ public class RetryTests
     }
 
     [Fact]
+    public async Task Retry_DuringShorterThanTheWait_StillWaitsTheFullDelayOnce()
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<TimeEnvironment>(int.MaxValue, new Counter());
+
+        // When
+        var result = await broken.Retry(Schedule.Spaced(TimeSpan.FromHours(1)).During(TimeSpan.FromSeconds(5)))
+            .RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(2)), result);
+        Assert.Equal([TimeSpan.FromHours(1)], clock.Waits);
+    }
+
+    [Fact]
     public async Task Retry_Jittered_SpreadsTheWaitAndRepeatsWithTheSameSeed()
     {
         // Given
