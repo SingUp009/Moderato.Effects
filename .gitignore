@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+
+## Test / coverage
+TestResults/
+coverage*.xml
+*.coverage
+
+## BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+## Packages
+*.nupkg
+*.snupkg
+artifacts/
+
