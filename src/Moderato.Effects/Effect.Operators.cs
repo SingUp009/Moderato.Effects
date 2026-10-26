@@ -244,7 +244,7 @@ public readonly partial struct Effect<T, E, R>
         _ => outcome.WithTypes<T, Never>(),
     };
 
-    // A handled Err drops its suppressed failures with it; defects among them must still be seen.
+    // A handled Err drops its suppressed failures, but their defects must still be reported.
     private static Outcome<U, Never> Handled<U>(Outcome<T, E> outcome, U value)
     {
         UnobservedFailures.ReportDefects(outcome.Suppressed);

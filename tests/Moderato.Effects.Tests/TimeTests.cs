@@ -506,7 +506,7 @@ public class TimeoutCallbackTests
         var gate = new ManualResetEventSlim();
         Effect<int, Never, TimeEnvironment> slow = Effect<TimeEnvironment>.Async(async ct =>
         {
-            // Registered first, so it runs last: the effect has already returned when it throws.
+            // Registered first, so it throws after the effect has returned.
             ct.Register(() =>
             {
                 gate.Wait();
@@ -541,8 +541,7 @@ public class TimeoutCallbackTests
         }
     }
 
-    // A clock whose single timer fires on another thread when the test says so, and whose disposal waits for that callback,
-    // as the system timer's does.
+    // A clock whose timer fires on demand on another thread and whose disposal waits for it.
     private sealed class ManualTime : TimeProvider
     {
         private ManualTimer? timer;

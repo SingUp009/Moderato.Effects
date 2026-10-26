@@ -111,7 +111,7 @@ public static class EffectScheduleExtensions
         return Recurrence.Repeat(effect, (_, _) => policy);
     }
 
-    // The schedule becomes a policy, so both forms share one executor. State is per run: a rerun starts its schedule over.
+    // Both forms share one policy executor, whose state is per run.
     private static Func<R, RunContext, Func<RetryContext<E>, Effect<bool, Never, R>>> ScheduledRetry<E, R>(ScheduleSpec spec, Func<E, bool>? when)
         where R : IHas<TimeProvider>
         => (env, _) =>

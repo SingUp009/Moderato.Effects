@@ -133,7 +133,7 @@ file static class Catching
         where TException : Exception
     {
         if (outcome.Kind != OutcomeKind.Die || outcome.Defect!.SourceException is not TException caught) return outcome;
-        // A ScopeFailure is a Gen block's control flow, not an error of the body; catching it would turn the block's Err into this one.
+        // ScopeFailure is a Gen block's control flow, so catching it would replace the block's Err.
         if (caught is ScopeFailure) return outcome;
 
         try
@@ -142,7 +142,7 @@ file static class Catching
         }
         catch (Exception exception)
         {
-            // The mapper failed while handling the caught defect; that defect stays as what came before.
+            // The mapper threw while handling the defect, which stays as earlier context.
             return Defects.From<T, E>(exception, context)
                 .After([new Suppressed(ExitCases.Die(outcome.Defect!), Relation.Sequential), .. outcome.Suppressed], outcome.Omitted);
         }

@@ -1,8 +1,7 @@
 using Moderato.Effects;
 using Moderato.Results;
 
-// Uses the package the way an application does: the [Error] and [Environment] generators must have run for this to compile,
-// and the Native AOT build must behave the same as the JIT one.
+// Uses the package as an application does, under both JIT and Native AOT.
 var env = new AppEnv(new Users(), TimeProvider.System);
 
 var found = await Profiles<AppEnv>.Find(1).Timeout(TimeSpan.FromSeconds(5)).RunAsync(env);

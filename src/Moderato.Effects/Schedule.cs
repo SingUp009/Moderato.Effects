@@ -115,11 +115,11 @@ internal sealed record ScheduleSpec(TimeSpan BaseDelay, double Factor)
         if (recurrence > MaxRecurrences) return null;
         if (elapsed >= MaxElapsed) return null;
 
-        // Once Pow overflows, 0 × ∞ is NaN; a zero base stays zero without relying on how NaN converts to long.
+        // 0 × ∞ = NaN once Pow overflows, so a zero base is kept at zero explicitly.
         var ticks = BaseDelay == TimeSpan.Zero ? 0 : BaseDelay.Ticks * Math.Pow(Factor, recurrence - 1);
         if (Jittered && random is not null) ticks *= 0.8 + (random.NextDouble() * 0.4);
         if (MaxDelay is { } max) ticks = Math.Min(ticks, max.Ticks);
-        // A growing schedule waits the longest the timer can hold rather than failing the run.
+        // A growing schedule caps at the longest wait the timer can hold.
         return TimeSpan.FromTicks((long)Math.Min(ticks, Timeouts.LongestWait.Ticks));
     }
 }

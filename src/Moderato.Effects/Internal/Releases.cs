@@ -47,16 +47,16 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         {
             bodyEnded = true;
             if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects.ToImmutable());
-            // The body is canceled for a child's defect or, in a Gen block, for a step it left running; a callback may have thrown either way.
+            // Any cancellation of the body may have left a callback failure.
             body = bodyCancellation.WithCallbackFailure(body);
             if (this.actions.Count == 0) return body;
             actions = [.. this.actions];
             this.actions.Clear();
         }
 
-        // Fixed before any release runs, so a failing release cannot change what the later ones see.
+        // Fixed before any release runs, so a failing release cannot change what later ones see.
         var exit = ExitCases.From(body);
-        // Releases ignore the run's token: a canceled token would stop a rollback from running.
+        // Releases ignore the run's token, which would otherwise stop a rollback.
         var context = new RunContext(CancellationToken.None);
 
         var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>();
@@ -80,7 +80,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             }
             else
             {
-                // A release that succeeded can still carry failures, such as a Race whose loser died; they go along with the outcome.
+                // A successful release may still carry failures, such as a dead Race loser.
                 carried.AddRange(released.Suppressed);
                 carriedOmitted += released.Omitted;
             }
@@ -104,7 +104,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             suppressed.AddRange(other.Suppressed);
         }
 
-        // A joined child's defect reaches the body too; it is the same failure, not a second one.
+        // A joined child's defect also reached the body, so it is not counted twice.
         var sameDefect = body.Kind == OutcomeKind.Die && defects.Any(d => ReferenceEquals(d.Defect!.SourceException, body.Defect!.SourceException));
         if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
             suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
@@ -112,7 +112,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + defects.Sum(static d => d.Omitted));
     }
 
-    // Each failed release brings its own suppressed failures along, so a release that failed twice loses neither.
+    // Each failed release keeps its own suppressed failures.
     private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
     {
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
@@ -124,7 +124,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             return Outcome<T, E>.Die(body.Defect!, suppressed.ToImmutable(), omitted: omitted);
         }
 
-        // A release defect is independent, so it outranks a body defect that only followed from cancellation.
+        // An independent release defect outranks a body defect caused by cancellation.
         var primary = defects[0];
         if (ExitCases.FailureOf(body) is { } bodyFailure)
             suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));

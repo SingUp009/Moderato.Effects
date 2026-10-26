@@ -5,7 +5,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Benchmarks;
 
-// The cost of describing work as an effect: build once, then run Map → AndThen, on the success and failure path.
+// The cost of an effect built once and run as Map → AndThen, on both paths.
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
@@ -27,7 +27,7 @@ public class ChainBenchmarks
             return await scope.Run(Half(x + 2));
         });
 
-        // Every row must compute the same thing, or some row is measuring a different path.
+        // Every row must compute the same thing to measure the same path.
         int[] rows = [Result_(), AsyncResult().AsTask().Result, Effect_Combinators().AsTask().Result, Effect_Gen().AsTask().Result];
         if (rows.Distinct().Count() != 1) throw new InvalidOperationException("Benchmarks disagree: " + string.Join(", ", rows));
     }

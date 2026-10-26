@@ -61,7 +61,7 @@ internal sealed class Cancellation : IDisposable
         }
         catch (AggregateException exception)
         {
-            // A callback registered on the token threw. The owner still has to wait for its work, so the defect is kept for it instead.
+            // The owner still waits for its work, so a callback's defect is kept for it.
             Keep(exception);
         }
 
@@ -83,8 +83,7 @@ internal sealed class Cancellation : IDisposable
         }
     }
 
-    // The owner may have taken the failure already: the work can end inline on the canceling thread before a later callback throws,
-    // or another thread canceled while the owner was finishing. Then no outcome is left to carry the defect.
+    // A failure arriving after the owner took it has no outcome left to carry it, so it is reported.
     private void Keep(AggregateException exception)
     {
         // Linked tokens nest one AggregateException per level.

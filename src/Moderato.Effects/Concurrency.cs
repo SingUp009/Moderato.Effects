@@ -3,7 +3,7 @@ namespace Moderato.Effects;
 /// <summary>How a group of effects runs. <c>default</c> is <see cref="Sequential"/>.</summary>
 public readonly struct Concurrency : IEquatable<Concurrency>
 {
-    // 0: sequential, -1: parallel without a limit, n > 0: parallel with at most n at a time.
+    // 0 = sequential, -1 = unbounded, n > 0 = at most n at a time.
     private readonly int maxDegree;
 
     private Concurrency(int maxDegree) => this.maxDegree = maxDegree;

@@ -16,7 +16,7 @@ public static class EffectUnionExtensions
         return Catch(effect, handler);
     }
 
-    // A separate overload: with E as a method type parameter, a handler returning Effect<T, Never, R> would make E ambiguous.
+    // A separate overload, since a handler returning Effect<T, Never, R> would leave E ambiguous.
     /// <summary>Recovers from one case of the error union with an effect that cannot fail; other cases pass through.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="handler">Builds the recovery from the case.</param>

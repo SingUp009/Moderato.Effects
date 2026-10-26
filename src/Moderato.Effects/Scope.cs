@@ -142,7 +142,7 @@ public sealed class Scope<E, R>
 
         if (!task.IsCompletedSuccessfully)
         {
-            // The step before this one was left behind without being awaited (MEFF310); it is settled when the block ends.
+            // The previous step was not awaited (MEFF310), so the block's end settles it.
             if (Volatile.Read(ref running) is { Observed: false } previous) (unobserved ??= []).Add(previous);
             var pending = new PendingStep<T>();
             Volatile.Write(ref running, pending);
@@ -162,7 +162,7 @@ public sealed class Scope<E, R>
             }
             catch (Exception exception)
             {
-                // A step should end in an outcome, not throw; if it does anyway, waiters must still be released.
+                // A step that throws instead of ending in an outcome must still release its waiters.
                 outcome = Defects.From<T, E>(exception, context);
             }
             finally
@@ -357,7 +357,7 @@ public sealed class Scope<E, R>
 
     private void ThrowIfFailed()
     {
-        // F20: once an Err has ended the block, later steps must not run, even if a catch swallowed the ScopeFailure.
+        // F20: after an Err, later steps must not run even if a catch swallowed the ScopeFailure.
         if (failed) throw new ScopeFailure(this, error);
     }
 

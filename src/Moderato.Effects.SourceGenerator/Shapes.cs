@@ -41,7 +41,7 @@ internal static class Shapes
 
     public static string Name(ITypeSymbol type) => type.ToDisplayString(FullName);
 
-    // Detected by the runtime contract rather than syntax: source unions show IUnion, unions from metadata also carry [Union].
+    // Source unions implement IUnion; unions from metadata also carry [Union].
     public static bool IsUnion(ITypeSymbol type)
         => type.AllInterfaces.Any(static i => i.ToDisplayString() == "System.Runtime.CompilerServices.IUnion")
             || type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute");
@@ -93,12 +93,12 @@ internal static class Shapes
         return new Declaration(global ? "" : type.ContainingNamespace.ToDisplayString(), keyword, Escape(type.Name), hint);
     }
 
-    // Hint names allow no '@', so they use the names as declared.
+    // Hint names disallow '@'.
     private static readonly SymbolDisplayFormat unescapedNamespace = new(
         globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
         typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
-    // A type may be named with a keyword, such as @class; the generated declaration has to keep the @.
+    // A keyword name such as @class must keep its @.
     private static string Escape(string name) => SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None ? name : "@" + name;
 
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
@@ -114,7 +114,7 @@ internal static class Shapes
     /// <summary>A conversion from a case at the end of <paramref name="path"/> up to the union at its start.</summary>
     public static string Widen(CasePath path, string value)
     {
-        // Each step is a union conversion; casting through the middle unions, innermost first, reaches the outermost case.
+        // Casting through each middle union, innermost first, reaches the outermost case.
         var expression = value;
         for (var i = path.Steps.Length - 2; i >= 0; i--) expression = $"({path.Steps.Items[i]}){expression}";
         return expression;

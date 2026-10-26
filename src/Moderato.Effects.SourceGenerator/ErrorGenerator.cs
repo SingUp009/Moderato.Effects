@@ -44,7 +44,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
                 continue;
             }
 
-            // A direct case stays usable; only the nested routes to the same type are ambiguous.
+            // Only the nested routes are ambiguous, so the direct case stays usable.
             if (paths.FirstOrDefault(static p => p.IsDirect) is { } direct) cases.Add(direct);
             var routes = string.Join(", ", paths.Select(static p => string.Join(" > ", p.Steps.Items.Select(Short))));
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.AmbiguousCase, location, type.Name, Short(entry.Key), routes));

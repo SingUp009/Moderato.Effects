@@ -61,7 +61,7 @@ public sealed class Fiber<T, E, R>
         try
         {
             var outcome = await task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
-            // Only an outcome the joiner actually received counts as observed; a canceled wait leaves it to the release.
+            // Only an outcome the joiner received counts as observed.
             Volatile.Write(ref joined, 1);
             return outcome;
         }
@@ -80,7 +80,7 @@ public sealed class Fiber<T, E, R>
         var released = Observe(outcome);
         if (callbackFailure is null) return released;
 
-        // A callback that threw while the fiber was being canceled is a defect of the release, raised only after the fiber has ended.
+        // A callback that threw during cancellation fails the release once the fiber has ended.
         return released.Kind == OutcomeKind.Die
             ? released.After([new Suppressed(ExitCases.Die(callbackFailure), Relation.Sequential)])
             : Outcome<Unit, Never>.Die(callbackFailure);
@@ -93,7 +93,7 @@ public sealed class Fiber<T, E, R>
         switch (outcome.Kind)
         {
             case OutcomeKind.Die when !outcome.Consequential && !reportedToOwner:
-                // The defect came after the parent's body had ended, so it fails the release instead.
+                // The parent's body had already ended, so the defect fails the release.
                 return outcome.WithTypes<Unit, Never>();
             case OutcomeKind.Die when outcome.Consequential:
                 UnobservedFailures.Report(ExitCases.ToDie(outcome));

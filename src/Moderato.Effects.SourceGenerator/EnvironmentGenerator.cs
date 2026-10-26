@@ -77,7 +77,7 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
         return new Model(Shapes.Declare(type, node), services.ToEquatableArray(), diagnostics.ToEquatableArray());
     }
 
-    // The primary constructor is the one declared on a type declaration's own parameter list; a record's copy constructor is not.
+    // A record's copy constructor is not the primary constructor.
     private static IMethodSymbol? PrimaryConstructor(INamedTypeSymbol type)
         => type.InstanceConstructors.FirstOrDefault(c =>
             c.DeclaringSyntaxReferences.Any(static r => r.GetSyntax() is TypeDeclarationSyntax { ParameterList: not null })

@@ -1,6 +1,6 @@
 namespace Moderato.Effects.SourceGenerator.Tests;
 
-// Mistakes the types must reject (the failing cases of spike S1, plus the random number need of a jittered schedule).
+// Mistakes the types must reject: spike S1's failing cases and a jittered schedule without IHas<Random>.
 public class CompileErrorTests
 {
     private static string Program(string body) => $$"""

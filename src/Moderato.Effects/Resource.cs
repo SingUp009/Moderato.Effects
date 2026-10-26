@@ -160,7 +160,7 @@ public static class Resource
         var run = acquire.Run;
         return new((env, context, releases) => Steps.Then(run(env, context), outcome =>
         {
-            // Registered as soon as the value exists, before anything checks the token, so a cancellation right after cannot leak it.
+            // Registered before any token check, so a cancellation right after cannot leak the value.
             if (outcome.Kind == OutcomeKind.Ok)
             {
                 var value = outcome.Value;

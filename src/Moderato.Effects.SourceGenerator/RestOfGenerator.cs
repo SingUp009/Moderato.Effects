@@ -45,7 +45,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfNotUnion, location, name));
         }
 
-        // F16: only direct cases of the source can be left out; nested cases of F still count as held.
+        // F16: only a direct case of the source can be left out.
         var held = Shapes.Reachable(type);
         var sourceCases = Shapes.Cases(source).Select(Shapes.Name).ToList();
         var missing = sourceCases.Where(c => !held.ContainsKey(c)).ToList();
@@ -76,7 +76,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], Shapes.NullCase(sourceCases), rests, nullable);
     }
 
-    // A case of the rest that E cannot produce is extra; a union the rest adds to group E's cases is looked into instead.
+    // A rest case ∉ E's cases is extra, unless it is a union grouping E's cases.
     private static List<string> Extras(INamedTypeSymbol rest, HashSet<string> allowed)
     {
         var extras = new List<string>();

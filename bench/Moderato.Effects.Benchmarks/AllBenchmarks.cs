@@ -3,7 +3,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Benchmarks;
 
-// Running eight small async steps together: Task.WhenAll against Effect.All in both modes.
+// Eight small async steps: Task.WhenAll vs Effect.All in both modes.
 [MemoryDiagnoser]
 public class AllBenchmarks
 {

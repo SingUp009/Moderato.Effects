@@ -18,7 +18,7 @@ internal static class Timeouts
     /// <summary>The longest wait <c>Task.Delay</c> and the system timer accept.</summary>
     internal static TimeSpan LongestWait { get; } = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
 
-    // Rejected here, so a wait the timer cannot hold is a usage error rather than a defect when the effect runs.
+    // Rejected here, so an overlong wait is a usage error rather than a defect at run time.
     internal static void ThrowIfInvalid(TimeSpan after)
     {
         if (after == Timeout.InfiniteTimeSpan) return;
@@ -54,7 +54,7 @@ internal static class Timeouts
                 timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
             }
 
-            // After the timer is disposed, which waits for a running timer callback, so its callback failures are in.
+            // Taken after disposing the timer, which waits for its callback.
             inner = cancellation.WithCallbackFailure(inner);
         }
         catch (Exception exception)
@@ -62,13 +62,12 @@ internal static class Timeouts
             return Defects.From<U, F>(exception, context);
         }
 
-        // The caller's cancellation outranks the timer (F12): the outcome is whatever the caller's cancellation made of it.
+        // F12: the caller's cancellation outranks the timer.
         if (!timedOutFirst || context.CancellationToken.IsCancellationRequested) return passthrough(inner);
 
         if (inner.Kind == OutcomeKind.Die && !inner.Consequential)
         {
-            // An independent defect, typically from a release action, outranks the timeout; the timeout becomes context.
-            // Decided before the timeout's error is built, so a failing onTimeout cannot hide it.
+            // An independent defect outranks the timeout, checked before onTimeout so that it cannot hide the defect.
             var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
             suppressed.Add(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
             suppressed.AddRange(inner.Suppressed.Where(static s => s.Case is not Interrupted));
@@ -88,7 +87,7 @@ internal static class Timeouts
         return AfterCanceled(timeout, inner);
     }
 
-    // What the canceled effect ended with follows from the timeout, so it stays as context.
+    // The canceled effect's outcome follows from the timeout, so it stays as context.
     private static Outcome<U, F> AfterCanceled<T, E, U, F>(Outcome<U, F> timeout, Outcome<T, E> inner) => inner.Kind switch
     {
         OutcomeKind.Die => timeout.After([new Suppressed(ExitCases.Die(inner.Defect!), Relation.Consequence), .. inner.Suppressed], inner.Omitted),

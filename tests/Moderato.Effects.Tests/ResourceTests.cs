@@ -844,7 +844,7 @@ public class ReleaseSuppressedTests
 {
     private const string MESSAGE = "race loser failed during release";
 
-    // A release that succeeds while its losing branch dies: the Race is Ok, the loser's defect is suppressed.
+    // A release whose Race is Ok while its loser dies.
     private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
     {
         var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

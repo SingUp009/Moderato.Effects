@@ -57,7 +57,7 @@ internal static class Concurrent
         var workers = new Task[Math.Min(concurrency.MaxDegree ?? children.Length, children.Length)];
         for (var w = 0; w < workers.Length; w++)
         {
-            // On the thread pool so a child that blocks before its first await cannot keep its siblings from starting.
+            // On the thread pool, so a child blocking before its first await cannot stall its siblings.
             workers[w] = Task.Run(async () =>
             {
                 int i;
@@ -85,7 +85,7 @@ internal static class Concurrent
 
             var afterCancel = group.Token.IsCancellationRequested;
             var reason = stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure;
-            // The child that cancels the group carries any defect a cancellation callback threw.
+            // The child that cancels the group carries any callback defect.
             if (Stops(outcome.Kind, stopOn) && group.TryCancel(reason)) outcome = group.WithCallbackFailure(outcome);
             ends[i] = new(outcome, afterCancel, Interlocked.Increment(ref order));
         }

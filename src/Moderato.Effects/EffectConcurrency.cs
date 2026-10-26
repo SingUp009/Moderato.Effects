@@ -157,8 +157,7 @@ public static partial class Effect
                 return Concurrent.Fail<T, E, T[], E[]>(ends, primary, static error => [error]);
             }
 
-            // Errors from only the children that ran, or errors made from the caller's cancellation, would look like a complete
-            // validation; they stay as context instead.
+            // Errors from a partial or canceled run would pass for a full validation, so they stay as context.
             if (Interrupted(ends, context) || CanceledIntoErr(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
 
             if (ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err))
@@ -219,12 +218,12 @@ public static partial class Effect
         return earliest;
     }
 
-    // An independent defect anywhere outranks the winner, so a loser's failing release is never dropped (G3).
+    // G3: an independent defect outranks the winner.
     private static Outcome<T, E> Settle<T, E>(ChildEnd<T, E>[] ends, int? winner, RunContext context)
     {
         var callerCanceled = context.CancellationToken.IsCancellationRequested;
         var primary = Concurrent.PrimaryFailure(ends, callerCanceled);
-        // No winner and no failure that decides: the caller canceled. Children that ran may still have failed after it; that stays as context.
+        // No winner ∧ no deciding failure ⇒ the caller canceled.
         if (primary is null && winner is null) return InterruptedWithOthers<T, E, T, E>(ends);
         var decidedByFailure = primary is { } p
             && (ends[p].Outcome.Kind == OutcomeKind.Die && ends[p].IsIndependentFailure
@@ -251,15 +250,14 @@ public static partial class Effect
     private static bool CanceledIntoErr<T, E>(ChildEnd<T, E>[] ends, RunContext context)
         => context.CancellationToken.IsCancellationRequested && ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err && end.AfterCancel);
 
-    // Every child ran and none failed; a child that never ran means the caller canceled before it could start.
-    // Cancellation decides the outcome, but what the children already failed with stays as context rather than vanishing.
+    // The caller's cancellation decides, and the children's failures stay as context.
     private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)
     {
         var (others, omitted) = Concurrent.Others(ends, null);
         return Outcome<U, F>.Interrupted().WithSuppressed(others, omitted);
     }
 
-    // Reached only when no failure decided the outcome, so a child that did not succeed ended because the caller canceled.
+    // No failure decided, so a child that is not Ok was stopped by the caller's cancellation.
     private static Outcome<U, F> Succeeded<T, E, U, F>(ChildEnd<T, E>[] ends, Func<T[], U> build)
     {
         if (ends.Any(static end => end.Outcome.Kind != OutcomeKind.Ok || !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);

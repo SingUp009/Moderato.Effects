@@ -94,7 +94,7 @@ public readonly partial struct Effect<T, E, R>
         switch (outcome.Kind)
         {
             case OutcomeKind.Ok:
-                // Results' Ok and Err have nowhere to carry suppressed failures, so defects among them would vanish silently.
+                // Result cannot carry suppressed failures, so their defects are reported here.
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return new(new Result<T, E>(new Ok<T>(outcome.Value)));
             case OutcomeKind.Err:
@@ -106,14 +106,14 @@ public readonly partial struct Effect<T, E, R>
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
-                // An inner cancellation, such as a fiber whose scope has ended, interrupts the run while the caller's token is not canceled.
+                // An inner cancellation can interrupt the run while the caller's token is not canceled.
                 return ValueTask.FromCanceled<Result<T, E>>(cancellationToken.IsCancellationRequested ? cancellationToken : new CancellationToken(canceled: true));
         }
     }
 
     private static Exit<T, E> ToExit(Outcome<T, E> outcome) => Exits.From(outcome);
 
-    // One key, overwritten: an exception thrown again by a later run must not accumulate stale entries.
+    // Overwritten, so a rethrown exception does not accumulate stale entries.
     private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed)
     {
         if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);

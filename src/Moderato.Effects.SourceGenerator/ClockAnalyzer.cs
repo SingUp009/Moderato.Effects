@@ -43,7 +43,7 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         context.RegisterOperationAction(static ctx =>
         {
             var method = ((IInvocationOperation)ctx.Operation).TargetMethod;
-            // An overload that takes a TimeProvider waits on the clock it is given; TimeProvider.System itself is reported on its own.
+            // An overload taking a TimeProvider uses that clock, and TimeProvider.System is reported separately.
             if (method.Parameters.Any(static p => p.Type.ToDisplayString() == "System.TimeProvider")) return;
             Check(ctx, $"{method.ContainingType.ToDisplayString()}.{method.Name}", methods);
         }, OperationKind.Invocation);
@@ -58,7 +58,7 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(Diagnostics.SystemClock, context.Operation.Syntax.GetLocation(), shortName, instead));
     }
 
-    // Effect code is a Gen block, or an argument to one of the Effect<R> factories (Succeed's value included).
+    // Effect code = a Gen block ∪ arguments to Effect<R> factories, Succeed's value included.
     private static bool InEffect(SemanticModel model, SyntaxNode node)
     {
         foreach (var ancestor in node.Ancestors())

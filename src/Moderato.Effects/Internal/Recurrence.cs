@@ -44,7 +44,7 @@ internal static class Recurrence
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome);
 
-            // The failed attempt is handled by trying again, so its suppressed failures are not carried over; defects among them are still seen.
+            // A retried attempt's suppressed failures are dropped, but its defects are still reported.
             UnobservedFailures.ReportDefects(outcome.Suppressed);
             UnobservedFailures.ReportDefects(decision.Suppressed);
         }
@@ -104,15 +104,14 @@ internal static class Recurrence
         }
     }
 
-    // An attempt or a policy that ignores the token would otherwise go on, possibly forever without yielding.
-    // A policy that decides to stop despite a cancellation still ends the run with the last outcome: no further work was skipped.
+    // Without this, an attempt or policy that ignores the token could run forever.
     private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
     {
         UnobservedFailures.ReportDefects(decision.Suppressed);
         return Interrupt(Outcome<bool, Never>.Interrupted(), last);
     }
 
-    // The policy died or was interrupted (typically while waiting); the last attempt's outcome stays as context.
+    // The policy failed, so the last attempt's outcome stays as context.
     private static Outcome<T, E> Interrupt<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
     {
         var failure = decision.WithTypes<T, E>();
@@ -148,13 +147,12 @@ internal sealed class ScheduleClock<R> where R : IHas<TimeProvider>
     /// <summary>Waits before recurrence <paramref name="recurrence"/>, or decides to stop.</summary>
     internal Effect<bool, Never, R> WaitBefore(int recurrence)
     {
-        // Only one Retry runs this clock at a time, so its private Random needs no lock.
+        // One Retry at a time uses this clock, so its private Random needs no lock.
         if (spec.Next(recurrence, time.GetElapsedTime(started), random) is not { } delay) return Effect<R>.Succeed(false);
         return Effect.Sleep<R>(delay).Map(static _ => true);
     }
 
-    // The environment's Random is touched once per run, under a lock, so one that is not thread-safe survives parallel retries (F6).
-    // Only the seed comes from it; the jitter itself uses the standard algorithm (F23).
+    // Only a seed is taken, once per run under a lock, so a non-thread-safe Random survives parallel retries (F6, F23).
     private static Random Derive(Random shared)
     {
         int seed;
