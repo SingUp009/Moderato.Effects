@@ -347,7 +347,7 @@ public class AllErrorsTests
     }
 
     [Fact]
-    public async Task AllErrors_CallerCancelsBeforeTheLastRuns_IsInterruptedWithTheEarlierErrorAsContext()
+    public async Task AllErrors_CallerCancelsBeforeTheLastRuns_IsInterruptedWithoutRunningIt()
     {
         // Given
         using var cts = new CancellationTokenSource();
