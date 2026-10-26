@@ -1,9 +1,6 @@
 namespace Moderato.Effects;
 
-/// <summary>
-/// A union <typeparamref name="TSelf"/> that holds every case of <typeparamref name="TSource"/> except <typeparamref name="TCase"/>.
-/// <c>[RestOf&lt;E&gt;]</c> unions get this from the source generator.
-/// </summary>
+/// <summary>A union <typeparamref name="TSelf"/> holding every case of <typeparamref name="TSource"/> except <typeparamref name="TCase"/>, generated for <c>[RestOf&lt;E&gt;]</c> unions.</summary>
 /// <typeparam name="TSelf">The rest.</typeparam>
 /// <typeparam name="TSource">The full union.</typeparam>
 /// <typeparam name="TCase">The case left out.</typeparam>

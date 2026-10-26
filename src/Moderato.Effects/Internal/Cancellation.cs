@@ -14,10 +14,7 @@ internal enum CancellationReason
     ChildDefect,
 }
 
-/// <summary>
-/// A unit that can cancel the work it owns, linked to its parent's token. Either the work settles first or one reason
-/// wins; whichever comes first is final.
-/// </summary>
+/// <summary>A cancellation unit linked to its parent, where settling or the first reason wins for good.</summary>
 internal sealed class Cancellation : IDisposable
 {
     private const int SETTLED = -1;
@@ -31,10 +28,7 @@ internal sealed class Cancellation : IDisposable
 
     internal Cancellation(CancellationToken parent) => source = CancellationTokenSource.CreateLinkedTokenSource(parent);
 
-    /// <summary>
-    /// A unit for the caller's token. It is not linked, but canceled from a registration, so a callback that throws when the caller
-    /// cancels is kept for the run instead of being thrown from the caller's <c>Cancel()</c>.
-    /// </summary>
+    /// <summary>A unit for the caller's token, canceled from a registration so a throwing callback stays out of the caller's <c>Cancel()</c>.</summary>
     internal static Cancellation ForCaller(CancellationToken caller)
     {
         var unit = new Cancellation(CancellationToken.None);
@@ -61,7 +55,7 @@ internal sealed class Cancellation : IDisposable
         }
         catch (AggregateException exception)
         {
-            // A callback registered on the token threw. The owner still has to wait for its work, so the defect is kept for it instead.
+            // The owner still waits for its work, so a callback's defect is kept for it.
             Keep(exception);
         }
 
@@ -83,8 +77,7 @@ internal sealed class Cancellation : IDisposable
         }
     }
 
-    // The owner may have taken the failure already: the work can end inline on the canceling thread before a later callback throws,
-    // or another thread canceled while the owner was finishing. Then no outcome is left to carry the defect.
+    // A failure arriving after the owner took it has no outcome left to carry it, so it is reported.
     private void Keep(AggregateException exception)
     {
         // Linked tokens nest one AggregateException per level.
@@ -93,14 +86,14 @@ internal sealed class Cancellation : IDisposable
         if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
     }
 
-    /// <summary>Takes the defect a callback threw when this unit was canceled, if any. A defect caught after this is reported instead.</summary>
+    /// <summary>Takes a callback's defect from the cancellation, after which defects are reported.</summary>
     internal ExceptionDispatchInfo? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as ExceptionDispatchInfo;
 
-    /// <summary>Takes the callback defect, if any, and puts it on the outcome as a failure that followed from the cancellation.</summary>
+    /// <summary>Takes the callback defect, if any, onto the outcome as a consequence of the cancellation.</summary>
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
         => TakeCallbackFailure() is { } failure ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)]) : outcome;
 
-    /// <summary>Marks the work as finished. Returns false if a reason won first.</summary>
+    /// <summary>Marks the work finished; false if a reason won first.</summary>
     internal bool TrySettle() => Interlocked.CompareExchange(ref state, SETTLED, 0) == 0;
 
     public void Dispose()

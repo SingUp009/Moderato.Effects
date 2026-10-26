@@ -109,7 +109,7 @@ public class FailureModelTests
         {
             var first = await scope.Fork(FailingReleases(120));
             var second = await scope.Fork(FailingReleases(130));
-            // Waits outside the canceled body token, so both defects reach the scope before the body ends.
+            // Ignores the canceled body token, so both defects arrive before the body ends.
             await first.Join().RunExitAsync(CancellationToken.None);
             await second.Join().RunExitAsync(CancellationToken.None);
             return 1;
@@ -244,7 +244,7 @@ public class CallerCancellationCallbackTests
         var stop = new TaskCompletionSource<int>();
         var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
-            // Callbacks run last-registered first, so the run can end inline before this one throws; it stays registered past the body.
+            // Registered first and kept past the body, so it throws after the run has ended inline.
             scope.CancellationToken.Register(() => throw new InvalidOperationException(MESSAGE));
             scope.CancellationToken.Register(() => stop.TrySetResult(42));
             ready.SetResult();

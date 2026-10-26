@@ -4,10 +4,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects;
 
-/// <summary>
-/// A lazy description of a value that must be released after use. Get the value with <see cref="Use{U}"/>, or with
-/// <see cref="Scope{E, R}.Acquire{T}"/> inside a Gen block; it is released when that ends. <c>default</c> is invalid.
-/// </summary>
+/// <summary>A lazy description of a value released after use, through <see cref="Use{U}"/> or <see cref="Scope{E, R}.Acquire{T}"/>; <c>default</c> is invalid.</summary>
 [DebuggerDisplay("Resource<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly struct Resource<T, E, R>
 {
@@ -27,7 +24,7 @@ public readonly struct Resource<T, E, R>
     }
 
     /// <summary>Acquires the value, runs <paramref name="use"/> with it, then releases it however the use ended.</summary>
-    /// <param name="use">Builds the work that uses the value. Do not let the value escape it.</param>
+    /// <param name="use">Builds the work using the value, which must not escape it.</param>
     /// <returns>An effect whose outcome is the use's outcome.</returns>
     public Effect<U, E, R> Use<U>(Func<T, Effect<U, E, R>> use)
     {
@@ -74,7 +71,7 @@ public readonly struct Resource<T, E, R>
         }
     }
 
-    /// <summary>Transforms the value. The release still receives the original value.</summary>
+    /// <summary>Transforms the value; the release still gets the original.</summary>
     /// <param name="mapper">Transforms the value.</param>
     /// <returns>A resource with the transformed value.</returns>
     public Resource<U, E, R> Map<U>(Func<T, U> mapper)
@@ -116,7 +113,7 @@ public readonly struct Resource<T, E, R>
         }));
     }
 
-    /// <summary>Acquires a second resource that depends on this one. They are released in reverse order.</summary>
+    /// <summary>Acquires a dependent second resource; release order is reversed.</summary>
     /// <param name="binder">Builds the second resource from this one's value.</param>
     /// <returns>A resource for the second value.</returns>
     public Resource<U, E, R> AndThen<U>(Func<T, Resource<U, E, R>> binder)
@@ -152,7 +149,7 @@ public static class Resource
 {
     /// <summary>A resource acquired by <paramref name="acquire"/> and released by <paramref name="release"/>.</summary>
     /// <param name="acquire">Acquires the value.</param>
-    /// <param name="release">Releases the value; it receives how the use ended and runs with an uncanceled token.</param>
+    /// <param name="release">Releases the value, given how the use ended, with an uncanceled token.</param>
     /// <returns>The resource.</returns>
     public static Resource<T, E, R> Make<T, E, R>(Effect<T, E, R> acquire, Func<T, ExitCase, Effect<Unit, Never, R>> release)
     {
@@ -160,7 +157,7 @@ public static class Resource
         var run = acquire.Run;
         return new((env, context, releases) => Steps.Then(run(env, context), outcome =>
         {
-            // Registered as soon as the value exists, before anything checks the token, so a cancellation right after cannot leak it.
+            // Registered before any token check, so a cancellation right after cannot leak the value.
             if (outcome.Kind == OutcomeKind.Ok)
             {
                 var value = outcome.Value;
@@ -172,10 +169,7 @@ public static class Resource
     }
 }
 
-/// <summary>
-/// LINQ query syntax for <see cref="Resource{T, E, R}"/>. Resources are released in reverse order of acquisition.
-/// A resource that cannot fail mixes with resources of any error type.
-/// </summary>
+/// <summary>LINQ query syntax for <see cref="Resource{T, E, R}"/>, releasing in reverse order of acquisition.</summary>
 public static class ResourceLinq
 {
     /// <summary><c>select</c></summary>

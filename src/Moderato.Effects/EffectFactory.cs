@@ -7,7 +7,7 @@ namespace Moderato.Effects;
 /// <typeparam name="R">The environment the effects run with.</typeparam>
 public static class Effect<R>
 {
-    /// <summary>An effect that succeeds with the value. The value is computed once, when this is called.</summary>
+    /// <summary>An effect that succeeds with the value, computed once when this is called.</summary>
     /// <param name="value">The value.</param>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> Succeed<T>(T value)
@@ -16,7 +16,7 @@ public static class Effect<R>
         return new((_, _) => new(outcome));
     }
 
-    /// <summary>An effect that fails with the error. Name the error type, as in <c>Fail&lt;AppError&gt;(new NotFound(id))</c>, so it converts to the effect you return.</summary>
+    /// <summary>An effect that fails with the error; name its type, as in <c>Fail&lt;AppError&gt;(new NotFound(id))</c>.</summary>
     /// <param name="error">The expected error.</param>
     /// <returns>An effect that cannot succeed.</returns>
     public static Effect<Never, E, R> Fail<E>(E error)
@@ -36,7 +36,7 @@ public static class Effect<R>
         return new((_, _) => new(outcome));
     }
 
-    /// <summary>An effect that runs synchronous code each time it runs. Exceptions are defects.</summary>
+    /// <summary>An effect that runs synchronous code on each run; exceptions are defects.</summary>
     /// <param name="body">The code.</param>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> Sync<T>(Func<T> body)
@@ -45,8 +45,8 @@ public static class Effect<R>
         return new((_, context) => Steps.Run<T, Never>(body, context));
     }
 
-    /// <summary>An effect that runs asynchronous code each time it runs. Exceptions are defects.</summary>
-    /// <param name="body">The code. Receives the run's cancellation token.</param>
+    /// <summary>An effect that runs asynchronous code on each run; exceptions are defects.</summary>
+    /// <param name="body">The code, given the run's token.</param>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> Async<T>(Func<CancellationToken, ValueTask<T>> body)
     {
@@ -54,8 +54,8 @@ public static class Effect<R>
         return new((_, context) => Steps.RunAsync<T, Never>(body, context));
     }
 
-    /// <summary>An effect that runs asynchronous code returning a Result each time it runs. Exceptions are defects.</summary>
-    /// <param name="body">The code. Receives the run's cancellation token.</param>
+    /// <summary>An effect that runs asynchronous code returning a Result on each run; exceptions are defects.</summary>
+    /// <param name="body">The code, given the run's token.</param>
     /// <returns>An effect with the result's value and error.</returns>
     public static Effect<T, E, R> FromResultAsync<T, E>(Func<CancellationToken, ValueTask<Result<T, E>>> body)
     {
@@ -67,7 +67,7 @@ public static class Effect<R>
         });
     }
 
-    /// <summary>A typed try/catch: exceptions of <typeparamref name="TException"/> become the error, anything else is a defect. Write the handler as <c>(JsonException ex) =&gt; ...</c>.</summary>
+    /// <summary>A typed try/catch: <typeparamref name="TException"/> becomes the error, anything else is a defect.</summary>
     /// <param name="body">The code.</param>
     /// <param name="map">Turns a caught exception into the error.</param>
     /// <returns>An effect that fails with the mapped error.</returns>
@@ -86,7 +86,7 @@ public static class Effect<R>
     public static Effect<T, E, R> Try<T, E>(Func<T> body, Func<Exception, E> map) => Try<Exception, T, E>(body, map);
 
     /// <summary>The asynchronous form of <see cref="Try{TException, T, E}(Func{T}, Func{TException, E})"/>.</summary>
-    /// <param name="body">The code. Receives the run's cancellation token.</param>
+    /// <param name="body">The code, given the run's token.</param>
     /// <param name="map">Turns a caught exception into the error.</param>
     /// <returns>An effect that fails with the mapped error.</returns>
     public static Effect<T, E, R> TryAsync<TException, T, E>(Func<CancellationToken, ValueTask<T>> body, Func<TException, E> map)
@@ -98,13 +98,13 @@ public static class Effect<R>
     }
 
     /// <summary>The asynchronous form of <see cref="Try{T, E}(Func{T}, Func{Exception, E})"/>.</summary>
-    /// <param name="body">The code. Receives the run's cancellation token.</param>
+    /// <param name="body">The code, given the run's token.</param>
     /// <param name="map">Turns a caught exception into the error.</param>
     /// <returns>An effect that fails with the mapped error.</returns>
     public static Effect<T, E, R> TryAsync<T, E>(Func<CancellationToken, ValueTask<T>> body, Func<Exception, E> map)
         => TryAsync<Exception, T, E>(body, map);
 
-    /// <summary>An effect that reads from the environment each time it runs. Exceptions are defects.</summary>
+    /// <summary>An effect that reads from the environment on each run; exceptions are defects.</summary>
     /// <param name="read">Reads from the environment.</param>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> Access<T>(Func<R, T> read)
@@ -113,8 +113,8 @@ public static class Effect<R>
         return new((env, context) => Steps.Run<T, Never>(() => read(env), context));
     }
 
-    /// <summary>An effect that runs asynchronous code against the environment each time it runs. Exceptions are defects.</summary>
-    /// <param name="read">The code. Receives the environment and the run's cancellation token.</param>
+    /// <summary>An effect that runs asynchronous code against the environment on each run; exceptions are defects.</summary>
+    /// <param name="read">The code, given the environment and the run's token.</param>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> AccessAsync<T>(Func<R, CancellationToken, ValueTask<T>> read)
     {
@@ -128,12 +128,12 @@ public static class Effect<R>
 
 file static class Catching
 {
-    /// <summary>Turns a defect of the caught type into the error. The run's own cancellation is an interruption, not a defect, so it is never caught.</summary>
+    /// <summary>Turns a defect of the caught type into the error; the run's own cancellation is never caught.</summary>
     internal static Outcome<T, E> Map<TException, T, E>(Outcome<T, E> outcome, Func<TException, E> map, RunContext context)
         where TException : Exception
     {
         if (outcome.Kind != OutcomeKind.Die || outcome.Defect!.SourceException is not TException caught) return outcome;
-        // A ScopeFailure is a Gen block's control flow, not an error of the body; catching it would turn the block's Err into this one.
+        // ScopeFailure is a Gen block's control flow, so catching it would replace the block's Err.
         if (caught is ScopeFailure) return outcome;
 
         try
@@ -142,7 +142,7 @@ file static class Catching
         }
         catch (Exception exception)
         {
-            // The mapper failed while handling the caught defect; that defect stays as what came before.
+            // The mapper threw while handling the defect, which stays as earlier context.
             return Defects.From<T, E>(exception, context)
                 .After([new Suppressed(ExitCases.Die(outcome.Defect!), Relation.Sequential), .. outcome.Suppressed], outcome.Omitted);
         }

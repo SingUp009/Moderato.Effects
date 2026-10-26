@@ -57,7 +57,7 @@ public static class Compiler
             .GetAnalyzerDiagnosticsAsync()
             .GetAwaiter()
             .GetResult();
-        // Hidden diagnostics are IDE hints such as unnecessary usings; a build never shows them.
+        // Hidden diagnostics are IDE hints that a build never shows.
         ImmutableArray<Diagnostic> shown = [.. generatorDiagnostics.Concat(output.GetDiagnostics()).Concat(analyzerDiagnostics)
             .Where(static d => d.Severity != DiagnosticSeverity.Hidden)];
         return new Build(shown, generated);

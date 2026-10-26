@@ -34,8 +34,7 @@ internal static class UnobservedFailures
         }
     }
 
-    // Reporting must not turn into a failure of the work it observes (EffectDiagnostics): a closed stderr or a ToString that throws
-    // while building the message is dropped, since there is nowhere left to report it.
+    // Reporting must never fail the work it observes, so its own failures are dropped.
     private static void Write<TState>(TState state, Func<TState, string> message)
     {
         try

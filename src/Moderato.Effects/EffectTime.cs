@@ -9,8 +9,8 @@ public sealed record TimeoutError(TimeSpan After);
 
 public static partial class Effect
 {
-    /// <summary>An effect that waits for the duration on the environment's clock. Canceling the run cuts the wait short.</summary>
-    /// <param name="duration">How long to wait, at most about 49.7 days (the timer's limit). <see cref="Timeout.InfiniteTimeSpan"/> waits until canceled.</param>
+    /// <summary>Waits for the duration on the environment's clock, cut short by cancellation.</summary>
+    /// <param name="duration">How long, ≤ about 49.7 days; <see cref="Timeout.InfiniteTimeSpan"/> waits until canceled.</param>
     /// <returns>An effect that completes after the duration.</returns>
     public static Effect<Unit, Never, R> Sleep<R>(TimeSpan duration) where R : IHas<TimeProvider>
     {
@@ -25,13 +25,10 @@ public static partial class Effect
     }
 }
 
-/// <summary>
-/// Time limits. The limit is cooperative: when it passes, the effect is canceled and the result waits until the effect and its releases
-/// have finished. Work that ignores its token is not cut short.
-/// </summary>
+/// <summary>Cooperative time limits: the effect is canceled and awaited, releases included.</summary>
 public static class EffectTimeExtensions
 {
-    /// <summary>Fails with <see cref="TimeoutError"/>, a case of the error union, if the effect does not finish in time.</summary>
+    /// <summary>Fails with <see cref="TimeoutError"/>, a case of the error union, if the effect runs out of time.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
     /// <returns>An effect with the same error type.</returns>
@@ -68,10 +65,10 @@ public static class EffectTimeExtensions
         return Timeouts.Create(effect, after, static outcome => outcome, error => Outcome<T, E>.Err(onTimeout(error)));
     }
 
-    /// <summary>Succeeds with <c>Err(TimeoutError)</c> if the effect does not finish in time, so the timeout is a value rather than a failure.</summary>
+    /// <summary>Succeeds with <c>Err(TimeoutError)</c> if the effect runs out of time, making the timeout a value.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
-    /// <returns>An effect whose value is <c>Ok</c> with the effect's value, or <c>Err</c> with the timeout.</returns>
+    /// <returns><c>Ok</c> with the effect's value, or <c>Err</c> with the timeout.</returns>
     public static Effect<Result<T, TimeoutError>, E, R> TimeoutResult<T, E, R>(this Effect<T, E, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
         => Timeouts.Create(

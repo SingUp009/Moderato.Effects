@@ -5,7 +5,7 @@ namespace Moderato.Effects;
 /// <summary>Operations that need the error to be a union with a given case.</summary>
 public static class EffectUnionExtensions
 {
-    /// <summary>Recovers from one case of the error union; other cases pass through. Write the handler as <c>(NotFound nf) =&gt; ...</c>.</summary>
+    /// <summary>Recovers from one case of the error union, as in <c>(NotFound nf) =&gt; ...</c>.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="handler">Builds the recovery from the case.</param>
     /// <returns>An effect with the same error type.</returns>
@@ -16,8 +16,8 @@ public static class EffectUnionExtensions
         return Catch(effect, handler);
     }
 
-    // A separate overload: with E as a method type parameter, a handler returning Effect<T, Never, R> would make E ambiguous.
-    /// <summary>Recovers from one case of the error union with an effect that cannot fail; other cases pass through.</summary>
+    // A separate overload, since a handler returning Effect<T, Never, R> would leave E ambiguous.
+    /// <summary>Recovers from one case of the error union with an effect that cannot fail.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="handler">Builds the recovery from the case.</param>
     /// <returns>An effect with the same error type.</returns>

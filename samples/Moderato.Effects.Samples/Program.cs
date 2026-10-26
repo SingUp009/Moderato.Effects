@@ -6,8 +6,7 @@ var env = new AppEnv(new InMemoryUsers(), new Permissions(), TimeProvider.System
 // 1. Gen blocks: each step's error widens to AppError, and an Err stops the block.
 foreach (var id in new[] { 1, 2, 3 })
 {
-    // Pass the token explicitly here: the .NET 11 RC2 compiler wrongly reports CS8655 on the switch below
-    // when a call in a loop passes default for a CancellationToken.
+    // The token is explicit to avoid a spurious CS8655 from the .NET 11 RC2 compiler.
     var exit = await Profiles<AppEnv>.GetUserProfile(id).RunExitAsync(env, CancellationToken.None);
     Console.WriteLine(exit switch
     {

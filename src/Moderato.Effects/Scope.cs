@@ -7,10 +7,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects;
 
-/// <summary>
-/// The handle a Gen block uses to run effects. An Err ends the block, and its <c>finally</c> blocks and <c>using</c> declarations still run.
-/// Use it only inside its own block, from one logical flow at a time.
-/// </summary>
+/// <summary>The handle a Gen block runs effects with, used only in its own block from one flow at a time.</summary>
 /// <typeparam name="E">The error the block can fail with.</typeparam>
 /// <typeparam name="R">The environment the block runs with.</typeparam>
 public sealed class Scope<E, R>
@@ -18,7 +15,7 @@ public sealed class Scope<E, R>
     private readonly RunContext context;
     private readonly Cancellation cancellation;
     private readonly Releases<R> releases;
-    // A step the body did not await records on the scope from another thread, so recording and the body's end take turns.
+    // An unawaited step records from another thread, so recording and the block's end take turns.
     private readonly Lock gate = new();
     private ImmutableArray<Suppressed>.Builder? suppressed;
     private int omitted;
@@ -55,24 +52,24 @@ public sealed class Scope<E, R>
         return new((env, context) => new Scope<E, R>(env, context).RunBodyAsync(body));
     }
 
-    /// <summary>Runs an effect and returns its value. An Err ends the block.</summary>
+    /// <summary>Runs an effect and returns its value; an Err ends the block.</summary>
     /// <param name="effect">The effect.</param>
     /// <returns>The value.</returns>
     public ValueTask<T> Run<T>(Effect<T, E, R> effect)
         => Step(effect, static (effect, scope) => effect.Run(scope.Env, scope.context));
 
-    /// <summary>Acquires a resource and returns its value. It is released when the block ends, in reverse order of acquisition. An Err ends the block.</summary>
+    /// <summary>Acquires a resource, released in reverse order when the block ends; an Err ends the block.</summary>
     /// <param name="resource">The resource.</param>
     /// <returns>The value.</returns>
     public ValueTask<T> Acquire<T>(Resource<T, E, R> resource)
         => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope.context, scope.releases));
 
-    /// <summary>Starts the effect as a fiber that runs alongside the block. When the block ends, the fiber is canceled and the block waits for it.</summary>
+    /// <summary>Starts the effect as a fiber that the block cancels and awaits when it ends.</summary>
     /// <param name="effect">The effect.</param>
-    /// <returns>The running fiber. Get its outcome with <c>scope.Run(fiber.Join())</c>.</returns>
+    /// <returns>The fiber; get its outcome with <c>scope.Run(fiber.Join())</c>.</returns>
     public ValueTask<Fiber<T, F, R>> Fork<T, F>(Effect<T, F, R> effect) => Acquire<Fiber<T, F, R>>(effect.Fork());
 
-    /// <summary>Returns the value of a result. An Err ends the block.</summary>
+    /// <summary>Returns the value of a result; an Err ends the block.</summary>
     /// <param name="result">The result.</param>
     /// <returns>The value.</returns>
     public T Get<T>(Result<T, E> result)
@@ -91,7 +88,7 @@ public sealed class Scope<E, R>
         }
     }
 
-    /// <summary>Ends the block with the error. Write it as <c>throw scope.Fail(error)</c> so the compiler knows the code after it does not run.</summary>
+    /// <summary>Ends the block with the error; write <c>throw scope.Fail(error)</c> for flow analysis.</summary>
     /// <param name="error">The error.</param>
     /// <returns>Never returns.</returns>
     [DoesNotReturn]
@@ -111,7 +108,7 @@ public sealed class Scope<E, R>
         throw failure;
     }
 
-    /// <summary>Registers a release action that runs when the block ends, however it ends, in reverse order of registration.</summary>
+    /// <summary>Registers a release action that runs when the block ends, in reverse order.</summary>
     /// <param name="release">Builds the release from how the block ended.</param>
     public void Defer(Func<ExitCase, Effect<Unit, Never, R>> release)
     {
@@ -144,7 +141,7 @@ public sealed class Scope<E, R>
 
         if (!task.IsCompletedSuccessfully)
         {
-            // The step before this one was left behind without being awaited (MEFF310); it is settled when the block ends.
+            // The previous step was not awaited (MEFF310), so the block's end settles it.
             if (Volatile.Read(ref running) is { Observed: false } previous) (unobserved ??= []).Add(previous);
             var pending = new PendingStep<T>();
             Volatile.Write(ref running, pending);
@@ -164,7 +161,7 @@ public sealed class Scope<E, R>
             }
             catch (Exception exception)
             {
-                // A step should end in an outcome, not throw; if it does anyway, waiters must still be released.
+                // A step that throws instead of ending in an outcome must still release its waiters.
                 outcome = Defects.From<T, E>(exception, context);
             }
             finally
@@ -176,7 +173,7 @@ public sealed class Scope<E, R>
             Exception? failure = null;
             lock (gate)
             {
-                // Whether this step's Err is the one the block records as its own, before Unwrap records it.
+                // Whether this Err becomes the block's own, read before Unwrap records it.
                 var recordsError = outcome.Kind == OutcomeKind.Err && !failed;
                 try
                 {
@@ -191,13 +188,13 @@ public sealed class Scope<E, R>
                 pending.Finish(outcome, recordsError);
             }
 
-            // Outside the lock: the awaiting body may continue inline.
+            // Outside the lock, since the awaiting body may continue inline.
             if (failure is null) pending.Succeed(value);
             else pending.Fail(failure);
         }
     }
 
-    /// <summary>A step that did not finish at once. It knows whether the body read its result, so a failure nobody saw is not lost.</summary>
+    /// <summary>A step that did not finish at once, tracking whether the body read it.</summary>
     private abstract class PendingStep
     {
         private readonly TaskCompletionSource<ExitCase?> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -206,14 +203,14 @@ public sealed class Scope<E, R>
         /// <summary>Whether the body read the step's result (or its failure).</summary>
         internal bool Observed => Volatile.Read(ref observed) == 1;
 
-        /// <summary>Completes with the step's failure, if any, once its outcome is recorded on the scope.</summary>
+        /// <summary>Completes with the step's failure, if any, once recorded on the scope.</summary>
         internal Task<ExitCase?> Done => done.Task;
 
         internal ExceptionDispatchInfo? Defect { get; private set; }
 
         internal bool Consequential { get; private set; }
 
-        /// <summary>Whether the step's Err became the block's own error, so the block already carries it.</summary>
+        /// <summary>Whether the step's Err became the block's own error.</summary>
         internal bool RecordedError { get; private set; }
 
         protected void Observe() => Volatile.Write(ref observed, 1);
@@ -274,7 +271,7 @@ public sealed class Scope<E, R>
             else outcome = failed ? Outcome<T, E>.Err(error) : Outcome<T, E>.Ok(value);
             steps = unobserved ?? [];
             if (Volatile.Read(ref running) is { Observed: false } last) steps.Add(last);
-            // A step that ended by now has recorded an Err on the outcome: as the block's Err, or as context.
+            // A step ended by now has its Err on the outcome already.
             endedWithBody = steps.ConvertAll(static step => step.Done.IsCompleted);
         }
 
@@ -296,8 +293,7 @@ public sealed class Scope<E, R>
     {
         if (exception is ScopeFailure failure && ReferenceEquals(failure.Owner, this)) return Outcome<T, E>.Err(error);
 
-        // A Die rethrown by Run keeps its own classification; the token may have been canceled only afterwards.
-        // So does an interruption: an inner one, such as a fiber whose scope has ended, comes while this token is not canceled.
+        // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
         if (rethrown is { } defect && ReferenceEquals(exception, defect.SourceException))
             outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
@@ -305,14 +301,12 @@ public sealed class Scope<E, R>
             outcome = Outcome<T, E>.Interrupted();
         else
             outcome = Defects.From<T, E>(exception, context);
-        // An Err that came first is kept as context for the defect or interruption that replaced it.
+        // An earlier Err stays as context for what replaced it.
         if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         return outcome;
     }
 
-    // A step the body did not await (MEFF310) would outlive the block, and a resource it acquired afterwards would never be
-    // released; one that already ended would take its failure with it. Running ones are canceled and waited for, so what they
-    // registered is released with the rest. A step the body awaited is the body's business, even if it caught the failure.
+    // Unawaited steps (MEFF310) are canceled and awaited, so none outlives the block or loses its failure.
     private async ValueTask<Outcome<T, E>> SettleUnobservedAsync<T>(Outcome<T, E> outcome, List<PendingStep> steps, List<bool> endedWithBody)
     {
         if (steps.Count == 0) return outcome;
@@ -325,11 +319,10 @@ public sealed class Scope<E, R>
 
             lock (gate)
             {
-                // An Err that was not the block's own is already context; the block's own is on the outcome if the step ended in time.
+                // An Err is already on the outcome unless it is the block's own and the step ended after the snapshot.
                 if (failure.Value is Failed && (!step.RecordedError || endedWithBody[i])) continue;
 
-                // A block that would otherwise succeed ends with the first failure, as it would have if the step had been awaited.
-                // A block that already failed keeps its own failure first.
+                // An Ok block takes the step's failure, while a failed block keeps its own first.
                 if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
                     outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential);
                 else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
@@ -387,7 +380,7 @@ public sealed class Scope<E, R>
 
     private void ThrowIfFailed()
     {
-        // F20: once an Err has ended the block, later steps must not run, even if a catch swallowed the ScopeFailure.
+        // F20: after an Err, later steps must not run even if a catch swallowed the ScopeFailure.
         if (failed) throw new ScopeFailure(this, error);
     }
 
@@ -419,7 +412,7 @@ public sealed class Scope<E, R>
 /// <summary>Scope operations that accept a case of the scope's error union.</summary>
 public static class ScopeExtensions
 {
-    /// <summary>Runs an effect whose error is a case of the scope's error union. An Err ends the block.</summary>
+    /// <summary>Runs an effect whose error ∈ the scope's error union; an Err ends the block.</summary>
     /// <param name="scope">The scope.</param>
     /// <param name="effect">The effect.</param>
     /// <returns>The value.</returns>
@@ -430,7 +423,7 @@ public static class ScopeExtensions
         return scope.Run(effect.Widen<E>());
     }
 
-    /// <summary>Acquires a resource whose error is a case of the scope's error union. An Err ends the block.</summary>
+    /// <summary>Acquires a resource whose error ∈ the scope's error union; an Err ends the block.</summary>
     /// <param name="scope">The scope.</param>
     /// <param name="resource">The resource.</param>
     /// <returns>The value.</returns>
@@ -441,7 +434,7 @@ public static class ScopeExtensions
         return scope.Acquire(resource.Widen<E>());
     }
 
-    /// <summary>Returns the value of a result whose error is a case of the scope's error union. An Err ends the block.</summary>
+    /// <summary>Returns the value of a result whose error ∈ the scope's error union; an Err ends the block.</summary>
     /// <param name="scope">The scope.</param>
     /// <param name="result">The result.</param>
     /// <returns>The value.</returns>

@@ -9,7 +9,7 @@ namespace Moderato.Effects;
 /// <param name="Error">The error of the attempt that just failed.</param>
 public readonly record struct RetryContext<E>(int Attempt, E Error)
 {
-    /// <summary>Writes the policy as a Gen block. A policy cannot fail, so the block is <c>Scope&lt;Never, R&gt;</c>.</summary>
+    /// <summary>Writes the policy as a Gen block, which cannot fail (<c>Scope&lt;Never, R&gt;</c>).</summary>
     /// <param name="body">Returns whether to try again, after waiting as long as it likes.</param>
     /// <returns>The policy.</returns>
     public Effect<bool, Never, R> Gen<R>(Func<Scope<Never, R>, ValueTask<bool>> body) => Scope<Never, R>.Gen(body);
@@ -21,24 +21,21 @@ public readonly record struct RetryContext<E>(int Attempt, E Error)
 /// <param name="Value">The value of the run that just succeeded.</param>
 public readonly record struct RepeatContext<T>(int Repetition, T Value)
 {
-    /// <summary>Writes the policy as a Gen block. A policy cannot fail, so the block is <c>Scope&lt;Never, R&gt;</c>.</summary>
+    /// <summary>Writes the policy as a Gen block, which cannot fail (<c>Scope&lt;Never, R&gt;</c>).</summary>
     /// <param name="body">Returns whether to run again, after waiting as long as it likes.</param>
     /// <returns>The policy.</returns>
     public Effect<bool, Never, R> Gen<R>(Func<Scope<Never, R>, ValueTask<bool>> body) => Scope<Never, R>.Gen(body);
 }
 
-/// <summary>
-/// Retrying on Err and repeating on Ok. Each attempt runs the effect from the start, so its resources are released per attempt.
-/// Defects and interruptions are never retried.
-/// </summary>
+/// <summary>Retry on Err and Repeat on Ok, rerunning the effect from the start; defects and interruptions are never retried.</summary>
 public static class EffectScheduleExtensions
 {
     private const string WHEN_JUSTIFICATION = "Overloads differ by schedule type; the 'when' filter is optional on each.";
 
-    /// <summary>Tries again on Err, as the schedule says. When the tries run out, the last Err is the outcome.</summary>
+    /// <summary>Tries again on Err as the schedule says, ending with the last Err.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="schedule">When and how many times to try again.</param>
-    /// <param name="when">Which errors to retry. All of them by default.</param>
+    /// <param name="when">Which errors to retry; all by default.</param>
     /// <returns>An effect with the same types.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WHEN_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WHEN_JUSTIFICATION)]
@@ -49,10 +46,10 @@ public static class EffectScheduleExtensions
         return Recurrence.Retry(effect, ScheduledRetry<E, R>(schedule.Spec, when));
     }
 
-    /// <summary>Tries again on Err, as the schedule says, with what the schedule needs from the environment.</summary>
+    /// <summary>Tries again on Err as the schedule says, with what it needs from the environment.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="schedule">When and how many times to try again.</param>
-    /// <param name="when">Which errors to retry. All of them by default.</param>
+    /// <param name="when">Which errors to retry; all by default.</param>
     /// <returns>An effect with the same types.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WHEN_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WHEN_JUSTIFICATION)]
@@ -63,7 +60,7 @@ public static class EffectScheduleExtensions
         return Recurrence.Retry(effect, ScheduledRetry<E, R>(schedule.Spec, when));
     }
 
-    /// <summary>Tries again on Err for as long as the policy returns <see langword="true"/>. The policy does its own waiting.</summary>
+    /// <summary>Tries again on Err while the policy, which does its own waiting, returns <see langword="true"/>.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="policy">Decides, after each failed attempt, whether to try again.</param>
     /// <returns>An effect with the same types.</returns>
@@ -73,10 +70,10 @@ public static class EffectScheduleExtensions
         return Recurrence.Retry(effect, (_, _) => policy);
     }
 
-    /// <summary>Runs again on Ok, as the schedule says. An Err stops it; otherwise the last value is the outcome.</summary>
+    /// <summary>Runs again on Ok as the schedule says, ending with the last value or the first Err.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="schedule">When and how many times to run again.</param>
-    /// <param name="when">Which values to run again after. All of them by default.</param>
+    /// <param name="when">Which values to run again after; all by default.</param>
     /// <returns>An effect with the last value.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WHEN_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WHEN_JUSTIFICATION)]
@@ -87,10 +84,10 @@ public static class EffectScheduleExtensions
         return Recurrence.Repeat(effect, ScheduledRepeat<T, R>(schedule.Spec, when));
     }
 
-    /// <summary>Runs again on Ok, as the schedule says, with what the schedule needs from the environment.</summary>
+    /// <summary>Runs again on Ok as the schedule says, with what it needs from the environment.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="schedule">When and how many times to run again.</param>
-    /// <param name="when">Which values to run again after. All of them by default.</param>
+    /// <param name="when">Which values to run again after; all by default.</param>
     /// <returns>An effect with the last value.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = WHEN_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = WHEN_JUSTIFICATION)]
@@ -101,7 +98,7 @@ public static class EffectScheduleExtensions
         return Recurrence.Repeat(effect, ScheduledRepeat<T, R>(schedule.Spec, when));
     }
 
-    /// <summary>Runs again on Ok for as long as the policy returns <see langword="true"/>. The policy does its own waiting.</summary>
+    /// <summary>Runs again on Ok while the policy, which does its own waiting, returns <see langword="true"/>.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="policy">Decides, after each successful run, whether to run again.</param>
     /// <returns>An effect with the last value.</returns>
@@ -111,7 +108,7 @@ public static class EffectScheduleExtensions
         return Recurrence.Repeat(effect, (_, _) => policy);
     }
 
-    // The schedule becomes a policy, so both forms share one executor. State is per run: a rerun starts its schedule over.
+    // Both forms share one policy executor, whose state is per run.
     private static Func<R, RunContext, Func<RetryContext<E>, Effect<bool, Never, R>>> ScheduledRetry<E, R>(ScheduleSpec spec, Func<E, bool>? when)
         where R : IHas<TimeProvider>
         => (env, _) =>

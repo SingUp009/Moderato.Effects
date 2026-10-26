@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>Finds misuse of a scope inside its Gen block that the runtime can only catch late, or not at all (D11).</summary>
+/// <summary>Finds scope misuse in a Gen block that the runtime catches late or never (D11).</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 {
@@ -92,7 +92,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // A step left running when the block ends races the block's releases, so it has to be awaited, or returned for Gen to await.
+    // A step still running at the block's end races its releases, so it must be awaited or returned.
     private static bool AwaitedOrReturned(InvocationExpressionSyntax step, SyntaxNode function)
     {
         SyntaxNode node = step;
@@ -115,7 +115,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // A finally block runs after an Err too, and so does a catch that also catches ScopeFailure.
+    // A finally block, or a catch that also catches ScopeFailure, runs after an Err too.
     private static bool InCleanup(SemanticModel model, SyntaxNode node, SyntaxNode function)
     {
         foreach (var ancestor in node.Ancestors().TakeWhile(a => a != function))
@@ -131,7 +131,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         => node.Ancestors().TakeWhile(a => a != function)
             .Any(static a => a is ForStatementSyntax or ForEachStatementSyntax or WhileStatementSyntax or DoStatementSyntax);
 
-    // Passing the scope to a method is fine; storing it in something that can outlive the block is not.
+    // Passing the scope on is fine, but storing it where it can outlive the block is not.
     private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
     {
         AssignmentExpressionSyntax assignment when assignment.Right == identifier
@@ -159,7 +159,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         return model.GetTypeInfo(clause.Declaration.Type).Type?.ToDisplayString() is "System.Exception";
     }
 
-    // Only a catch that always rethrows lets ScopeFailure through: it cannot fall off its end or return, and it has a bare throw.
+    // Only a catch whose every path ends in a bare throw lets ScopeFailure through.
     private static bool Rethrows(SemanticModel model, CatchClauseSyntax clause)
     {
         var statements = clause.Block.DescendantNodes(static n => !IsFunction(n)).ToList();
@@ -168,14 +168,14 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         return model.AnalyzeControlFlow(clause.Block) is { Succeeded: true, EndPointIsReachable: false };
     }
 
-    // Only this block's own scope can throw a ScopeFailure that the catch would swallow; a nested Gen block catches its own.
+    // A nested Gen block catches its own ScopeFailure, so only this block's scope counts.
     private static bool UsesScope(SemanticModel model, SyntaxNode node, ImmutableArray<IParameterSymbol> scopes)
         => node.DescendantNodes().OfType<IdentifierNameSyntax>()
             .Any(i => model.GetSymbolInfo(i).Symbol is IParameterSymbol p && scopes.Contains(p, SymbolEqualityComparer.Default));
 
     private static void AnalyzeBlockingWaits(SyntaxNodeAnalysisContext context, SyntaxNode body)
     {
-        // A lambda inside the block still runs on its flow; a nested Gen block is analyzed on its own.
+        // A lambda runs on the block's flow, while a nested Gen block is analyzed separately.
         var model = context.SemanticModel;
         foreach (var access in body.DescendantNodes(n => !IsGenBlock(model, n)).OfType<MemberAccessExpressionSyntax>())
         {

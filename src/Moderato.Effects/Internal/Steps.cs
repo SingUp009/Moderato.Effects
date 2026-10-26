@@ -2,7 +2,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Internal;
 
-/// <summary>Bridges user code and outcomes, staying synchronous while the work completes synchronously.</summary>
+/// <summary>Bridges user code and outcomes, staying synchronous while the work does.</summary>
 internal static class Steps
 {
     /// <summary>Continues with the outcome of a step.</summary>
@@ -55,7 +55,7 @@ internal static class Steps
         }
     }
 
-    /// <summary>Converts a Result into an outcome. A default Result is a defect.</summary>
+    /// <summary>Converts a Result into an outcome; a default Result is a defect.</summary>
     internal static Outcome<T, E> FromResult<T, E>(Result<T, E> result)
     {
         if (result.TryGetOk(out var value)) return Outcome<T, E>.Ok(value);

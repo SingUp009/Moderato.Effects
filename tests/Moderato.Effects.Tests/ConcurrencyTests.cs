@@ -575,7 +575,7 @@ public sealed class DiagnosticsCollection;
 [Collection(nameof(DiagnosticsCollection))]
 public class EffectDiagnosticsTests
 {
-    // A fails; B is canceled because of it and then throws, so B's defect is suppressed under A's Err and has to be reported.
+    // B throws after A's Err cancels it, so B's defect is suppressed and must be reported.
     private static Effect<int[], AppError, EmptyEnvironment> ErrWithACanceledSiblingThatThrows()
     {
         var started = new TaskCompletionSource();

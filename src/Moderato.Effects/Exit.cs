@@ -63,7 +63,7 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         state = STATE_INTERRUPTED;
     }
 
-    /// <summary>The boxed case, or <see langword="null"/> for <c>default</c>. Allocates; pattern matching does not use it.</summary>
+    /// <summary>The boxed case, or <see langword="null"/> for <c>default</c>; it allocates.</summary>
     public object? Value => state switch
     {
         STATE_OK => new Ok<T>(value),

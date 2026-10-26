@@ -5,7 +5,7 @@ namespace Moderato.Effects;
 
 public readonly partial struct Effect<T, E, R>
 {
-    /// <summary>Transforms the value. An Err passes through and the mapper is not called.</summary>
+    /// <summary>Transforms the value; an Err passes through.</summary>
     /// <param name="mapper">Transforms the value.</param>
     /// <returns>An effect with the transformed value.</returns>
     public Effect<U, E, R> Map<U>(Func<T, U> mapper)
@@ -16,7 +16,7 @@ public readonly partial struct Effect<T, E, R>
             : outcome.WithValueType<U>()));
     }
 
-    /// <summary>Transforms the error. An Ok passes through and the mapper is not called.</summary>
+    /// <summary>Transforms the error; an Ok passes through.</summary>
     /// <param name="mapper">Transforms the error.</param>
     /// <returns>An effect with the transformed error.</returns>
     public Effect<T, F, R> MapErr<F>(Func<E, F> mapper)
@@ -27,7 +27,7 @@ public readonly partial struct Effect<T, E, R>
             : outcome.WithErrorType<F>()));
     }
 
-    /// <summary>Continues with the next effect. On an Err the binder is not called.</summary>
+    /// <summary>Continues with the next effect unless this one fails.</summary>
     /// <param name="binder">Builds the next effect from the value.</param>
     /// <returns>The next effect's outcome.</returns>
     public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
@@ -51,7 +51,7 @@ public readonly partial struct Effect<T, E, R>
             : new(outcome));
     }
 
-    /// <summary>Recovers from the error with the next effect. On an Ok the binder is not called.</summary>
+    /// <summary>Recovers from the error with the next effect.</summary>
     /// <param name="binder">Builds the recovery from the error.</param>
     /// <returns>The recovery's outcome.</returns>
     public Effect<T, F, R> OrElse<F>(Func<E, Effect<T, F, R>> binder)
@@ -91,7 +91,7 @@ public readonly partial struct Effect<T, E, R>
         });
     }
 
-    /// <summary>Folds the value and the error into one value. Nothing runs until the effect does.</summary>
+    /// <summary>Folds the value and the error into one value.</summary>
     /// <param name="ok">Folds the value.</param>
     /// <param name="err">Folds the error.</param>
     /// <returns>An effect that cannot fail.</returns>
@@ -122,7 +122,7 @@ public readonly partial struct Effect<T, E, R>
         return Then<T, Never>((outcome, _, _) => new(Recover(outcome, static (fallback, error) => fallback(error), fallback)));
     }
 
-    /// <summary>Turns the error into a value, so it can be matched instead of short-circuiting.</summary>
+    /// <summary>Makes the error a value to match on instead of short-circuiting.</summary>
     /// <returns>An effect that cannot fail, whose value is the result.</returns>
     public Effect<Result<T, E>, Never, R> Attempt() => Then<Result<T, E>, Never>(static (outcome, _, _) => new(outcome.Kind switch
     {
@@ -131,10 +131,7 @@ public readonly partial struct Effect<T, E, R>
         _ => outcome.WithTypes<Result<T, E>, Never>(),
     }));
 
-    /// <summary>
-    /// Handles one case of the error union and removes it from the error type. Name the case and the union of the remaining cases,
-    /// declared with <c>[RestOf&lt;E&gt;]</c>: <c>Catch&lt;NotFound, AccessError&gt;(nf =&gt; ...)</c>.
-    /// </summary>
+    /// <summary>Handles one case and narrows the error to the <c>[RestOf&lt;E&gt;]</c> union of the remaining cases.</summary>
     /// <param name="handler">Builds the recovery from the case.</param>
     /// <returns>An effect whose error is the rest of the union.</returns>
     public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) where F : IUnionRest<F, E, TCase>
@@ -184,14 +181,11 @@ public readonly partial struct Effect<T, E, R>
         return new((env, context) => run(env, context));
     }
 
-    /// <summary>
-    /// A resource that starts the effect as a fiber running alongside the caller. Releasing it cancels the fiber and waits for it.
-    /// In a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>.
-    /// </summary>
+    /// <summary>A resource running the effect as a fiber, canceled and awaited on release (in a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>).</summary>
     /// <returns>The resource of the running fiber.</returns>
     public Resource<Fiber<T, E, R>, Never, R> Fork() => Fiber<T, E, R>.Fork(this);
 
-    /// <summary>Starts the effect on the thread pool, so CPU-bound work does not hold up the caller's flow.</summary>
+    /// <summary>Starts the effect on the thread pool, so CPU-bound work does not hold up the caller.</summary>
     /// <returns>The same effect, started on the thread pool.</returns>
     public Effect<T, E, R> OnThreadPool()
     {
@@ -209,7 +203,7 @@ public readonly partial struct Effect<T, E, R>
         })));
     }
 
-    /// <summary>Continues with this effect's outcome. Exceptions from <paramref name="next"/> are defects.</summary>
+    /// <summary>Continues with this effect's outcome; exceptions from <paramref name="next"/> are defects.</summary>
     internal Effect<U, F, R> Then<U, F>(Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next)
     {
         var run = Run;
@@ -244,7 +238,7 @@ public readonly partial struct Effect<T, E, R>
         _ => outcome.WithTypes<T, Never>(),
     };
 
-    // A handled Err drops its suppressed failures with it; defects among them must still be seen.
+    // A handled Err drops its suppressed failures, but their defects must still be reported.
     private static Outcome<U, Never> Handled<U>(Outcome<T, E> outcome, U value)
     {
         UnobservedFailures.ReportDefects(outcome.Suppressed);

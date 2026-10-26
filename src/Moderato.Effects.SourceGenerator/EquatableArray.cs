@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Moderato.Effects.SourceGenerator;
 
-/// <summary>An immutable array compared by its items, so incremental models cache correctly.</summary>
+/// <summary>An immutable array compared by its items, so incremental models cache.</summary>
 internal readonly struct EquatableArray<T>(ImmutableArray<T> items) : IEquatable<EquatableArray<T>>, IEnumerable<T>
     where T : IEquatable<T>
 {

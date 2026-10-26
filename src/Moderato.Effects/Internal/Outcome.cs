@@ -27,7 +27,7 @@ internal readonly struct Outcome<T, E>
     internal readonly int Omitted;
     internal readonly OutcomeKind Kind;
 
-    /// <summary>A Die thrown after its token was canceled: a consequence of the cancellation rather than an independent failure.</summary>
+    /// <summary>A Die thrown after its token was canceled, a consequence of the cancellation.</summary>
     internal readonly bool Consequential;
 
     private Outcome(
@@ -82,7 +82,7 @@ internal readonly struct Outcome<T, E>
     /// <summary>Puts the failures suppressed by an earlier outcome in front of this outcome's own.</summary>
     internal Outcome<T, E> After<U, F>(Outcome<U, F> earlier) => After(earlier.Suppressed, earlier.Omitted);
 
-    /// <summary>Follows an outcome that this one replaced, such as when an error handler threw: the earlier Err, if any, becomes context.</summary>
+    /// <summary>Follows an outcome this one replaced, keeping its Err as context.</summary>
     internal Outcome<T, E> Replacing<U, F>(Outcome<U, F> earlier) => earlier.Kind == OutcomeKind.Err
         ? After([new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential), .. earlier.Suppressed], earlier.Omitted)
         : After(earlier);
@@ -95,7 +95,7 @@ internal readonly struct Outcome<T, E>
 /// <summary>Turns exceptions escaping user code into outcomes.</summary>
 internal static class Defects
 {
-    /// <summary>OCE from the run's own token is an interruption; everything else is a defect, consequential if the token was already canceled.</summary>
+    /// <summary>Own-token OCE = interruption; anything else is a defect, consequential if the token was canceled.</summary>
     internal static Outcome<T, E> From<T, E>(Exception exception, RunContext context)
     {
         var canceled = context.CancellationToken.IsCancellationRequested;

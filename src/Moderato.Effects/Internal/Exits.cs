@@ -4,7 +4,7 @@ namespace Moderato.Effects.Internal;
 
 internal static class Exits
 {
-    /// <summary>The public view of an outcome. Defects suppressed by an Ok, Err or Interrupted are reported, since Exit has nowhere to carry them.</summary>
+    /// <summary>The public view of an outcome, reporting the defects Exit cannot carry.</summary>
     internal static Exit<T, E> From<T, E>(Outcome<T, E> outcome)
     {
         switch (outcome.Kind)

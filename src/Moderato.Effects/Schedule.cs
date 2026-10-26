@@ -2,10 +2,7 @@ using Moderato.Effects.Internal;
 
 namespace Moderato.Effects;
 
-/// <summary>
-/// When to try again and how many times, for <c>Retry</c> and <c>Repeat</c>. It never looks at errors or values; pass <c>when:</c> for that.
-/// Without <see cref="UpTo"/> or <see cref="During"/> it goes on until the effect stops failing (or, for Repeat, stops succeeding).
-/// </summary>
+/// <summary>When and how often <c>Retry</c> and <c>Repeat</c> try again, regardless of errors or values; without <see cref="UpTo"/> or <see cref="During"/> it has no limit.</summary>
 public sealed class Schedule
 {
     internal Schedule(ScheduleSpec spec) => Spec = spec;
@@ -26,7 +23,7 @@ public sealed class Schedule
 
     /// <summary>Waits <paramref name="baseDelay"/>, then multiplies the wait by <paramref name="factor"/> each time.</summary>
     /// <param name="baseDelay">The first wait.</param>
-    /// <param name="factor">How much each wait grows. At least 1.</param>
+    /// <param name="factor">How much each wait grows, ≥ 1.</param>
     /// <returns>The schedule.</returns>
     public static Schedule Exponential(TimeSpan baseDelay, double factor = 2)
     {
@@ -41,10 +38,7 @@ public sealed class Schedule
     /// <returns>The limited schedule.</returns>
     public Schedule UpTo(int times) => new(Spec.UpTo(times));
 
-    /// <summary>
-    /// Stops trying again once <paramref name="total"/> has passed since the first attempt started. It checks before each wait and
-    /// does not shorten the wait, so it is not a strict time limit; use <c>Retry(...).Timeout(...)</c> for that.
-    /// </summary>
+    /// <summary>Stops once <paramref name="total"/> has passed since the first attempt, checked before each wait, so it is not a strict limit.</summary>
     /// <param name="total">The limit.</param>
     /// <returns>The limited schedule.</returns>
     public Schedule During(TimeSpan total) => new(Spec.During(total));
@@ -54,15 +48,12 @@ public sealed class Schedule
     /// <returns>The capped schedule.</returns>
     public Schedule WithMaxDelay(TimeSpan max) => new(Spec.WithMaxDelay(max));
 
-    /// <summary>Spreads each wait randomly between 80% and 120%, so many clients do not retry in step. Needs <c>IHas&lt;Random&gt;</c>.</summary>
+    /// <summary>Spreads each wait randomly over 80–120% so clients do not retry in step; needs <c>IHas&lt;Random&gt;</c>.</summary>
     /// <returns>A schedule that needs a random number generator from the environment.</returns>
     public Schedule<IHas<Random>> Jittered() => new(Spec with { Jittered = true });
 }
 
-/// <summary>
-/// A <see cref="Schedule"/> that needs <typeparamref name="TNeed"/> from the environment. Not derived from <see cref="Schedule"/>,
-/// so the need cannot be dropped by accident.
-/// </summary>
+/// <summary>A <see cref="Schedule"/> needing <typeparamref name="TNeed"/>, not derived from it so the need cannot be dropped.</summary>
 /// <typeparam name="TNeed">What the environment must provide.</typeparam>
 public sealed class Schedule<TNeed>
 {
@@ -115,11 +106,11 @@ internal sealed record ScheduleSpec(TimeSpan BaseDelay, double Factor)
         if (recurrence > MaxRecurrences) return null;
         if (elapsed >= MaxElapsed) return null;
 
-        // Once Pow overflows, 0 × ∞ is NaN; a zero base stays zero without relying on how NaN converts to long.
+        // 0 × ∞ = NaN once Pow overflows, so a zero base is kept at zero explicitly.
         var ticks = BaseDelay == TimeSpan.Zero ? 0 : BaseDelay.Ticks * Math.Pow(Factor, recurrence - 1);
         if (Jittered && random is not null) ticks *= 0.8 + (random.NextDouble() * 0.4);
         if (MaxDelay is { } max) ticks = Math.Min(ticks, max.Ticks);
-        // A growing schedule waits the longest the timer can hold rather than failing the run.
+        // A growing schedule caps at the longest wait the timer can hold.
         return TimeSpan.FromTicks((long)Math.Min(ticks, Timeouts.LongestWait.Ticks));
     }
 }

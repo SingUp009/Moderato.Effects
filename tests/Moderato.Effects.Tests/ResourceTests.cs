@@ -406,7 +406,7 @@ public class ResourceLinqTests
 
 public class AcquireTests
 {
-    // A step that ends right as the block ends lands on either side of it; enough runs make both sides happen.
+    // Enough runs land the step's end on both sides of the block's end.
     private const int RACE_RUNS = 20_000;
 
     // An effect that breaks the contract and throws from its run instead of ending in an outcome.
@@ -916,7 +916,7 @@ public class ReleaseSuppressedTests
 {
     private const string MESSAGE = "race loser failed during release";
 
-    // A release that succeeds while its losing branch dies: the Race is Ok, the loser's defect is suppressed.
+    // A release whose Race is Ok while its loser dies.
     private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
     {
         var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
