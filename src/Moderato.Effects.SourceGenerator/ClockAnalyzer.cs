@@ -43,6 +43,8 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         context.RegisterOperationAction(static ctx =>
         {
             var method = ((IInvocationOperation)ctx.Operation).TargetMethod;
+            // An overload that takes a TimeProvider waits on the clock it is given; TimeProvider.System itself is reported on its own.
+            if (method.Parameters.Any(static p => p.Type.ToDisplayString() == "System.TimeProvider")) return;
             Check(ctx, $"{method.ContainingType.ToDisplayString()}.{method.Name}", methods);
         }, OperationKind.Invocation);
     }

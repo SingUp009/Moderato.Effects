@@ -283,6 +283,121 @@ public class AllTests
     }
 }
 
+public class CanceledIntoErrTests
+{
+    private static Effect<int, string, EmptyEnvironment> ErrOnCancel(TaskCompletionSource started)
+        => Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            try
+            {
+                started.TrySetResult();
+                await Task.Delay(Timeout.Infinite, scope.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw scope.Fail("canceled");
+            }
+
+            return 1;
+        });
+
+    [Fact]
+    public async Task All_CallerCancelsAndEveryChildTurnsItIntoErr_IsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var both = Effect.All([ErrOnCancel(first), ErrOnCancel(second)], Concurrency.Parallel);
+
+        // When
+        var running = both.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await Task.WhenAll(first.Task, second.Task);
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task All_CallerCancelsAOkAndErrMix_IsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> done = Effect<EmptyEnvironment>.Succeed(1);
+        var both = Effect.All([done, ErrOnCancel(started)]);
+
+        // When
+        var running = both.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await started.Task;
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task All_TupleWhenTheCallerCancelsIntoErr_ThrowsCanceledFromRunAsync()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pair = Effect.All(ErrOnCancel(first), ErrOnCancel(second), Concurrency.Parallel);
+
+        // When
+        var running = pair.RunAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await Task.WhenAll(first.Task, second.Task);
+        await cts.CancelAsync();
+        async Task Act() => await running;
+
+        // Then
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(Act);
+    }
+
+    [Fact]
+    public async Task AllErrors_CallerCancelsAndEveryChildTurnsItIntoErr_IsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var both = Effect.AllErrors([ErrOnCancel(first), ErrOnCancel(second)], Concurrency.Parallel);
+
+        // When
+        var running = both.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await Task.WhenAll(first.Task, second.Task);
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task AllSettled_CallerCancelsAndEveryChildTurnsItIntoErr_CollectsTheErrs()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var both = Effect.AllSettled([ErrOnCancel(first), ErrOnCancel(second)], Concurrency.Parallel);
+
+        // When
+        var running = both.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await Task.WhenAll(first.Task, second.Task);
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Ok<Exit<int, string>[]> ok));
+        Assert.All(ok.Value, child => Assert.Equal<Exit<int, string>>(new Err<string>("canceled"), child));
+    }
+}
+
 public class AllSettledTests
 {
     [Fact]

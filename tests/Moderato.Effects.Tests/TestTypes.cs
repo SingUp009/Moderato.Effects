@@ -98,3 +98,9 @@ public partial union StoreError(DbError, NotFound);
 
 [Error, RestOf<AppError>]
 public partial union Denied(Forbidden);
+
+[Error]
+public partial union Note(string?, int);
+
+[Error, RestOf<Note>]
+public partial union NoteNumber(int);

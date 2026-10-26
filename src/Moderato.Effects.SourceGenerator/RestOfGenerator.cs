@@ -14,7 +14,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
     private sealed record Rest(string Case, CasePath Path);
 
     private sealed record Model(
-        Declaration? Declaration, string Source, string Caught, EquatableArray<Rest> Rests, EquatableArray<DiagnosticInfo> Diagnostics);
+        Declaration? Declaration, string Source, string Caught, string? NullCase, EquatableArray<Rest> Rests, EquatableArray<DiagnosticInfo> Diagnostics);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -70,7 +70,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             .Where(c => c != missing[0])
             .Select(c => new Rest(c, held[c].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
-        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], rests, default);
+        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], Shapes.NullCase(sourceCases), rests, default);
     }
 
     // A case of the rest that E cannot produce is extra; a union the rest adds to group E's cases is looked into instead.
@@ -99,7 +99,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         }
     }
 
-    private static Model Failed(DiagnosticInfo diagnostic) => new(null, "", "", default, new[] { diagnostic }.ToEquatableArray());
+    private static Model Failed(DiagnosticInfo diagnostic) => new(null, "", "", null, default, new[] { diagnostic }.ToEquatableArray());
 
     private static string Short(string fullName) => fullName.Substring(fullName.LastIndexOf('.') + 1);
 
@@ -112,11 +112,20 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         sb.Append($"partial {declaration.Keyword} {self} : {iface}\n{{\n");
         sb.Append($"    static bool {iface}.TrySplit({model.Source} source, out {model.Caught} caught, out {self} rest)\n    {{\n");
         sb.Append("        switch (source)\n        {\n");
-        sb.Append($"            case {model.Caught} found:\n                caught = found;\n                rest = default!;\n                return true;\n");
+        if (model.NullCase == model.Caught)
+        {
+            sb.Append("            case null:\n                caught = default!;\n                rest = default!;\n                return true;\n");
+        }
+        else if (model.Rests.FirstOrDefault(r => r.Case == model.NullCase) is { } nullRest)
+        {
+            sb.Append($"            case null:\n                caught = default!;\n                rest = {Shapes.Widen(nullRest.Path, $"({nullRest.Path.Target})null")};\n                return false;\n");
+        }
+
+        sb.Append($"            case {Shapes.PatternType(model.Caught)} found:\n                caught = found;\n                rest = default!;\n                return true;\n");
         var i = 0;
         foreach (var rest in model.Rests)
         {
-            sb.Append($"            case {rest.Case} other{i}:\n                caught = default!;\n");
+            sb.Append($"            case {Shapes.PatternType(rest.Case)} other{i}:\n                caught = default!;\n");
             sb.Append($"                rest = {Shapes.Widen(rest.Path, $"other{i}")};\n                return false;\n");
             i++;
         }

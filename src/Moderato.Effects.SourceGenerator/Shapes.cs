@@ -115,6 +115,19 @@ internal static class Shapes
         return expression;
     }
 
+    /// <summary>The type as a pattern names it: a pattern cannot test for a nullable type, so the outer <c>?</c> goes.</summary>
+    public static string PatternType(string name) => name.EndsWith("?", StringComparison.Ordinal) ? name.Substring(0, name.Length - 1) : name;
+
+    /// <summary>
+    /// The direct case a null value belongs to: the only one whose type admits null. A type pattern never matches null,
+    /// so null is tested on its own; with no such case, or several, null matches none.
+    /// </summary>
+    public static string? NullCase(IEnumerable<string> directCases)
+    {
+        var admitting = directCases.Where(static c => c.EndsWith("?", StringComparison.Ordinal)).Take(2).ToList();
+        return admitting.Count == 1 ? admitting[0] : null;
+    }
+
     /// <summary>A pattern test that narrows <paramref name="value"/> through each case of <paramref name="path"/> into <paramref name="result"/>.</summary>
     public static string Narrow(CasePath path, string value, string result)
     {
@@ -123,7 +136,7 @@ internal static class Shapes
         for (var i = 0; i < path.Steps.Length; i++)
         {
             var name = i == path.Steps.Length - 1 ? result : $"step{i}";
-            tests.Add($"{current} is {path.Steps.Items[i]} {name}");
+            tests.Add($"{current} is {PatternType(path.Steps.Items[i])} {name}");
             current = name;
         }
 

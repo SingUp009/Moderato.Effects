@@ -65,12 +65,15 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         sb.Append($"partial {declaration.Keyword} {self} : ");
         sb.Append(string.Join(", ", cases.Select(c => $"global::Moderato.Effects.IUnionCase<{self}, {c.Target}>")));
         sb.Append("\n{\n");
+        var nullCase = Shapes.NullCase(cases.Where(static c => c.IsDirect).Select(static c => c.Target));
         foreach (var path in cases)
         {
             var iface = $"global::Moderato.Effects.IUnionCase<{self}, {path.Target}>";
             sb.Append($"    static {self} {iface}.From({path.Target} value) => {Shapes.Widen(path, "value")};\n\n");
             sb.Append($"    static bool {iface}.TryGet({self} self, out {path.Target} value)\n    {{\n");
             sb.Append($"        if ({Shapes.Narrow(path, "self", "found")})\n        {{\n            value = found;\n            return true;\n        }}\n\n");
+            if (path.IsDirect && path.Target == nullCase)
+                sb.Append("        if (self is null)\n        {\n            value = default;\n            return true;\n        }\n\n");
             sb.Append("        value = default!;\n        return false;\n    }\n\n");
         }
 

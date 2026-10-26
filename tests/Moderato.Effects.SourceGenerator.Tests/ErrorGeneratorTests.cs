@@ -190,4 +190,38 @@ public class ErrorGeneratorTests
         Assert.Empty(build.Errors);
         Assert.Empty(build.Warnings);
     }
+
+    [Fact]
+    public void Error_NullableReferenceCase_Compiles()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Note(string?, int);
+            [RestOf<Note>] public partial union NoteNumber(int);
+            [RestOf<Note>] public partial union NoteText(string?);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+    }
+
+    [Fact]
+    public void Error_NullableValueCase_Compiles()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Count(int?, string);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+    }
 }

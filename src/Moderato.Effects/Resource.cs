@@ -42,16 +42,32 @@ public readonly struct Resource<T, E, R>
             var releases = new Releases<R>(cancellation);
             var body = releases.BodyContext;
             Outcome<U, E> outcome;
+            Outcome<T, E> acquired;
             try
             {
-                var acquired = await acquire(env, body, releases).ConfigureAwait(false);
-                outcome = acquired.Kind == OutcomeKind.Ok
-                    ? (await use(acquired.Value).Run(env, body).ConfigureAwait(false)).After(acquired)
-                    : acquired.WithValueType<U>();
+                acquired = await acquire(env, body, releases).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                outcome = Defects.From<U, E>(exception, body);
+                acquired = Defects.From<T, E>(exception, body);
+            }
+
+            if (acquired.Kind != OutcomeKind.Ok)
+            {
+                outcome = acquired.WithValueType<U>();
+            }
+            else
+            {
+                try
+                {
+                    outcome = await use(acquired.Value).Run(env, body).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    outcome = Defects.From<U, E>(exception, body);
+                }
+
+                outcome = outcome.After(acquired);
             }
 
             return await releases.ReleaseAsync(outcome, env).ConfigureAwait(false);

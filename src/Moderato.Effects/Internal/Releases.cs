@@ -58,6 +58,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var context = new RunContext(CancellationToken.None);
 
         var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>();
+        var carried = ImmutableArray.CreateBuilder<Suppressed>();
+        var carriedOmitted = 0;
         for (var i = actions.Length - 1; i >= 0; i--)
         {
             Outcome<Unit, Never> released;
@@ -70,10 +72,22 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
                 released = Defects.From<Unit, Never>(exception, context);
             }
 
-            if (released.Kind == OutcomeKind.Die) defects.Add(released);
+            if (released.Kind == OutcomeKind.Die)
+            {
+                defects.Add(released);
+            }
+            else
+            {
+                // A release that succeeded can still carry failures, such as a Race whose loser died; they go along with the outcome.
+                carried.AddRange(released.Suppressed);
+                carriedOmitted += released.Omitted;
+            }
         }
 
-        return defects.Count == 0 ? body : Combine(body, defects.ToImmutable());
+        var outcome = defects.Count == 0 ? body : Combine(body, defects.ToImmutable());
+        return carried.Count == 0 && carriedOmitted == 0
+            ? outcome
+            : outcome.WithSuppressed(outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
     }
 
     /// <summary>The first child defect is the outcome; what the body did after being canceled for it is context.</summary>
