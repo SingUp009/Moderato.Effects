@@ -407,6 +407,94 @@ public class ResourceLinqTests
 public class AcquireTests
 {
     [Fact]
+    public async Task Run_NotAwaitedAndDyingBeforeTheBlockEnds_EndsTheBlockWithItsDefect()
+    {
+        // Given
+        var thrown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> dies = Effect<EmptyEnvironment>.Async<int>(async _ =>
+        {
+            await Task.Yield();
+            thrown.SetResult();
+            throw new InvalidOperationException("abandoned defect");
+        });
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            // Not awaited on purpose: the step dies while the block is still running.
+#pragma warning disable MEFF310
+            _ = scope.Run(dies);
+#pragma warning restore MEFF310
+            await thrown.Task;
+            await Task.Delay(50);
+            return 0;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("abandoned defect", die.Exception.Message);
+    }
+
+    [Fact]
+    public async Task Run_NotAwaitedAndFailingBeforeTheBlockEnds_EndsTheBlockWithItsErr()
+    {
+        // Given
+        var failing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await Task.Yield();
+            failing.SetResult();
+            return 1;
+        });
+        var fails = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail("abandoned failure"));
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            // Not awaited on purpose: the step fails while the block is still running.
+#pragma warning disable MEFF310
+            _ = scope.Run(fails);
+#pragma warning restore MEFF310
+            await failing.Task;
+            await Task.Delay(50);
+            return 0;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, string>>(new Err<string>("abandoned failure"), exit);
+    }
+
+    [Fact]
+    public async Task Run_AwaitedAndItsDefectCaughtByTheBlock_LetsTheBlockRecover()
+    {
+        // Given
+        Effect<int, string, EmptyEnvironment> dies = Effect<EmptyEnvironment>.Async<int>(async _ =>
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("handled defect");
+        });
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            try
+            {
+                return await scope.Run(dies);
+            }
+            catch (InvalidOperationException)
+            {
+                return -1;
+            }
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, string>>(new Ok<int>(-1), exit);
+    }
+
+    [Fact]
     public async Task Run_NotAwaitedAndFailingAfterTheBlock_EndsTheBlockWithItsErr()
     {
         // Given
