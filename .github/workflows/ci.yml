@@ -48,7 +48,7 @@ jobs:
       - run: dotnet test -c Release
 
       - name: Run the samples
-        run: dotnet run --project samples/Moderato.Effects.Samples -c Release --no-build
+        run: dotnet run --project samples/Moderato.Effects.Samples -c Release
 
   pack:
     needs: [lint, format, test]
