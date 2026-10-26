@@ -317,6 +317,48 @@ public class ForkTests
     }
 
     [Fact]
+    public async Task Join_FiberKeptAfterItsScopeEndedInsideGen_IsInterrupted()
+    {
+        // Given
+        Fiber<int, Never, EmptyEnvironment>? kept = null;
+        var forever = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return 1;
+        });
+        await forever.Fork().Use(fiber =>
+        {
+            kept = fiber;
+            return Effect<EmptyEnvironment>.Succeed(0);
+        }).RunAsync(TestContext.Current.CancellationToken);
+        var join = Scope<Never, EmptyEnvironment>.Gen(async scope => await scope.Run(kept!.Join()));
+
+        // When
+        var exit = await join.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task Gen_UnrelatedCancellationThrownByTheBody_Dies()
+    {
+        // Given
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(async _ =>
+        {
+            await Task.Yield();
+            throw new OperationCanceledException("not this run's");
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<OperationCanceledException>(die.Exception);
+    }
+
+    [Fact]
     public async Task Fork_WithUse_JoinsInsideTheResourcesLifetime()
     {
         // Given
