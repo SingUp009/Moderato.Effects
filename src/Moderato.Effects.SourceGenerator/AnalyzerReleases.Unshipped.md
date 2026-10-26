@@ -24,3 +24,4 @@ MEFF306 | Moderato.Effects | Warning | Analyzers
 MEFF307 | Moderato.Effects | Info | Analyzers
 MEFF308 | Moderato.Effects | Error | Analyzers
 MEFF309 | Moderato.Effects | Error | Analyzers
+MEFF310 | Moderato.Effects | Warning | Analyzers
