@@ -374,6 +374,40 @@ public class TryTests
     }
 
     [Fact]
+    public async Task Try_HandlerThrows_KeepsTheCaughtExceptionAsSuppressed()
+    {
+        // Given
+        var effect = Effect<EmptyEnvironment>.Try(() => int.Parse("x"), string (FormatException _) => throw new InvalidOperationException("bad handler"));
+
+        // When
+        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<InvalidOperationException>(die.Exception);
+        var original = Assert.Single(die.Suppressed);
+        Assert.Equal(Relation.Sequential, original.Relation);
+        Assert.IsType<FormatException>(Assert.IsType<Die>(original.Case.Value).Exception);
+    }
+
+    [Fact]
+    public async Task TryAsync_HandlerThrows_KeepsTheCaughtExceptionAsSuppressed()
+    {
+        // Given
+        var effect = Effect<EmptyEnvironment>.TryAsync<HttpRequestException, string, string>(
+            _ => throw new HttpRequestException("down"),
+            _ => throw new InvalidOperationException("bad handler"));
+
+        // When
+        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<InvalidOperationException>(die.Exception);
+        Assert.IsType<HttpRequestException>(Assert.IsType<Die>(Assert.Single(die.Suppressed).Case.Value).Exception);
+    }
+
+    [Fact]
     public async Task TryAsync_BodyThrowsTheCaughtType_RunsToTheMappedErr()
     {
         // Given
@@ -480,5 +514,41 @@ public class AccessTests
         // Then
         Assert.True(result.TryGetOk(out var received));
         Assert.Same(environment, received);
+    }
+}
+
+[Collection(nameof(DiagnosticsCollection))]
+public class TryCancellationTests
+{
+    [Fact]
+    public async Task TryAsync_HandlerThrowsCanceledAfterTheCallerCancels_IsInterruptedAndReportsTheCaughtException()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        using var cts = new CancellationTokenSource();
+        var effect = Effect<EmptyEnvironment>.TryAsync<HttpRequestException, string, string>(
+            _ => throw new HttpRequestException("down while canceling"),
+            _ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+
+        try
+        {
+            // When
+            var exit = await effect.RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            List<Die> ours;
+            lock (reported) ours = [.. reported.Select(static f => f.Value).OfType<Die>().Where(static d => d.Exception.Message == "down while canceling")];
+            Assert.Single(ours);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
     }
 }

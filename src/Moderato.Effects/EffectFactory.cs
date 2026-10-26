@@ -142,7 +142,9 @@ file static class Catching
         }
         catch (Exception exception)
         {
-            return Defects.From<T, E>(exception, context);
+            // The mapper failed while handling the caught defect; that defect stays as what came before.
+            return Defects.From<T, E>(exception, context)
+                .After([new Suppressed(ExitCases.Die(outcome.Defect!), Relation.Sequential), .. outcome.Suppressed], outcome.Omitted);
         }
     }
 }
