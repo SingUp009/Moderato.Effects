@@ -199,7 +199,17 @@ public sealed class Scope<E, R>
         if (Volatile.Read(ref running) is { Task.IsCompleted: false } step)
         {
             cancellation.TryCancel(CancellationReason.ParentScopeClosed);
-            if (await step.Task.ConfigureAwait(false) is { Value: not Interrupted } abandoned) AddSuppressed(new Suppressed(abandoned, Relation.Sequential));
+            if (await step.Task.ConfigureAwait(false) is { Value: not Interrupted } abandoned)
+            {
+                // The step's Unwrap recorded its failure on this scope; a block that would otherwise succeed ends with it,
+                // as it would have if the step had been awaited. A block that already failed keeps its own failure first.
+                if (outcome.Kind == OutcomeKind.Ok && abandoned.Value is Die && rethrown is { } defect)
+                    outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
+                else if (outcome.Kind == OutcomeKind.Ok && failed)
+                    outcome = Outcome<T, E>.Err(error);
+                else
+                    AddSuppressed(new Suppressed(abandoned, Relation.Sequential));
+            }
         }
 
         closed = true;

@@ -46,7 +46,9 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         lock (gate)
         {
             bodyEnded = true;
-            if (childDefects is { Count: > 0 }) body = bodyCancellation.WithCallbackFailure(AfterChildDefects(body, childDefects.ToImmutable()));
+            if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects.ToImmutable());
+            // The body is canceled for a child's defect or, in a Gen block, for a step it left running; a callback may have thrown either way.
+            body = bodyCancellation.WithCallbackFailure(body);
             if (this.actions.Count == 0) return body;
             actions = [.. this.actions];
             this.actions.Clear();
