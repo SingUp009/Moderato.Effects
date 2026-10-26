@@ -260,6 +260,47 @@ public class ResourceTests
         var kept = Assert.Single(die.Suppressed);
         Assert.True(kept.Case is Failed(NotFound { Id: 404 }));
     }
+
+    [Fact]
+    public async Task Use_FactoryThrowsAfterAnAcquisitionWithASuppressedDefect_KeepsItAndReleases()
+    {
+        // Given
+        var released = false;
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, Never, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, Never, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            try
+            {
+                loserStarted.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException("loser failed");
+            }
+
+            return 2;
+        });
+        var resource = Resource.Make(Effect.Race(winner, loser), (_, _) => Effect<EmptyEnvironment>.Sync(() =>
+        {
+            released = true;
+            return Unit.Value;
+        }));
+
+        // When
+        var exit = await resource.Use<int>(_ => throw new FormatException("factory failed")).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("factory failed", die.Exception.Message);
+        Assert.Contains(die.Suppressed, s => s.Case.Value is Die d && d.Exception.Message == "loser failed");
+        Assert.True(released);
+    }
 }
 
 public class ResourceLinqTests
@@ -631,5 +672,93 @@ public class AbandonedStepCallbackTests
         {
             EffectDiagnostics.UnobservedFailureHandler = null;
         }
+    }
+}
+
+[Collection(nameof(DiagnosticsCollection))]
+public class ReleaseSuppressedTests
+{
+    private const string MESSAGE = "race loser failed during release";
+
+    // A release that succeeds while its losing branch dies: the Race is Ok, the loser's defect is suppressed.
+    private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
+    {
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<Unit, Never, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return Unit.Value;
+        });
+        Effect<Unit, Never, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<Unit>(async ct =>
+        {
+            try
+            {
+                loserStarted.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException(MESSAGE);
+            }
+
+            return Unit.Value;
+        });
+        return Effect.Race(winner, loser);
+    }
+
+    [Fact]
+    public async Task Defer_ReleaseSucceedsWithASuppressedDefect_ReportsTheDefect()
+    {
+        // Given
+        var reported = Collect();
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(_ => RaceWithDyingLoser());
+            await Task.Yield();
+            return 1;
+        });
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(1), exit);
+            Assert.Single(Ours(reported));
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    [Fact]
+    public async Task Use_ReleaseSucceedsWithASuppressedDefectAfterTheBodyDies_KeepsItOnTheDie()
+    {
+        // Given
+        var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(1), (_, _) => RaceWithDyingLoser());
+        Effect<int, Never, EmptyEnvironment> broken = Effect<EmptyEnvironment>.Sync<int>(() => throw new FormatException("body failed"));
+
+        // When
+        var exit = await resource.Use(_ => broken).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<FormatException>(die.Exception);
+        Assert.Contains(die.Suppressed, s => s.Case.Value is Die d && d.Exception.Message == MESSAGE);
+    }
+
+    private static List<ExitCase> Collect()
+    {
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        return reported;
+    }
+
+    // Other tests running at the same time may report their own failures to the handler.
+    private static List<Die> Ours(List<ExitCase> reported)
+    {
+        lock (reported) return [.. reported.Select(static failure => failure.Value).OfType<Die>().Where(static die => die.Exception.Message == MESSAGE)];
     }
 }

@@ -466,6 +466,38 @@ public class SystemClockTests
     }
 
     [Fact]
+    public void AccessAsync_TaskDelayWithTheEnvironmentsClock_ReportsNothing()
+    {
+        // Given
+        var source = Code.InClass("""
+            public static Effect<int, Never, R> Wait() => Effect<R>.AccessAsync(async (env, ct) =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), env.Resolve<TimeProvider>(), ct);
+                return 1;
+            });
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.DoesNotContain("MEFF307", build.Ids);
+    }
+
+    [Fact]
+    public void GenBlock_TaskDelayWithTheSystemClock_ReportsTheSystemClock()
+    {
+        // Given
+        var source = Code.InGen("await Task.Delay(TimeSpan.FromSeconds(1), TimeProvider.System); return 0;");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("'TimeProvider.System'", build.Single("MEFF307").GetMessage());
+    }
+
+    [Fact]
     public void Succeed_ValueReadFromTheClock_ReportsMEFF307()
     {
         // Given

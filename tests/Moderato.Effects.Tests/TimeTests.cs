@@ -340,6 +340,48 @@ public class TimeoutTests
     }
 
     [Fact]
+    public async Task Timeout_ReleaseAndOnTimeoutBothThrow_DiesWithTheReleaseDefect()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var work = Scope<string, TimeEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(_ => Effect<TimeEnvironment>.Sync<Unit>(() => throw new IOException("rollback failed")));
+            await scope.Run(Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1)));
+            return 1;
+        });
+
+        // When
+        var running = work.Timeout(oneSecond, onTimeout: string (TimeoutError _) => throw new InvalidOperationException("bad onTimeout"))
+            .RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(oneSecond);
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<IOException>(die.Exception);
+        Assert.Equal([new Suppressed(new Failed(new TimeoutError(oneSecond)), Relation.Sequential)], die.Suppressed);
+    }
+
+    [Fact]
+    public async Task Timeout_OnTimeoutThrows_DiesWithItsDefect()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        Effect<int, string, TimeEnvironment> slow = Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1)).Map(static _ => 1);
+
+        // When
+        var running = slow.Timeout(oneSecond, onTimeout: string (TimeoutError _) => throw new InvalidOperationException("bad onTimeout"))
+            .RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(oneSecond);
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("bad onTimeout", die.Exception.Message);
+    }
+
+    [Fact]
     public async Task Timeout_ReleaseInANestedGenThrowsAfterTheLimit_DiesWithTheReleaseDefect()
     {
         // Given
@@ -445,5 +487,93 @@ public class TimeoutTests
 
         // Then
         Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(oneSecond)), result);
+    }
+}
+
+[Collection(nameof(DiagnosticsCollection))]
+public class TimeoutCallbackTests
+{
+    private const string MESSAGE = "late timeout callback failed";
+
+    [Fact]
+    public async Task Timeout_CallbackThrowsAfterTheEffectReturned_ReportsTheDefectOnce()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        var time = new ManualTime();
+        var returned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new ManualResetEventSlim();
+        Effect<int, Never, TimeEnvironment> slow = Effect<TimeEnvironment>.Async(async ct =>
+        {
+            // Registered first, so it runs last: the effect has already returned when it throws.
+            ct.Register(() =>
+            {
+                gate.Wait();
+                throw new InvalidOperationException(MESSAGE);
+            });
+            var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            ct.Register(() => canceled.TrySetResult());
+            await canceled.Task;
+            returned.SetResult();
+            return 1;
+        });
+
+        try
+        {
+            // When
+            var running = slow.Timeout(TimeSpan.FromSeconds(1)).RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+            time.Fire();
+            await returned.Task;
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+            gate.Set();
+            var exit = await running;
+
+            // Then
+            Assert.Equal<Exit<int, TimeoutError>>(new Err<TimeoutError>(new TimeoutError(TimeSpan.FromSeconds(1))), exit);
+            List<Die> ours;
+            lock (reported) ours = [.. reported.Select(static f => f.Value).OfType<Die>().Where(static d => d.Exception.Message == MESSAGE)];
+            Assert.Single(ours);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    // A clock whose single timer fires on another thread when the test says so, and whose disposal waits for that callback,
+    // as the system timer's does.
+    private sealed class ManualTime : TimeProvider
+    {
+        private ManualTimer? timer;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+            => timer = new ManualTimer(callback, state);
+
+        public void Fire() => timer!.Fire();
+
+        private sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
+        {
+            private readonly TaskCompletionSource done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private int fired;
+
+            public void Fire()
+            {
+                fired = 1;
+                new Thread(() =>
+                {
+                    callback(state);
+                    done.SetResult();
+                }).Start();
+            }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => fired == 1 ? new(done.Task) : ValueTask.CompletedTask;
+        }
     }
 }

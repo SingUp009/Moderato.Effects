@@ -251,6 +251,7 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - 主となる失敗は、**キャンセルのきっかけになった失敗**（時間順で最初のもの）。キャンセルより前に独立して起きた失敗の中では Die を優先する。キャンセルより後に兄弟が起こした失敗は、キャンセルされたせいで起きたものなので、付属情報（`Consequence`）にするだけ。規則の全体は D18。
 - fail-fast しない版：
   - `AllSettled`：`Effect<Exit<T, E>[], Never, R>`。全部の結果を Exit で受け取る。
+  - 呼び出し側のキャンセルを子が Err に変えた場合（`catch (OperationCanceledException)` で `scope.Fail` するなど）、`All` と `AllErrors` は Interrupted で終わる。その Err は付属情報に残る。`AllSettled` は、その Err をそのまま集める（Issue #27）。
   - `AllErrors`：`Effect<T[], E[], R>`。エラーを全部集める（入力値の検証向け。Results の `CombineAll` と同じ考え方）。
 - 名前を Results の `Combine` / `CombineAll` と分けるのは、すでに計算し終えた Result をまとめる操作とは違い、並列数など実行のしかたを伴うため。
 
@@ -536,6 +537,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - 生成器は3つ（`ErrorGenerator` / `EnvironmentGenerator` / `RestOfGenerator`）。どれも Roslyn 4.14 に対して作り、SDK の新しいコンパイラの上で動く。
 - 生成器のテストは `Moderato.Effects.SourceGenerator.Tests` で、Roslyn 5.9.0（union をコンパイルできる最初の公開版）を使い、利用者のコードをテストの中でコンパイルして確かめる。S1 でコンパイルエラーになるべきとした5件と、jitter 付きの Schedule を `IHas<Random>` のない環境で使う場合も、ここでエラーコードまで確かめる。
 - 入れ子の union の case は、`(Middle)value` のように内側の union を経由して広げ、`self is Middle m && m is Inner found` のように順に狭める。
+- null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、null を許す直接の case がちょうど1つなら、null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
 - 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
 - `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。

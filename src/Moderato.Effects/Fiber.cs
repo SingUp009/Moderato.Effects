@@ -7,6 +7,7 @@ namespace Moderato.Effects;
 /// Forked work that runs alongside its parent and never outlives the parent's scope: when the scope ends, the fiber is canceled
 /// and the scope waits for it. A defect in the fiber ends the parent with that defect. An Err shows only through <see cref="Join"/>;
 /// if the fiber is never joined, it goes to <see cref="EffectDiagnostics.UnobservedFailureHandler"/>.
+/// A fiber kept after its scope has ended was canceled by it; joining it then is interrupted.
 /// </summary>
 /// <typeparam name="T">The value.</typeparam>
 /// <typeparam name="E">The error.</typeparam>
@@ -74,7 +75,7 @@ public sealed class Fiber<T, E, R>
     {
         cancellation.TryCancel(CancellationReason.ParentScopeClosed);
         var outcome = await task.ConfigureAwait(false);
-        var callbackFailure = cancellation.CallbackFailure;
+        var callbackFailure = cancellation.TakeCallbackFailure();
         cancellation.Dispose();
         var released = Observe(outcome);
         if (callbackFailure is null) return released;

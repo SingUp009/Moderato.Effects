@@ -271,6 +271,52 @@ public class ForkTests
     }
 
     [Fact]
+    public async Task Join_FiberKeptAfterItsScopeEnded_RunAsyncThrowsCanceled()
+    {
+        // Given
+        Fiber<int, Never, EmptyEnvironment>? kept = null;
+        var forever = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return 1;
+        });
+        await forever.Fork().Use(fiber =>
+        {
+            kept = fiber;
+            return Effect<EmptyEnvironment>.Succeed(0);
+        }).RunAsync(TestContext.Current.CancellationToken);
+
+        // When
+        async Task Act() => await kept!.Join().RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(Act);
+    }
+
+    [Fact]
+    public async Task Join_FiberKeptAfterItsScopeEnded_RunExitAsyncIsInterrupted()
+    {
+        // Given
+        Fiber<int, Never, EmptyEnvironment>? kept = null;
+        var forever = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return 1;
+        });
+        await forever.Fork().Use(fiber =>
+        {
+            kept = fiber;
+            return Effect<EmptyEnvironment>.Succeed(0);
+        }).RunAsync(TestContext.Current.CancellationToken);
+
+        // When
+        var exit = await kept!.Join().RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
     public async Task Fork_WithUse_JoinsInsideTheResourcesLifetime()
     {
         // Given
