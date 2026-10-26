@@ -38,7 +38,7 @@ public readonly partial struct Effect<T, E, R>
 
     /// <summary>Runs the effect. Defects are rethrown as they were thrown; the caller's cancellation surfaces as <see cref="OperationCanceledException"/>.</summary>
     /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="cancellationToken">Cancels the run. The effect sees a token derived from it, not this token itself.</param>
     /// <returns>The value, or the expected error.</returns>
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken = default)
     {
@@ -54,7 +54,7 @@ public readonly partial struct Effect<T, E, R>
 
     /// <summary>Runs the effect and returns how it ended, without throwing.</summary>
     /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="cancellationToken">Cancels the run. The effect sees a token derived from it, not this token itself.</param>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
     {

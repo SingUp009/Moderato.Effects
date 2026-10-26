@@ -199,7 +199,7 @@ public class AsyncTests
     }
 
     [Fact]
-    public async Task Async_Run_PassesTheRunTokenToTheBody()
+    public async Task Async_Run_PassesATokenThatTheCallerCancels()
     {
         // Given
         using var cts = new CancellationTokenSource();
@@ -207,6 +207,7 @@ public class AsyncTests
         var effect = Effect<EmptyEnvironment>.Async(ct =>
         {
             received = ct;
+            cts.Cancel();
             return ValueTask.FromResult(0);
         });
 
@@ -214,7 +215,7 @@ public class AsyncTests
         await effect.RunAsync(cts.Token);
 
         // Then
-        Assert.Equal(cts.Token, received);
+        Assert.True(received.IsCancellationRequested);
     }
 
     [Fact]
@@ -447,11 +448,15 @@ public class AccessTests
     }
 
     [Fact]
-    public async Task AccessAsync_Run_PassesTheEnvironmentAndTheToken()
+    public async Task AccessAsync_Run_PassesTheEnvironmentAndATokenThatTheCallerCancels()
     {
         // Given
         using var cts = new CancellationTokenSource();
-        var effect = Effect<CounterEnvironment>.AccessAsync((env, ct) => ValueTask.FromResult((env.Resolve<Counter>(), ct)));
+        var effect = Effect<CounterEnvironment>.AccessAsync((env, ct) =>
+        {
+            cts.Cancel();
+            return ValueTask.FromResult((env.Resolve<Counter>(), ct.IsCancellationRequested));
+        });
         var counter = new Counter();
 
         // When
@@ -460,7 +465,7 @@ public class AccessTests
         // Then
         Assert.True(result.TryGetOk(out var received));
         Assert.Same(counter, received.Item1);
-        Assert.Equal(cts.Token, received.Item2);
+        Assert.True(received.Item2);
     }
 
     [Fact]

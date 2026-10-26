@@ -164,17 +164,19 @@ public class FailureModelTests
 [Collection(nameof(DiagnosticsCollection))]
 public class CallerCancellationCallbackTests
 {
+    private const string MESSAGE = "scope callback failed on caller cancel";
+
     [Fact]
-    public async Task RunExitAsync_CallerCancelsAndACallbackOnTheScopeTokenThrows_IsInterruptedAndReportsTheDefect()
+    public async Task RunExitAsync_CallerCancelsAndACallbackOnTheScopeTokenThrows_IsInterruptedAndReportsTheDefectOnce()
     {
         // Given
-        var reported = new List<ExitCase>();
-        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        var reported = Collect();
         using var caller = new CancellationTokenSource();
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
-            using var registration = scope.CancellationToken.Register(() => throw new InvalidOperationException("callback failed"));
+            // Kept past the body: the body can end inline before this callback runs.
+            scope.CancellationToken.Register(() => throw new InvalidOperationException(MESSAGE));
             ready.SetResult();
             await Task.Delay(Timeout.Infinite, scope.CancellationToken);
             return 42;
@@ -190,8 +192,7 @@ public class CallerCancellationCallbackTests
 
             // Then
             Assert.True(exit.TryGetValue(out Interrupted? _));
-            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
-            Assert.Equal("callback failed", die.Exception.Message);
+            Assert.Single(Ours(reported));
         }
         finally
         {
@@ -200,16 +201,16 @@ public class CallerCancellationCallbackTests
     }
 
     [Fact]
-    public async Task RunAsync_CallerCancelsAsyncAndACallbackOnTheScopeTokenThrows_ThrowsCanceledAndReportsTheDefect()
+    public async Task RunAsync_CallerCancelsAsyncAndACallbackOnTheScopeTokenThrows_ThrowsCanceledAndReportsTheDefectOnce()
     {
         // Given
-        var reported = new List<ExitCase>();
-        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        var reported = Collect();
         using var caller = new CancellationTokenSource();
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
-            using var registration = scope.CancellationToken.Register(() => throw new InvalidOperationException("callback failed"));
+            // Kept past the body: the body can end inline before this callback runs.
+            scope.CancellationToken.Register(() => throw new InvalidOperationException(MESSAGE));
             ready.SetResult();
             await Task.Delay(Timeout.Infinite, scope.CancellationToken);
             return 42;
@@ -225,12 +226,84 @@ public class CallerCancellationCallbackTests
 
             // Then
             await Assert.ThrowsAnyAsync<OperationCanceledException>(Act);
-            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
-            Assert.Equal("callback failed", die.Exception.Message);
+            Assert.Single(Ours(reported));
         }
         finally
         {
             EffectDiagnostics.UnobservedFailureHandler = null;
         }
+    }
+
+    [Fact]
+    public async Task RunExitAsync_CallbackThrowsAfterTheRunEndedOnTheCancelingThread_ReportsTheDefectOnce()
+    {
+        // Given
+        var reported = Collect();
+        using var caller = new CancellationTokenSource();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stop = new TaskCompletionSource<int>();
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            // Callbacks run last-registered first, so the run can end inline before this one throws; it stays registered past the body.
+            scope.CancellationToken.Register(() => throw new InvalidOperationException(MESSAGE));
+            scope.CancellationToken.Register(() => stop.TrySetResult(42));
+            ready.SetResult();
+            return await stop.Task.ConfigureAwait(false);
+        });
+
+        try
+        {
+            // When
+            var running = work.RunExitAsync(EmptyEnvironment.Value, caller.Token).AsTask();
+            await ready.Task;
+            caller.Cancel();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Ok<int> ok));
+            Assert.Equal(42, ok.Value);
+            Assert.Single(Ours(reported));
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    [Fact]
+    public async Task RunExitAsync_CallbackOnTheCallersOwnTokenThrows_StillThrowsFromCancel()
+    {
+        // Given
+        using var caller = new CancellationTokenSource();
+        using var registration = caller.Token.Register(() => throw new InvalidOperationException(MESSAGE));
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            ready.SetResult();
+            await Task.Delay(Timeout.Infinite, scope.CancellationToken);
+            return 42;
+        });
+
+        // When
+        var running = work.RunExitAsync(EmptyEnvironment.Value, caller.Token).AsTask();
+        await ready.Task;
+        void Act() => caller.Cancel();
+
+        // Then
+        Assert.Throws<AggregateException>(Act);
+        Assert.True((await running).TryGetValue(out Interrupted? _));
+    }
+
+    private static List<ExitCase> Collect()
+    {
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        return reported;
+    }
+
+    // Other tests running at the same time may report their own failures to the handler.
+    private static List<Die> Ours(List<ExitCase> reported)
+    {
+        lock (reported) return [.. reported.Select(static failure => failure.Value).OfType<Die>().Where(static die => die.Exception.Message == MESSAGE)];
     }
 }
