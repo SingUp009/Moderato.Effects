@@ -120,7 +120,10 @@ public static partial class Effect
     public static Effect<(T1, T2, T3, T4, T5, T6, T7, T8), E, R> All<T1, T2, T3, T4, T5, T6, T7, T8, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Effect<T5, E, R> effect5, Effect<T6, E, R> effect6, Effect<T7, E, R> effect7, Effect<T8, E, R> effect8, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4), Box(effect5), Box(effect6), Box(effect7), Box(effect8)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!, (T5)values[4]!, (T6)values[5]!, (T7)values[6]!, (T8)values[7]!));
 
-    /// <summary>Runs the effects to the end, whatever each one does, and collects how each ended.</summary>
+    /// <summary>
+    /// Runs the effects to the end, whatever each one does, and collects how each ended. An effect that turns the caller's cancellation
+    /// into an Err is collected as that Err.
+    /// </summary>
     /// <param name="effects">The effects.</param>
     /// <param name="concurrency">How they run. Sequential by default.</param>
     /// <returns>An effect whose value holds each effect's exit, in input order.</returns>
@@ -154,8 +157,9 @@ public static partial class Effect
                 return Concurrent.Fail<T, E, T[], E[]>(ends, primary, static error => [error]);
             }
 
-            // Errors from only the children that ran would look like a complete validation; they stay as context instead.
-            if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
+            // Errors from only the children that ran, or errors made from the caller's cancellation, would look like a complete
+            // validation; they stay as context instead.
+            if (Interrupted(ends, context) || CanceledIntoErr(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
 
             if (ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err))
             {
@@ -244,6 +248,9 @@ public static partial class Effect
     private static bool Interrupted<T, E>(ChildEnd<T, E>[] ends, RunContext context)
         => ends.Any(static end => !end.Ran || end.Outcome.Kind == OutcomeKind.Interrupted) && context.CancellationToken.IsCancellationRequested;
 
+    private static bool CanceledIntoErr<T, E>(ChildEnd<T, E>[] ends, RunContext context)
+        => context.CancellationToken.IsCancellationRequested && ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err && end.AfterCancel);
+
     // Every child ran and none failed; a child that never ran means the caller canceled before it could start.
     // Cancellation decides the outcome, but what the children already failed with stays as context rather than vanishing.
     private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)
@@ -252,9 +259,10 @@ public static partial class Effect
         return Outcome<U, F>.Interrupted().WithSuppressed(others, omitted);
     }
 
+    // Reached only when no failure decided the outcome, so a child that did not succeed ended because the caller canceled.
     private static Outcome<U, F> Succeeded<T, E, U, F>(ChildEnd<T, E>[] ends, Func<T[], U> build)
     {
-        if (ends.Any(static end => !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);
+        if (ends.Any(static end => end.Outcome.Kind != OutcomeKind.Ok || !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);
         var (others, omitted) = Concurrent.Others(ends, null);
         return Outcome<U, F>.Ok(build([.. ends.Select(static end => end.Outcome.Value)])).WithSuppressed(others, omitted);
     }
