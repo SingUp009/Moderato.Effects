@@ -121,3 +121,62 @@ public class EnvironmentAttributeTests
         Assert.Equal<Result<int, Never>>(Result.Ok(2), result);
     }
 }
+
+public class NullableCaseTests
+{
+    [Fact]
+    public async Task CatchCase_NullableCaseWithAValue_RecoversFromIt()
+    {
+        // Given
+        Effect<string, Note, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<Note>("missing");
+
+        // When
+        var result = await load.CatchCase((string? note) => Effect<EmptyEnvironment>.Succeed($"noted {note ?? "null"}"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, Note>>(Result.Ok("noted missing"), result);
+    }
+
+    [Fact]
+    public async Task CatchCase_NullableCaseHoldingNull_RecoversWithNull()
+    {
+        // Given
+        Effect<string, Note, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<Note>((string?)null);
+
+        // When
+        var result = await load.CatchCase((string? note) => Effect<EmptyEnvironment>.Succeed($"noted {note ?? "null"}"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, Note>>(Result.Ok("noted null"), result);
+    }
+
+    [Fact]
+    public async Task Catch_NullableCaseHoldingNull_RemovesIt()
+    {
+        // Given
+        Effect<string, Note, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<Note>((string?)null);
+
+        // When
+        Effect<string, NoteNumber, EmptyEnvironment> recovered = load.Catch<string?, NoteNumber>(note => Effect<EmptyEnvironment>.Succeed(note ?? "null"));
+        var result = await recovered.RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, NoteNumber>>(Result.Ok("null"), result);
+    }
+
+    [Fact]
+    public async Task Catch_NullableCaseLeftOutWithAnotherCase_PassesItThrough()
+    {
+        // Given
+        Effect<string, Note, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<Note>(7);
+
+        // When
+        Effect<string, NoteNumber, EmptyEnvironment> recovered = load.Catch<string?, NoteNumber>(note => Effect<EmptyEnvironment>.Succeed(note ?? "null"));
+        var result = await recovered.RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, NoteNumber>>(Result.Err<NoteNumber>(7), result);
+    }
+}
