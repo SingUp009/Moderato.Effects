@@ -224,8 +224,8 @@ public static partial class Effect
     {
         var callerCanceled = context.CancellationToken.IsCancellationRequested;
         var primary = Concurrent.PrimaryFailure(ends, callerCanceled);
-        // Nothing finished: the caller canceled before either side could start.
-        if (primary is null && winner is null) return Outcome<T, E>.Interrupted();
+        // No winner and no failure that decides: the caller canceled. Children that ran may still have failed after it; that stays as context.
+        if (primary is null && winner is null) return InterruptedWithOthers<T, E, T, E>(ends);
         var decidedByFailure = primary is { } p
             && (ends[p].Outcome.Kind == OutcomeKind.Die && ends[p].IsIndependentFailure
                 || ends[p].Outcome.Kind == OutcomeKind.Interrupted && callerCanceled

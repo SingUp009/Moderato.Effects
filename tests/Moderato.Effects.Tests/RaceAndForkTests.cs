@@ -425,3 +425,121 @@ public class ForkCleanupTests
         Assert.IsType<IOException>(die.Exception);
     }
 }
+
+[Collection(nameof(DiagnosticsCollection))]
+public class RaceCanceledIntoErrTests
+{
+    private const string MESSAGE = "race child's release failed";
+
+    // A child that turns the caller's cancellation into an Err, after a release whose own Race loser died.
+    private static Effect<int, string, EmptyEnvironment> ErrOnCancelWithAFailingRelease(TaskCompletionSource started)
+        => Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            scope.Defer(_ => RaceWithDyingLoser());
+            try
+            {
+                started.SetResult();
+                await Task.Delay(Timeout.Infinite, scope.CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw scope.Fail("canceled");
+            }
+
+            return 1;
+        });
+
+    private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
+    {
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<Unit, Never, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return Unit.Value;
+        });
+        Effect<Unit, Never, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<Unit>(async ct =>
+        {
+            try
+            {
+                loserStarted.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException(MESSAGE);
+            }
+
+            return Unit.Value;
+        });
+        return Effect.Race(winner, loser);
+    }
+
+    [Fact]
+    public async Task Race_CallerCancelsAndBothChildrenEndWithErr_IsInterruptedAndReportsTheirDefects()
+    {
+        // Given
+        var reported = Collect();
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var race = Effect.Race(ErrOnCancelWithAFailingRelease(first), ErrOnCancelWithAFailingRelease(second));
+
+        try
+        {
+            // When
+            var running = race.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+            await Task.WhenAll(first.Task, second.Task);
+            await cts.CancelAsync();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            Assert.Equal(2, Ours(reported).Count);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    [Fact]
+    public async Task RaceFirst_CallerCancelsAndBothChildrenEndWithErr_IsInterruptedAndReportsTheirDefects()
+    {
+        // Given
+        var reported = Collect();
+        using var cts = new CancellationTokenSource();
+        var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var race = Effect.RaceFirst(ErrOnCancelWithAFailingRelease(first), ErrOnCancelWithAFailingRelease(second));
+
+        try
+        {
+            // When
+            var running = race.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+            await Task.WhenAll(first.Task, second.Task);
+            await cts.CancelAsync();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            Assert.Equal(2, Ours(reported).Count);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    private static List<ExitCase> Collect()
+    {
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        return reported;
+    }
+
+    // Other tests running at the same time may report their own failures to the handler.
+    private static List<Die> Ours(List<ExitCase> reported)
+    {
+        lock (reported) return [.. reported.Select(static failure => failure.Value).OfType<Die>().Where(static die => die.Exception.Message == MESSAGE)];
+    }
+}
