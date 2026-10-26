@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Schedule` and `Schedule<TNeed>` (`Spaced`, `Exponential`, `Immediately`, `UpTo`, `During`, `WithMaxDelay`, `Jittered`), `Retry` and `Repeat` with a schedule or with an effect as the policy.
 - Failure model: suppressed failures in `Die.Suppressed`, and `EffectDiagnostics.UnobservedFailureHandler` for failures no outcome can carry.
 - Source generators: `[Error]` (`IUnionCase`, including the cases of cases), `[Environment]` and `[Expose<T>]` (`IHas<T>`), `[RestOf<E>]` (`IUnionRest`, for `Catch`).
-- Analyzers MEFF301 to MEFF309 for misuse of Gen blocks, use of the system clock inside effects, and `Catch` calls that do not compile.
+- Source generator diagnostics: MEFF001 to MEFF005 for `[Error]` and `[RestOf<E>]` targets, MEFF101 to MEFF104 for `[Environment]`, and MEFF201 to MEFF203 for `[RestOf<E>]` unions.
+- Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 
 [Unreleased]: https://github.com/SingUp009/Moderato.Effects/commits/main
