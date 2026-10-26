@@ -713,6 +713,7 @@ PollStatus<R>(jobId).Repeat(Schedule.Spaced(TimeSpan.FromSeconds(1)).During(Time
 **実装メモ（P5）**
 
 - `UpTo` も `During` も付けない Schedule は、制限なしに続ける（Effect-TS と同じ）。
+- 次の試行を始める前に、呼び出し側の ct を確かめる。キャンセル済みなら Interrupted で終わる（Issue #15）。トークンを見ない処理と、すぐ終わる policy の組み合わせでも止まるようにするため。ただし、ループは待たずに同期で回り続けることがあり、そのあいだスレッドを占有する（`Task.Yield` は入れない。普通の Retry が遅くなるため）。
 - `During(total)` は、最初の試行を始めてからの経過時間を、次を試すかどうか決める時点で測る。経過時間が total 以上なら止める。その後の待ち時間は total で切らないので、`Spaced(1時間).During(5秒)` は最初の失敗の後に1時間待つことがある。全体の時間に厳密な上限が欲しいときは `effect.Retry(s).Timeout(total)` を使う（Issue #5）。
 - `.Jittered()` は、待ち時間に 0.8〜1.2 倍のばらつきを加える（Effect-TS の既定と同じ）。`WithMaxDelay` の上限は、ばらつきを加えた後にかける。
 - `RetryContext<E>.Attempt` は、失敗した試行を含めて、それまでに実行した回数（最初の失敗の後は 1）。`RepeatContext<T>.Repetition` も同じ数え方。
