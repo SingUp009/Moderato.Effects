@@ -63,6 +63,16 @@ internal static class Timeouts
         // The caller's cancellation outranks the timer (F12): the outcome is whatever the caller's cancellation made of it.
         if (!timedOutFirst || context.CancellationToken.IsCancellationRequested) return passthrough(inner);
 
+        if (inner.Kind == OutcomeKind.Die && !inner.Consequential)
+        {
+            // An independent defect, typically from a release action, outranks the timeout; the timeout becomes context.
+            // Decided before the timeout's error is built, so a failing onTimeout cannot hide it.
+            var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
+            suppressed.Add(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
+            suppressed.AddRange(inner.Suppressed.Where(static s => s.Case is not Interrupted));
+            return inner.WithSuppressed(suppressed.ToImmutable(), inner.Omitted).WithTypes<U, F>();
+        }
+
         Outcome<U, F> timeout;
         try
         {
@@ -70,28 +80,17 @@ internal static class Timeouts
         }
         catch (Exception exception)
         {
-            return Defects.From<U, F>(exception, context).After(inner);
+            timeout = Defects.From<U, F>(exception, context);
         }
 
-        return Decide(inner, timeout, error);
+        return AfterCanceled(timeout, inner);
     }
 
-    private static Outcome<U, F> Decide<T, E, U, F>(Outcome<T, E> inner, Outcome<U, F> timeout, TimeoutError error)
+    // What the canceled effect ended with follows from the timeout, so it stays as context.
+    private static Outcome<U, F> AfterCanceled<T, E, U, F>(Outcome<U, F> timeout, Outcome<T, E> inner) => inner.Kind switch
     {
-        switch (inner.Kind)
-        {
-            case OutcomeKind.Die when !inner.Consequential:
-                // An independent defect, typically from a release action, outranks the timeout; the timeout becomes context.
-                var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
-                suppressed.Add(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
-                suppressed.AddRange(inner.Suppressed.Where(static s => s.Case is not Interrupted));
-                return inner.WithSuppressed(suppressed.ToImmutable(), inner.Omitted).WithTypes<U, F>();
-            case OutcomeKind.Die:
-                return timeout.After([new Suppressed(ExitCases.Die(inner.Defect!), Relation.Consequence), .. inner.Suppressed], inner.Omitted);
-            case OutcomeKind.Err:
-                return timeout.After([new Suppressed(ExitCases.Failed(inner.Error), Relation.Consequence), .. inner.Suppressed], inner.Omitted);
-            default:
-                return timeout.After(inner);
-        }
-    }
+        OutcomeKind.Die => timeout.After([new Suppressed(ExitCases.Die(inner.Defect!), Relation.Consequence), .. inner.Suppressed], inner.Omitted),
+        OutcomeKind.Err => timeout.After([new Suppressed(ExitCases.Failed(inner.Error), Relation.Consequence), .. inner.Suppressed], inner.Omitted),
+        _ => timeout.After(inner),
+    };
 }

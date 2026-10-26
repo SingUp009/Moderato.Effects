@@ -340,6 +340,48 @@ public class TimeoutTests
     }
 
     [Fact]
+    public async Task Timeout_ReleaseAndOnTimeoutBothThrow_DiesWithTheReleaseDefect()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var work = Scope<string, TimeEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(_ => Effect<TimeEnvironment>.Sync<Unit>(() => throw new IOException("rollback failed")));
+            await scope.Run(Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1)));
+            return 1;
+        });
+
+        // When
+        var running = work.Timeout(oneSecond, onTimeout: string (TimeoutError _) => throw new InvalidOperationException("bad onTimeout"))
+            .RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(oneSecond);
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<IOException>(die.Exception);
+        Assert.Equal([new Suppressed(new Failed(new TimeoutError(oneSecond)), Relation.Sequential)], die.Suppressed);
+    }
+
+    [Fact]
+    public async Task Timeout_OnTimeoutThrows_DiesWithItsDefect()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        Effect<int, string, TimeEnvironment> slow = Effect.Sleep<TimeEnvironment>(TimeSpan.FromMinutes(1)).Map(static _ => 1);
+
+        // When
+        var running = slow.Timeout(oneSecond, onTimeout: string (TimeoutError _) => throw new InvalidOperationException("bad onTimeout"))
+            .RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(oneSecond);
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("bad onTimeout", die.Exception.Message);
+    }
+
+    [Fact]
     public async Task Timeout_ReleaseInANestedGenThrowsAfterTheLimit_DiesWithTheReleaseDefect()
     {
         // Given
