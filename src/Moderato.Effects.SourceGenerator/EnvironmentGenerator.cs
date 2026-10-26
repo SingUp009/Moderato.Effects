@@ -26,8 +26,7 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
             foreach (var diagnostic in model.Diagnostics) spc.ReportDiagnostic(diagnostic.ToDiagnostic());
             if (model.Declaration is { } declaration && model.Diagnostics.Length == 0 && model.Services.Length > 0)
             {
-                var hint = declaration.Namespace.Length == 0 ? declaration.Name : $"{declaration.Namespace}.{declaration.Name}";
-                spc.AddSource($"{hint}.Environment.g.cs", Emit(declaration, model.Services));
+                spc.AddSource($"{declaration.Hint}.Environment.g.cs", Emit(declaration, model.Services));
             }
         });
     }

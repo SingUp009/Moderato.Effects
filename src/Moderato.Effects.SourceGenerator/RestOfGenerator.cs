@@ -28,8 +28,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             foreach (var diagnostic in model.Diagnostics) spc.ReportDiagnostic(diagnostic.ToDiagnostic());
             if (model.Declaration is { } declaration)
             {
-                var hint = declaration.Namespace.Length == 0 ? declaration.Name : $"{declaration.Namespace}.{declaration.Name}";
-                spc.AddSource($"{hint}.RestOf.g.cs", Emit(declaration, model));
+                spc.AddSource($"{declaration.Hint}.RestOf.g.cs", Emit(declaration, model));
             }
         });
     }

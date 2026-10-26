@@ -215,4 +215,27 @@ public class EnvironmentGeneratorTests
         // Then
         Assert.Contains("[Environment]", build.Single("MEFF004").GetMessage());
     }
+
+    [Fact]
+    public void Environment_KeywordTypeName_Compiles()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            [Environment]
+            public sealed partial record @class(IUserRepository Users, TimeProvider Clock);
+
+            public static class Use
+            {
+                public static TimeProvider Clock(@class env) => env.Resolve<TimeProvider>();
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Empty(build.Warnings);
+    }
 }
