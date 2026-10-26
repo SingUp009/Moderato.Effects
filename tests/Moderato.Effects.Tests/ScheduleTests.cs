@@ -465,6 +465,38 @@ public class RetryTests
     }
 
     [Fact]
+    public async Task Retry_ExponentialFromZeroManyTimes_NeverWaits()
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<TimeEnvironment>(int.MaxValue, new Counter());
+
+        // When
+        var result = await broken.Retry(Schedule.Exponential(TimeSpan.Zero).UpTo(1100))
+            .RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(1101)), result);
+        Assert.Empty(clock.Waits);
+    }
+
+    [Fact]
+    public async Task Retry_JitteredCappedExponentialFromZeroManyTimes_NeverWaits()
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter());
+
+        // When
+        var result = await broken.Retry(Schedule.Exponential(TimeSpan.Zero).WithMaxDelay(TimeSpan.FromSeconds(1)).UpTo(1100).Jittered())
+            .RunAsync(new RetryEnvironment(clock, new Random(42)), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(1101)), result);
+        Assert.Empty(clock.Waits);
+    }
+
+    [Fact]
     public async Task Retry_WaitBeyondWhatTheClockSupports_IsCappedInsteadOfDying()
     {
         // Given
