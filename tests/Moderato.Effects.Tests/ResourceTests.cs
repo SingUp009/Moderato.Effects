@@ -406,6 +406,9 @@ public class ResourceLinqTests
 
 public class AcquireTests
 {
+    // A step that ends right as the block ends lands on either side of it; enough runs make both sides happen.
+    private const int RACE_RUNS = 20_000;
+
     // An effect that breaks the contract and throws from its run instead of ending in an outcome.
     private static Effect<int, string, EmptyEnvironment> ThrowsFromItsRun()
         => new((_, _) => new ValueTask<Internal.Outcome<int, string>>(Task.FromException<Internal.Outcome<int, string>>(new InvalidOperationException("faulted run"))));
@@ -540,6 +543,75 @@ public class AcquireTests
 
         // Then
         Assert.Equal<Exit<int, string>>(new Err<string>("abandoned failure"), exit);
+    }
+
+    [Fact]
+    public async Task Run_NotAwaitedAndFailingAsTheBlockReturns_AlwaysEndsTheBlockWithItsErr()
+    {
+        // Given
+        var go = new TaskCompletionSource();
+        Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await go.Task;
+            return 1;
+        });
+        var fails = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail("abandoned failure"));
+        var runs = 0;
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Not awaited on purpose: the step fails on another thread around the time the block returns.
+#pragma warning disable MEFF310
+            _ = scope.Run(fails);
+#pragma warning restore MEFF310
+            go.SetResult();
+            Thread.SpinWait(Interlocked.Increment(ref runs) % 200);
+            return ValueTask.FromResult(0);
+        });
+
+        // When
+        var exits = new List<Exit<int, string>>();
+        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken));
+
+        // Then
+        Assert.All(exits, exit => Assert.Equal<Exit<int, string>>(new Err<string>("abandoned failure"), exit));
+    }
+
+    [Fact]
+    public async Task Run_NotAwaitedAndFailingAsTheBlockThrows_KeepsTheErrOnce()
+    {
+        // Given
+        var go = new TaskCompletionSource();
+        Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await go.Task;
+            return 1;
+        });
+        var fails = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail("abandoned failure"));
+        var runs = 0;
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Not awaited on purpose: the step fails on another thread around the time the block throws.
+#pragma warning disable MEFF310
+            _ = scope.Run(fails);
+#pragma warning restore MEFF310
+            go.SetResult();
+            Thread.SpinWait(Interlocked.Increment(ref runs) % 200);
+            throw new IOException("body failed");
+        });
+
+        // When
+        var exits = new List<Exit<int, string>>();
+        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken));
+
+        // Then
+        Assert.All(exits, exit =>
+        {
+            Assert.True(exit.TryGetValue(out Die? die));
+            Assert.IsType<IOException>(die.Exception);
+            Assert.Single(die.Suppressed, s => s.Case.Value is Failed { Error: "abandoned failure" });
+        });
     }
 
     [Fact]
