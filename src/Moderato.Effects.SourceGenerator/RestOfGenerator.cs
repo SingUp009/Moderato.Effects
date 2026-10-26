@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -55,11 +56,48 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfWrongCases, location, type.Name, source.Name, leftOut));
         }
 
+        var allowed = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var @case in Shapes.Cases(source).Where(c => Shapes.Name(c) != missing[0]))
+        {
+            allowed.Add(Shapes.Name(@case));
+            if (@case is INamedTypeSymbol union && Shapes.IsUnion(union)) allowed.UnionWith(Shapes.Reachable(union).Keys);
+        }
+
+        var extras = Extras(type, allowed);
+        if (extras.Count > 0)
+            return Failed(DiagnosticInfo.Create(Diagnostics.RestOfExtraCases, location, type.Name, source.Name, string.Join(", ", extras.Select(Short))));
+
         var rests = sourceCases
             .Where(c => c != missing[0])
             .Select(c => new Rest(c, held[c].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
         return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], rests, default);
+    }
+
+    // A case of the rest that E cannot produce is extra; a union the rest adds to group E's cases is looked into instead.
+    private static List<string> Extras(INamedTypeSymbol rest, HashSet<string> allowed)
+    {
+        var extras = new List<string>();
+        var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { rest };
+        Visit(rest);
+        return extras;
+
+        void Visit(INamedTypeSymbol current)
+        {
+            foreach (var @case in Shapes.Cases(current))
+            {
+                var name = Shapes.Name(@case);
+                if (allowed.Contains(name)) continue;
+                if (@case is INamedTypeSymbol union && Shapes.IsUnion(union))
+                {
+                    if (visited.Add(union)) Visit(union);
+                }
+                else if (!extras.Contains(name))
+                {
+                    extras.Add(name);
+                }
+            }
+        }
     }
 
     private static Model Failed(DiagnosticInfo diagnostic) => new(null, "", "", default, new[] { diagnostic }.ToEquatableArray());
