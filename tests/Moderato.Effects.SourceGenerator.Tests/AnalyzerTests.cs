@@ -376,6 +376,65 @@ public class BlockingWaitTests
     }
 }
 
+public class StepNotAwaitedTests
+{
+    [Fact]
+    public void GenBlock_DiscardedScopeRun_ReportsMEFF310()
+    {
+        // Given
+        var source = Code.InGen("_ = scope.Run(Load()); await Task.Yield(); return 0;");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("'scope.Run'", build.Single("MEFF310").GetMessage());
+    }
+
+    [Fact]
+    public void GenBlock_StepStoredAndAwaitedLater_ReportsMEFF310()
+    {
+        // Given
+        var source = Code.InGen("var pending = scope.Run(Load()); await Task.Yield(); return await pending;");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("MEFF310", build.Ids);
+    }
+
+    [Fact]
+    public void GenBlock_AwaitedWithConfigureAwait_ReportsNothing()
+    {
+        // Given
+        var source = Code.InGen("return await scope.Run(Load()).ConfigureAwait(false);");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
+
+    [Fact]
+    public void GenBlock_StepReturnedForGenToAwait_ReportsNothing()
+    {
+        // Given
+        var source = Code.InClass("""
+            static Effect<int, Never, R> Load() => Effect<R>.Succeed(1);
+
+            public static Effect<int, Never, R> Work() => Scope<Never, R>.Gen(scope => scope.Run(Load()));
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
+}
+
 public class SystemClockTests
 {
     [Fact]

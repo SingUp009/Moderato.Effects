@@ -14,11 +14,12 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableHashSet<string> steps = ["Run", "Get", "Acquire", "Fork"];
     private static readonly ImmutableHashSet<string> resources = ["Acquire", "Defer", "Fork"];
+    private static readonly ImmutableHashSet<string> asyncSteps = ["Run", "Acquire", "Fork"];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
     [
         Diagnostics.CatchAllInGen, Diagnostics.StepInCleanup, Diagnostics.ScopeInNestedFunction,
-        Diagnostics.ScopeEscapes, Diagnostics.ResourceInLoop, Diagnostics.BlockingWait,
+        Diagnostics.ScopeEscapes, Diagnostics.ResourceInLoop, Diagnostics.BlockingWait, Diagnostics.StepNotAwaited,
     ];
 
     public override void Initialize(AnalysisContext context)
@@ -81,10 +82,35 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepInCleanup, access.GetLocation(), access.ToString()));
                 if (resources.Contains(name) && InLoop(identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ResourceInLoop, access.GetLocation(), access.ToString()));
+                if (asyncSteps.Contains(name) && access.Parent is InvocationExpressionSyntax step && !AwaitedOrReturned(step, function))
+                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepNotAwaited, step.GetLocation(), access.ToString()));
             }
             else if (Escapes(context.SemanticModel, identifier))
             {
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ScopeEscapes, identifier.GetLocation(), parameter.Name));
+            }
+        }
+    }
+
+    // A step left running when the block ends races the block's releases, so it has to be awaited, or returned for Gen to await.
+    private static bool AwaitedOrReturned(InvocationExpressionSyntax step, SyntaxNode function)
+    {
+        SyntaxNode node = step;
+        while (true)
+        {
+            switch (node.Parent)
+            {
+                case ParenthesizedExpressionSyntax parenthesized:
+                    node = parenthesized;
+                    continue;
+                case MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait", Parent: InvocationExpressionSyntax configured } access
+                    when access.Expression == node:
+                    node = configured;
+                    continue;
+                case AwaitExpressionSyntax or ReturnStatementSyntax:
+                    return true;
+                case var parent:
+                    return parent == function;
             }
         }
     }

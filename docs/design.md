@@ -561,6 +561,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF305 | Warning | ループの中の `scope.Acquire` / `Defer` / `Fork` | '{0}' in a loop holds each resource until the Gen block ends; use a nested Gen block or 'Use' |
 | MEFF306 | Warning | Gen の中の `.Result` / `.Wait()` / `GetAwaiter().GetResult()` | '{0}' blocks the thread; use 'await' |
 | MEFF307 | Info | Gen の中と `Effect<R>` の作る API の引数（ラムダと `Succeed` の値）での、時計の直接使用（D14 の一覧に `DateTime.Today` と `Stopwatch.StartNew` を加えた） | '{0}' reads the system clock; use {1} |
+| MEFF310 | Warning | `scope.Run` / `Acquire` / `Fork` を、すぐに await も return もしていない（未完了の操作を残したまま Gen が終わり、解放処理と競合するのを防ぐ。変数に入れて後で await する書き方も指摘する。#3） | '{0}' is not awaited; await it so the Gen block cannot end while it runs |
 | MEFF308 | Error | `Catch<TCase, F>` で、F が `[RestOf<E>]` ではない（CS0315 の言い換え） | '{0}' is not declared [RestOf<{1}>] |
 | MEFF309 | Error | `Catch<TCase, F>` で、F が除いた case と TCase が違う（CS0315 の言い換え） | '{0}' leaves out '{1}', not '{2}' |
 

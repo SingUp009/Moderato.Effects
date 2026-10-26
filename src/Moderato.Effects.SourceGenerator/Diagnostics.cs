@@ -76,6 +76,10 @@ internal static class Diagnostics
         "MEFF307", "System clock used in an effect", "'{0}' reads the system clock; use {1}",
         CATEGORY, DiagnosticSeverity.Info, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor StepNotAwaited = new(
+        "MEFF310", "Scope step not awaited", "'{0}' is not awaited; await it so the Gen block cannot end while it runs",
+        CATEGORY, DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NotRestOf = new(
         "MEFF308", "Not the rest of the error union", "'{0}' is not declared [RestOf<{1}>]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);

@@ -675,7 +675,10 @@ public class ScopeMisuseTests
         });
         var effect = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
+            // Shows that the runtime rejects a scope used from two flows at once.
+#pragma warning disable MEFF310
             var both = await Task.WhenAll(scope.Run(slow).AsTask(), scope.Run(slow).AsTask());
+#pragma warning restore MEFF310
             return both.Sum();
         });
 
