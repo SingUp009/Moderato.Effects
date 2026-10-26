@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Not in the solution: it consumes the package that `dotnet pack` wrote to artifacts/, as an application would. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moderato.Effects" Version="$(ModeratoEffectsVersion)" />
+  </ItemGroup>
+
+  <!-- Misuse.cs must fail the build with an analyzer error; it is compiled only to prove the analyzers load. -->
+  <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
+    <Compile Remove="Misuse.cs" />
+  </ItemGroup>
+
+</Project>
