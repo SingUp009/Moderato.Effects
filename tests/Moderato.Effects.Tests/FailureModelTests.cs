@@ -26,6 +26,53 @@ public class FailureModelTests
     }
 
     [Fact]
+    public async Task RunExitAsync_AnotherTokensCancellationAfterTheCallerCancels_ReturnsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        using var service = new CancellationTokenSource();
+        var gate = new TaskCompletionSource();
+        var call = Effect<EmptyEnvironment>.Async<int>(async _ =>
+        {
+            await gate.Task;
+            await service.CancelAsync();
+            service.Token.ThrowIfCancellationRequested();
+            return 1;
+        });
+
+        // When
+        var running = call.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await cts.CancelAsync();
+        gate.SetResult();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task RunExitAsync_CancellationWithoutATokenAfterTheCallerCancels_ReturnsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var gate = new TaskCompletionSource();
+        var call = Effect<EmptyEnvironment>.Async<int>(async _ =>
+        {
+            await gate.Task;
+            throw new OperationCanceledException();
+        });
+
+        // When
+        var running = call.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await cts.CancelAsync();
+        gate.SetResult();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
     public async Task RunExitAsync_ManyReleasesFail_KeepsAHundredSuppressedAndCountsTheRest()
     {
         // Given

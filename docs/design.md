@@ -154,6 +154,7 @@ public sealed record Interrupted;
 - **`RunAsync` で Die を投げるとき**は、元の例外を `ExceptionDispatchInfo` でそのまま投げ直す（F14）。例外の型を保ち、ミドルウェアの `catch` に影響させないため。付属情報は `Exception.Data` に入れる。キーは名前空間付きの1つだけを使い、追加ではなく上書きする（F24。使い回された例外や、再実行で同じ例外が投げられたときに情報がたまらないように）。すべての情報が必要なときは `RunExitAsync` を使う。上限（D18）を超えて省いた件数も `Exception.Data` には入れず、`RunExitAsync` の `Die.OmittedSuppressed` でだけ分かるようにする（レビューで確認）。
 - 失敗が複数のとき、どれを主とし、残りをどう付属情報にするかは **D18** で決める。Err を全部集めたいときは `AllErrors`（`E[]`）か `AllSettled`（`Exit[]`）を使う（D10）。
 - **`Interrupted` は、呼び出し側のトークンによるキャンセルだけ**を表す。判定の規則は「**呼び出し側の ct がキャンセル済み、かつ OCE**」（F12）。内部では連動したトークン（linked token）を使うので、OCE の `CancellationToken` プロパティでは判定しない。よそのトークンによるキャンセル（`HttpClient` のタイムアウトなど）と呼び出し側のキャンセルがほぼ同時に起きた場合も、呼び出し側のキャンセルを優先して Interrupted とする。
+- **既知の制限**：呼び出し側の ct がキャンセル済みなら、OCE がどのトークンから来たか（よそのトークン、トークンなし）は見ずに Interrupted とする。ライブラリが連動させたトークンを覚えておけば区別できるが、規則が複雑になる割に得るものが少ないため、この規則のままにする（Issue #2）。キャンセル済みの後に OCE 以外の例外で終わった場合は、D18 の表のとおり `Consequence` として扱う（ほかに主となる失敗がなければ Die。F26）。
 - 呼び出し側がキャンセルしたとき、API によっては OCE ではなく `ObjectDisposedException` や `IOException` を投げる。これは**仕様として Die** とする（F26）。アプリの停止時にエラーログが出ることがあると、ドキュメントに書く。
 
   | 中断の出どころ | 扱い |
@@ -161,7 +162,8 @@ public sealed record Interrupted;
   | 呼び出し側のトークン（アプリの停止を連動したものも含む） | `Interrupted` |
   | `Timeout` | `Err(TimeoutError)` |
   | `Race` の負けた側、`All` の兄弟、終了した親の子 | 外から見えない |
-  | よそのトークンの OCE（`HttpClient` のタイムアウトなど） | `Die`（`Try` で包めば Err） |
+  | よそのトークンの OCE（`HttpClient` のタイムアウトなど）。呼び出し側の ct がキャンセル前のとき | `Die`（`Try` で包めば Err） |
+  | よそのトークンの OCE、トークンなしの OCE。呼び出し側の ct がキャンセル済みのとき | `Interrupted`（既知の制限） |
   | Fork した子の Die で親がキャンセルされたとき | 親の結果は子の `Die`（D10） |
 
 ### D8. Timeout
