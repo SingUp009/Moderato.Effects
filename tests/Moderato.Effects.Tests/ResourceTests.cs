@@ -406,6 +406,114 @@ public class ResourceLinqTests
 
 public class AcquireTests
 {
+    [Fact]
+    public async Task Run_NotAwaitedAndFailingAfterTheBlock_EndsTheBlockWithItsErr()
+    {
+        // Given
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var bodyEnded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await gate.Task;
+            return 1;
+        });
+        var failsLate = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail("late failure"));
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Not awaited on purpose: the step fails only after the block has returned.
+#pragma warning disable MEFF310
+            _ = scope.Run(failsLate);
+#pragma warning restore MEFF310
+            bodyEnded.SetResult();
+            return ValueTask.FromResult(0);
+        });
+
+        // When
+        var running = work.RunExitAsync(TestContext.Current.CancellationToken).AsTask();
+        await bodyEnded.Task;
+        gate.SetResult();
+        var exit = await running;
+
+        // Then
+        Assert.Equal<Exit<int, string>>(new Err<string>("late failure"), exit);
+    }
+
+    [Fact]
+    public async Task Acquire_NotAwaitedAndFinishingAfterTheBlock_IsStillReleased()
+    {
+        // Given
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var bodyEnded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var released = false;
+        var resource = Resource.Make(
+            Effect<EmptyEnvironment>.Async<int>(async _ =>
+            {
+                await gate.Task;
+                return 1;
+            }),
+            (_, _) => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                released = true;
+                return Unit.Value;
+            }));
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Not awaited on purpose: the acquisition finishes only after the block has returned.
+#pragma warning disable MEFF310
+            _ = scope.Acquire(resource);
+#pragma warning restore MEFF310
+            bodyEnded.SetResult();
+            return ValueTask.FromResult(0);
+        });
+
+        // When
+        var running = work.RunExitAsync(TestContext.Current.CancellationToken).AsTask();
+        await bodyEnded.Task;
+        gate.SetResult();
+        var exit = await running;
+
+        // Then
+        Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
+        Assert.True(released);
+    }
+
+    [Fact]
+    public async Task Acquire_NotAwaitedAndWaitingForCancellation_IsCanceledWhenTheBlockEnds()
+    {
+        // Given
+        var stopped = false;
+        var resource = Resource.Make(
+            Effect<EmptyEnvironment>.Async<int>(async ct =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+                finally
+                {
+                    stopped = true;
+                }
+
+                return 1;
+            }),
+            (_, _) => Effect<EmptyEnvironment>.Succeed(Unit.Value));
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Not awaited on purpose: the acquisition would otherwise outlive the block.
+#pragma warning disable MEFF310
+            _ = scope.Acquire(resource);
+#pragma warning restore MEFF310
+            return ValueTask.FromResult(0);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
+        Assert.True(stopped);
+    }
+
     private static Resource<Connection, NotFound, EmptyEnvironment> Open(List<string> log, string name, bool exists = true)
         => Resource.Make(
             acquire: exists
@@ -520,6 +628,50 @@ public class AcquireTests
 
         // Then
         Assert.Equal<Result<int, AppError>>(Result.Ok(16), result);
+    }
+}
+
+[Collection(nameof(DiagnosticsCollection))]
+public class AbandonedStepCallbackTests
+{
+    private const string MESSAGE = "scope callback failed while the block closed";
+
+    [Fact]
+    public async Task Run_NotAwaitedWhenTheBlockEnds_ReportsATokenCallbackThatThrows()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        Effect<int, Never, EmptyEnvironment> forever = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return 1;
+        });
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            scope.CancellationToken.Register(() => throw new InvalidOperationException(MESSAGE));
+            // Not awaited on purpose: the block cancels it when it ends.
+#pragma warning disable MEFF310
+            _ = scope.Run(forever);
+#pragma warning restore MEFF310
+            return ValueTask.FromResult(0);
+        });
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
+            List<Die> ours;
+            lock (reported) ours = [.. reported.Select(static f => f.Value).OfType<Die>().Where(static d => d.Exception.Message == MESSAGE)];
+            Assert.Single(ours);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
     }
 }
 
