@@ -20,6 +20,7 @@ public sealed class Scope<E, R>
     private ImmutableArray<Suppressed>.Builder? suppressed;
     private int omitted;
     private ExceptionDispatchInfo? rethrown;
+    private OperationCanceledException? interruption;
     private bool rethrownConsequential;
     private bool failed;
     private E error = default!;
@@ -187,9 +188,13 @@ public sealed class Scope<E, R>
         catch (Exception exception)
         {
             // A Die rethrown by Run keeps its own classification; the token may have been canceled only afterwards.
-            outcome = rethrown is { } defect && ReferenceEquals(exception, defect.SourceException)
-                ? Outcome<T, E>.Die(defect, consequential: rethrownConsequential)
-                : Defects.From<T, E>(exception, context);
+            // So does an interruption: an inner one, such as a fiber whose scope has ended, comes while this token is not canceled.
+            if (rethrown is { } defect && ReferenceEquals(exception, defect.SourceException))
+                outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
+            else if (ReferenceEquals(exception, interruption))
+                outcome = Outcome<T, E>.Interrupted();
+            else
+                outcome = Defects.From<T, E>(exception, context);
             // An Err that came first is kept as context for the defect or interruption that replaced it.
             if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         }
@@ -241,7 +246,8 @@ public sealed class Scope<E, R>
                 outcome.Defect!.Throw();
                 return default!;
             default:
-                throw new OperationCanceledException(context.CancellationToken);
+                interruption = new OperationCanceledException(context.CancellationToken);
+                throw interruption;
         }
     }
 
