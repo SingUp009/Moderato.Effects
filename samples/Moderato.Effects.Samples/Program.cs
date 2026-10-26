@@ -27,7 +27,7 @@ foreach (var id in new[] { 1, 2, 3 })
 var orGuest = Profiles<AppEnv>.GetUserProfile(2).Catch<NotFound, AccessError>(nf => Effect<AppEnv>.Succeed(new Profile($"guest {nf.Id}")));
 Console.WriteLine(await orGuest.RunAsync(env));
 
-// 3. Resources are released in reverse order, and the release sees how the use ended.
+// 3. A resource is released after use, and the release sees how the use ended.
 Resource<Transaction, Overdrawn, EmptyEnvironment> transaction = Bank.OpenTransaction();
 var transfer = transaction.Use(tx => Bank.Transfer(tx, amount: 500));
 Console.WriteLine(await transfer.RunAsync());
