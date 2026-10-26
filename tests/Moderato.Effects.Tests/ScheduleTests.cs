@@ -385,6 +385,86 @@ public class RetryTests
     }
 
     [Fact]
+    public async Task Retry_CallerCancelsDuringAnAttemptWithAnImmediatePolicy_IsInterruptedWithoutAnotherAttempt()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var attempts = 0;
+        Effect<int, AppError, EmptyEnvironment> fail = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+        var broken = fail.TapErr(_ =>
+        {
+            if (++attempts == 2) cts.Cancel();
+        });
+
+        // When
+        var exit = await broken.Retry(ctx => Effect<EmptyEnvironment>.Succeed(ctx.Attempt < 5)).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Retry_CallerCancelsWhileThePolicyDecides_DoesNotStartAnotherAttempt()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var attempts = 0;
+        Effect<int, AppError, EmptyEnvironment> fail = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+        var broken = fail.TapErr(_ => attempts++);
+
+        // When
+        var exit = await broken.Retry(ctx =>
+        {
+            cts.Cancel();
+            return Effect<EmptyEnvironment>.Succeed(true);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public async Task Retry_CallerCancelsDuringAnAttempt_IsInterruptedWithoutRunningThePolicy()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var policyCalls = 0;
+        Effect<int, AppError, EmptyEnvironment> fail = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+        var broken = fail.TapErr(_ => cts.Cancel());
+
+        // When
+        var exit = await broken.Retry(_ =>
+        {
+            policyCalls++;
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(0, policyCalls);
+    }
+
+    [Fact]
+    public async Task Retry_CallerCancelsWhileThePolicyDecidesToStop_FailsWithTheLastErr()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        Effect<int, AppError, EmptyEnvironment> broken = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+
+        // When
+        var exit = await broken.Retry(_ =>
+        {
+            cts.Cancel();
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.Equal<Exit<int, AppError>>(new Err<AppError>(new NotFound(1)), exit);
+    }
+
+    [Fact]
     public async Task Retry_WaitBeyondWhatTheClockSupports_IsCappedInsteadOfDying()
     {
         // Given
@@ -481,6 +561,45 @@ public class RepeatTests
 
         // Then
         Assert.Equal<Result<int, Never>>(Result.Ok(4), result);
+    }
+
+    [Fact]
+    public async Task Repeat_CallerCancelsDuringARepetitionWithAnImmediatePolicy_IsInterruptedWithoutAnotherRepetition()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var repetitions = 0;
+        var tick = Effect<EmptyEnvironment>.Succeed(1).Tap(_ =>
+        {
+            if (++repetitions == 2) cts.Cancel();
+        });
+
+        // When
+        var exit = await tick.Repeat(_ => Effect<EmptyEnvironment>.Succeed(true)).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(2, repetitions);
+    }
+
+    [Fact]
+    public async Task Repeat_CallerCancelsDuringARepetition_IsInterruptedWithoutRunningThePolicy()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var policyCalls = 0;
+        var tick = Effect<EmptyEnvironment>.Succeed(1).Tap(_ => cts.Cancel());
+
+        // When
+        var exit = await tick.Repeat(_ =>
+        {
+            policyCalls++;
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(0, policyCalls);
     }
 
     [Fact]
