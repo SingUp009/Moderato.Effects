@@ -106,7 +106,8 @@ public readonly partial struct Effect<T, E, R>
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
-                return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
+                // An inner cancellation, such as a fiber whose scope has ended, interrupts the run while the caller's token is not canceled.
+                return ValueTask.FromCanceled<Result<T, E>>(cancellationToken.IsCancellationRequested ? cancellationToken : new CancellationToken(canceled: true));
         }
     }
 
