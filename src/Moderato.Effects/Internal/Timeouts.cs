@@ -52,8 +52,10 @@ internal static class Timeouts
                 }
 
                 timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
-                inner = cancellation.WithCallbackFailure(inner);
             }
+
+            // After the timer is disposed, which waits for a running timer callback, so its callback failures are in.
+            inner = cancellation.WithCallbackFailure(inner);
         }
         catch (Exception exception)
         {

@@ -85,7 +85,7 @@ public readonly partial struct Effect<T, E, R>
                 outcome = Defects.From<T, E>(exception, new RunContext(caller.Token));
             }
 
-            return caller.CloseForCaller(outcome);
+            return caller.WithCallbackFailure(outcome);
         }
     }
 
