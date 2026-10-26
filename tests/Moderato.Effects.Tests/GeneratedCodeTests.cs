@@ -291,5 +291,19 @@ public class DefaultUnionTests
         Assert.True(isText);
         Assert.Null(text);
     }
+
+    [Fact]
+    public void TrySplit_DefaultUnionWithANullableCase_CatchesThatCaseHoldingNull()
+    {
+        // Given
+        Note uninitialized = default;
+
+        // When
+        var isText = TrySplit<NoteNumber, Note, string?>(uninitialized, out var text, out _);
+
+        // Then
+        Assert.True(isText);
+        Assert.Null(text);
+    }
 }
 
