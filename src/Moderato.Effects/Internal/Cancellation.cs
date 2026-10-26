@@ -26,9 +26,8 @@ internal sealed class Cancellation : IDisposable
 
     private readonly CancellationTokenSource source;
     private int state;
-    private ExceptionDispatchInfo? callbackFailure;
     private CancellationTokenRegistration callerLink;
-    private object? callerFailure;
+    private object? callbackFailure;
 
     internal Cancellation(CancellationToken parent) => source = CancellationTokenSource.CreateLinkedTokenSource(parent);
 
@@ -42,12 +41,6 @@ internal sealed class Cancellation : IDisposable
         unit.callerLink = caller.UnsafeRegister(static self => ((Cancellation)self!).CancelForCaller(), unit);
         return unit;
     }
-
-    /// <summary>Ends the run: puts a callback defect caught so far on the outcome; one caught later is reported instead.</summary>
-    internal Outcome<T, E> CloseForCaller<T, E>(Outcome<T, E> outcome)
-        => Interlocked.Exchange(ref callerFailure, closed) is ExceptionDispatchInfo failure
-            ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)])
-            : outcome;
 
     /// <summary>The token for the owned work.</summary>
     internal CancellationToken Token => source.Token;
@@ -69,7 +62,7 @@ internal sealed class Cancellation : IDisposable
         catch (AggregateException exception)
         {
             // A callback registered on the token threw. The owner still has to wait for its work, so the defect is kept for it instead.
-            callbackFailure = Capture(exception);
+            Keep(exception);
         }
 
         return true;
@@ -86,25 +79,26 @@ internal sealed class Cancellation : IDisposable
         }
         catch (AggregateException exception)
         {
-            // The run may already have ended inline on this thread; then no outcome is left to carry the defect.
-            var failure = Capture(exception);
-            if (Interlocked.CompareExchange(ref callerFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
+            Keep(exception);
         }
     }
 
-    // Linked tokens nest one AggregateException per level.
-    private static ExceptionDispatchInfo Capture(AggregateException exception)
+    // The owner may have taken the failure already: the work can end inline on the canceling thread before a later callback throws,
+    // or another thread canceled while the owner was finishing. Then no outcome is left to carry the defect.
+    private void Keep(AggregateException exception)
     {
+        // Linked tokens nest one AggregateException per level.
         var flat = exception.Flatten();
-        return ExceptionDispatchInfo.Capture(flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat);
+        var failure = ExceptionDispatchInfo.Capture(flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat);
+        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
     }
 
-    /// <summary>The defect thrown by a callback on the token when this unit canceled it, if any.</summary>
-    internal ExceptionDispatchInfo? CallbackFailure => Volatile.Read(ref callbackFailure);
+    /// <summary>Takes the defect a callback threw when this unit was canceled, if any. A defect caught after this is reported instead.</summary>
+    internal ExceptionDispatchInfo? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as ExceptionDispatchInfo;
 
-    /// <summary>Puts the callback defect, if any, on the outcome as a failure that followed from the cancellation.</summary>
+    /// <summary>Takes the callback defect, if any, and puts it on the outcome as a failure that followed from the cancellation.</summary>
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
-        => CallbackFailure is { } failure ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)]) : outcome;
+        => TakeCallbackFailure() is { } failure ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)]) : outcome;
 
     /// <summary>Marks the work as finished. Returns false if a reason won first.</summary>
     internal bool TrySettle() => Interlocked.CompareExchange(ref state, SETTLED, 0) == 0;

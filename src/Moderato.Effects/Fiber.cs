@@ -74,7 +74,7 @@ public sealed class Fiber<T, E, R>
     {
         cancellation.TryCancel(CancellationReason.ParentScopeClosed);
         var outcome = await task.ConfigureAwait(false);
-        var callbackFailure = cancellation.CallbackFailure;
+        var callbackFailure = cancellation.TakeCallbackFailure();
         cancellation.Dispose();
         var released = Observe(outcome);
         if (callbackFailure is null) return released;
