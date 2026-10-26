@@ -12,12 +12,12 @@ namespace Moderato.Effects;
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly partial struct Effect<T, E, R>
 {
-    private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? _run;
+    private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
-    internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run) => _run = run;
+    internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run) => this.run = run;
 
     internal Func<R, RunContext, ValueTask<Outcome<T, E>>> Run
-        => _run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>();
+        => run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>();
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
@@ -92,10 +92,10 @@ public readonly partial struct Effect<T, E, R>
     // One key, overwritten: an exception thrown again by a later run must not accumulate stale entries.
     private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed)
     {
-        if (suppressed.IsEmpty) exception.Data.Remove(SuppressedDataKey);
-        else exception.Data[SuppressedDataKey] = suppressed;
+        if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);
+        else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
     }
 
     /// <summary>The <see cref="Exception.Data"/> key under which <see cref="RunAsync"/> attaches suppressed failures to a rethrown defect.</summary>
-    public const string SuppressedDataKey = "Moderato.Effects.Suppressed";
+    public const string SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed";
 }

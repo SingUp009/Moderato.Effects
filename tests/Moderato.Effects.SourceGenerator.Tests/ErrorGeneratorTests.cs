@@ -6,7 +6,7 @@ public class ErrorGeneratorTests
     public void Error_PartialUnion_ImplementsIUnionCaseForEachCase()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record NotFound(int Id);
             public record Forbidden(string Reason);
@@ -20,7 +20,7 @@ public class ErrorGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -31,7 +31,7 @@ public class ErrorGeneratorTests
     public void Error_CaseThatIsAUnion_AlsoImplementsItsCases()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record ConnFailed(string Host);
             public record QueryFailed(string Sql);
@@ -48,7 +48,7 @@ public class ErrorGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -59,7 +59,7 @@ public class ErrorGeneratorTests
     public void Error_CaseReachableTwoWays_WarnsAndSkipsTheNestedConversion()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record Timeout(int Ms);
             public record ConnFailed(string Host);
@@ -70,7 +70,7 @@ public class ErrorGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -82,14 +82,14 @@ public class ErrorGeneratorTests
     public void Error_UnionWithoutTheAttribute_GeneratesNothing()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record NotFound(int Id);
             public partial union AppError(NotFound, string);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -100,14 +100,14 @@ public class ErrorGeneratorTests
     public void Error_NotPartial_ReportsMEFF001()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record NotFound(int Id);
             [Error] public union AppError(NotFound, string);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF001", build.Errors);
@@ -117,13 +117,13 @@ public class ErrorGeneratorTests
     public void Error_NotAUnion_ReportsMEFF001()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             [Error] public partial record AppError(string Message);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF001", build.Errors);
@@ -133,14 +133,14 @@ public class ErrorGeneratorTests
     public void Error_GenericUnion_ReportsMEFF002()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record NotFound<T>(T Id);
             [Error] public partial union AppError<T>(NotFound<T>, string);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF002", build.Errors);
@@ -150,7 +150,7 @@ public class ErrorGeneratorTests
     public void Error_NestedUnion_ReportsMEFF004()
     {
         // Given
-        const string source = """
+        const string SOURCE = """
             namespace App;
             public record NotFound(int Id);
             public static partial class Errors
@@ -160,7 +160,7 @@ public class ErrorGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF004", build.Errors);

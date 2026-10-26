@@ -14,31 +14,31 @@ namespace Moderato.Effects;
 /// <typeparam name="R">The environment the block runs with.</typeparam>
 public sealed class Scope<E, R>
 {
-    private readonly RunContext _context;
-    private readonly Cancellation _cancellation;
-    private readonly Releases<R> _releases;
-    private ImmutableArray<Suppressed>.Builder? _suppressed;
-    private int _omitted;
-    private ExceptionDispatchInfo? _rethrown;
-    private bool _rethrownConsequential;
-    private bool _failed;
-    private E _error = default!;
-    private int _busy;
-    private bool _closed;
+    private readonly RunContext context;
+    private readonly Cancellation cancellation;
+    private readonly Releases<R> releases;
+    private ImmutableArray<Suppressed>.Builder? suppressed;
+    private int omitted;
+    private ExceptionDispatchInfo? rethrown;
+    private bool rethrownConsequential;
+    private bool failed;
+    private E error = default!;
+    private int busy;
+    private bool closed;
 
     private Scope(R env, RunContext context)
     {
         Env = env;
-        _cancellation = new Cancellation(context.CancellationToken);
-        _releases = new Releases<R>(_cancellation);
-        _context = _releases.BodyContext;
+        cancellation = new Cancellation(context.CancellationToken);
+        releases = new Releases<R>(cancellation);
+        this.context = releases.BodyContext;
     }
 
     /// <summary>The environment the block runs with.</summary>
     public R Env { get; }
 
     /// <summary>The token the block runs with.</summary>
-    public CancellationToken CancellationToken => _context.CancellationToken;
+    public CancellationToken CancellationToken => context.CancellationToken;
 
     /// <summary>An effect that runs the block each time it runs.</summary>
     /// <param name="body">The block.</param>
@@ -53,13 +53,13 @@ public sealed class Scope<E, R>
     /// <param name="effect">The effect.</param>
     /// <returns>The value.</returns>
     public ValueTask<T> Run<T>(Effect<T, E, R> effect)
-        => Step(effect, static (effect, scope) => effect.Run(scope.Env, scope._context));
+        => Step(effect, static (effect, scope) => effect.Run(scope.Env, scope.context));
 
     /// <summary>Acquires a resource and returns its value. It is released when the block ends, in reverse order of acquisition. An Err ends the block.</summary>
     /// <param name="resource">The resource.</param>
     /// <returns>The value.</returns>
     public ValueTask<T> Acquire<T>(Resource<T, E, R> resource)
-        => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope._context, scope._releases));
+        => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope.context, scope.releases));
 
     /// <summary>Starts the effect as a fiber that runs alongside the block. When the block ends, the fiber is canceled and the block waits for it.</summary>
     /// <param name="effect">The effect.</param>
@@ -113,7 +113,7 @@ public sealed class Scope<E, R>
         Enter();
         try
         {
-            _releases.Add(release);
+            releases.Add(release);
         }
         finally
         {
@@ -162,38 +162,38 @@ public sealed class Scope<E, R>
         try
         {
             var value = await body(this).ConfigureAwait(false);
-            outcome = _failed ? Outcome<T, E>.Err(_error) : Outcome<T, E>.Ok(value);
+            outcome = failed ? Outcome<T, E>.Err(error) : Outcome<T, E>.Ok(value);
         }
         catch (ScopeFailure failure) when (ReferenceEquals(failure.Owner, this))
         {
-            outcome = Outcome<T, E>.Err(_error);
+            outcome = Outcome<T, E>.Err(error);
         }
         catch (Exception exception)
         {
             // A Die rethrown by Run keeps its own classification; the token may have been canceled only afterwards.
-            outcome = _rethrown is { } rethrown && ReferenceEquals(exception, rethrown.SourceException)
-                ? Outcome<T, E>.Die(rethrown, consequential: _rethrownConsequential)
-                : Defects.From<T, E>(exception, _context);
+            outcome = rethrown is { } defect && ReferenceEquals(exception, defect.SourceException)
+                ? Outcome<T, E>.Die(defect, consequential: rethrownConsequential)
+                : Defects.From<T, E>(exception, context);
             // An Err that came first is kept as context for the defect or interruption that replaced it.
-            if (_failed) AddSuppressed(new Suppressed(ExitCases.Failed(_error), Relation.Sequential));
+            if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         }
 
-        _closed = true;
-        if (_suppressed is { Count: > 0 } || _omitted > 0) outcome = outcome.After(_suppressed?.ToImmutable() ?? [], _omitted);
+        closed = true;
+        if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.ToImmutable() ?? [], omitted);
         try
         {
-            return await _releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);
+            return await releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);
         }
         finally
         {
-            _cancellation.Dispose();
+            cancellation.Dispose();
         }
     }
 
     private T Unwrap<T>(Outcome<T, E> outcome)
     {
         AddSuppressed(outcome.Suppressed);
-        _omitted += outcome.Omitted;
+        omitted += outcome.Omitted;
 
         switch (outcome.Kind)
         {
@@ -202,53 +202,53 @@ public sealed class Scope<E, R>
             case OutcomeKind.Err:
                 throw Record(outcome.Error);
             case OutcomeKind.Die:
-                _rethrown = outcome.Defect;
-                _rethrownConsequential = outcome.Consequential;
+                rethrown = outcome.Defect;
+                rethrownConsequential = outcome.Consequential;
                 outcome.Defect!.Throw();
                 return default!;
             default:
-                throw new OperationCanceledException(_context.CancellationToken);
+                throw new OperationCanceledException(context.CancellationToken);
         }
     }
 
     private ScopeFailure Record(E error)
     {
-        if (!_failed)
+        if (!failed)
         {
-            _failed = true;
-            _error = error;
+            failed = true;
+            this.error = error;
         }
         else
         {
             AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         }
 
-        return new ScopeFailure(this, _error);
+        return new ScopeFailure(this, this.error);
     }
 
     private void ThrowIfFailed()
     {
         // F20: once an Err has ended the block, later steps must not run, even if a catch swallowed the ScopeFailure.
-        if (_failed) throw new ScopeFailure(this, _error);
+        if (failed) throw new ScopeFailure(this, error);
     }
 
     private void Enter()
     {
-        if (_closed) throw new InvalidOperationException("The Gen block has ended; its scope can no longer be used.");
-        if (Interlocked.Exchange(ref _busy, 1) == 1)
+        if (closed) throw new InvalidOperationException("The Gen block has ended; its scope can no longer be used.");
+        if (Interlocked.Exchange(ref busy, 1) == 1)
         {
             throw new InvalidOperationException(
                 "The scope is already running a step. Use it from one flow at a time, and not from a nested Gen block; run effects in parallel with Effect.All instead.");
         }
     }
 
-    private void Leave() => Volatile.Write(ref _busy, 0);
+    private void Leave() => Volatile.Write(ref busy, 0);
 
     private void AddSuppressed(Suppressed failure)
     {
-        _suppressed ??= ImmutableArray.CreateBuilder<Suppressed>();
-        if (_suppressed.Count < SuppressedLimit.Max) _suppressed.Add(failure);
-        else _omitted++;
+        suppressed ??= ImmutableArray.CreateBuilder<Suppressed>();
+        if (suppressed.Count < SuppressedLimit.MAX) suppressed.Add(failure);
+        else omitted++;
     }
 
     private void AddSuppressed(ImmutableArray<Suppressed> failures)

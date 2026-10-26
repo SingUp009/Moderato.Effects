@@ -8,9 +8,9 @@ public partial union AppError(NotFound, Forbidden);
 
 public sealed class Counter
 {
-    private int _value;
+    private int value;
 
-    public int Next() => ++_value;
+    public int Next() => ++value;
 }
 
 public sealed class CounterEnvironment(Counter counter) : IHas<Counter>
@@ -39,20 +39,20 @@ public partial union RequestError(NotFound, TimeoutError);
 /// <summary>A clock that records each wait and lets it pass at once, so schedules can be checked without waiting.</summary>
 public sealed class RecordingClock : TimeProvider
 {
-    private readonly List<TimeSpan> _waits = [];
-    private long _now;
+    private readonly List<TimeSpan> waits = [];
+    private long now;
 
     public IReadOnlyList<TimeSpan> Waits
     {
         get
         {
-            lock (_waits) return [.. _waits];
+            lock (waits) return [.. waits];
         }
     }
 
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
-    public override long GetTimestamp() => Interlocked.Read(ref _now);
+    public override long GetTimestamp() => Interlocked.Read(ref now);
 
     public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(GetTimestamp());
 
@@ -60,8 +60,8 @@ public sealed class RecordingClock : TimeProvider
     {
         if (dueTime != Timeout.InfiniteTimeSpan)
         {
-            lock (_waits) _waits.Add(dueTime);
-            Interlocked.Add(ref _now, dueTime.Ticks);
+            lock (waits) waits.Add(dueTime);
+            Interlocked.Add(ref now, dueTime.Ticks);
             ThreadPool.QueueUserWorkItem(_ => callback(state));
         }
 

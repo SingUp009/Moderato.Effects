@@ -40,30 +40,21 @@ csharp_style_pattern_matching_over_as_with_null_check = true:warning
 csharp_style_throw_expression = true:suggestion
 csharp_style_prefer_switch_expression = true:suggestion
 
-# Naming: private fields are _camelCase, private static fields s_camelCase, constants PascalCase
+# Naming: constants are UPPER_SNAKE_CASE, private fields camelCase; static fields follow the same rules
 dotnet_naming_rule.constants.symbols = constants
-dotnet_naming_rule.constants.style = pascal_case
+dotnet_naming_rule.constants.style = upper_snake_case
 dotnet_naming_rule.constants.severity = warning
-dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_kinds = field, local
 dotnet_naming_symbols.constants.required_modifiers = const
-dotnet_naming_style.pascal_case.capitalization = pascal_case
-
-dotnet_naming_rule.private_static_fields.symbols = private_static_fields
-dotnet_naming_rule.private_static_fields.style = s_camel_case
-dotnet_naming_rule.private_static_fields.severity = warning
-dotnet_naming_symbols.private_static_fields.applicable_kinds = field
-dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
-dotnet_naming_symbols.private_static_fields.required_modifiers = static
-dotnet_naming_style.s_camel_case.required_prefix = s_
-dotnet_naming_style.s_camel_case.capitalization = camel_case
+dotnet_naming_style.upper_snake_case.capitalization = all_upper
+dotnet_naming_style.upper_snake_case.word_separator = _
 
 dotnet_naming_rule.private_fields.symbols = private_fields
-dotnet_naming_rule.private_fields.style = underscore_camel_case
+dotnet_naming_rule.private_fields.style = camel_case
 dotnet_naming_rule.private_fields.severity = warning
 dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
-dotnet_naming_style.underscore_camel_case.required_prefix = _
-dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.camel_case.capitalization = camel_case
 
 # Unused code
 dotnet_diagnostic.IDE0051.severity = warning

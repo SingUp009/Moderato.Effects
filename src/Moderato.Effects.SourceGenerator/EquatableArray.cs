@@ -10,9 +10,9 @@ namespace Moderato.Effects.SourceGenerator;
 internal readonly struct EquatableArray<T>(ImmutableArray<T> items) : IEquatable<EquatableArray<T>>, IEnumerable<T>
     where T : IEquatable<T>
 {
-    private readonly ImmutableArray<T> _items = items;
+    private readonly ImmutableArray<T> items = items;
 
-    public ImmutableArray<T> Items => _items.IsDefault ? ImmutableArray<T>.Empty : _items;
+    public ImmutableArray<T> Items => items.IsDefault ? ImmutableArray<T>.Empty : items;
 
     public int Length => Items.Length;
 

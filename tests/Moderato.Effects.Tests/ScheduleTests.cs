@@ -33,7 +33,7 @@ public class ScheduleTests
 
 public class RetryTests
 {
-    private static readonly TimeSpan s_oneSecond = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan oneSecond = TimeSpan.FromSeconds(1);
 
     // Fails with NotFound(attempt) until the given attempt, then succeeds with the attempt number.
     private static Effect<int, AppError, R> SucceedsOnAttempt<R>(int succeedOn, Counter attempts)
@@ -51,11 +51,11 @@ public class RetryTests
         var flaky = SucceedsOnAttempt<TimeEnvironment>(3, attempts);
 
         // When
-        var result = await flaky.Retry(Schedule.Spaced(s_oneSecond).UpTo(5)).RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
+        var result = await flaky.Retry(Schedule.Spaced(oneSecond).UpTo(5)).RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<int, AppError>>(Result.Ok(3), result);
-        Assert.Equal([s_oneSecond, s_oneSecond], clock.Waits);
+        Assert.Equal([oneSecond, oneSecond], clock.Waits);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class RetryTests
         var broken = SucceedsOnAttempt<TimeEnvironment>(int.MaxValue, attempts);
 
         // When
-        var result = await broken.Retry(Schedule.Spaced(s_oneSecond).UpTo(2)).RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
+        var result = await broken.Retry(Schedule.Spaced(oneSecond).UpTo(2)).RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(3)), result);
@@ -165,7 +165,7 @@ public class RetryTests
         var broken = SucceedsOnAttempt<TimeEnvironment>(int.MaxValue, attempts);
 
         // When
-        var result = await broken.Retry(Schedule.Spaced(s_oneSecond).During(TimeSpan.FromSeconds(2.5)))
+        var result = await broken.Retry(Schedule.Spaced(oneSecond).During(TimeSpan.FromSeconds(2.5)))
             .RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
 
         // Then
@@ -178,7 +178,7 @@ public class RetryTests
     {
         // Given
         var broken = SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter());
-        var retried = broken.Retry(Schedule.Spaced(s_oneSecond).UpTo(5).Jittered());
+        var retried = broken.Retry(Schedule.Spaced(oneSecond).UpTo(5).Jittered());
         var firstClock = new RecordingClock();
         var secondClock = new RecordingClock();
 
@@ -199,7 +199,7 @@ public class RetryTests
         var clock = new RecordingClock();
         var env = new RetryEnvironment(clock, new Random(7));
         var retries = Enumerable.Range(0, 32).Select(_ =>
-            SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter()).Retry(Schedule.Spaced(s_oneSecond).UpTo(10).Jittered()).Attempt());
+            SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter()).Retry(Schedule.Spaced(oneSecond).UpTo(10).Jittered()).Attempt());
 
         // When
         await Effect.All(retries, Concurrency.Parallel).RunAsync(env, TestContext.Current.CancellationToken);

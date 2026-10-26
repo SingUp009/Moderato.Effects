@@ -14,7 +14,7 @@ internal enum OutcomeKind : byte
 internal static class SuppressedLimit
 {
     /// <summary>The most suppressed failures one outcome keeps; the rest are only counted.</summary>
-    internal const int Max = 100;
+    internal const int MAX = 100;
 }
 
 /// <summary>The internal result of one run: the primary outcome plus the failures it suppressed.</summary>
@@ -39,10 +39,10 @@ internal readonly struct Outcome<T, E>
         Defect = defect;
         Consequential = consequential;
         if (suppressed.IsDefault) suppressed = [];
-        if (suppressed.Length > SuppressedLimit.Max)
+        if (suppressed.Length > SuppressedLimit.MAX)
         {
-            omitted += suppressed.Length - SuppressedLimit.Max;
-            suppressed = suppressed[..SuppressedLimit.Max];
+            omitted += suppressed.Length - SuppressedLimit.MAX;
+            suppressed = suppressed[..SuppressedLimit.MAX];
         }
 
         Suppressed = suppressed;

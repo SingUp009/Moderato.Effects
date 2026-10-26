@@ -12,8 +12,8 @@ namespace Moderato.Effects.SourceGenerator;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 {
-    private static readonly ImmutableHashSet<string> s_steps = ["Run", "Get", "Acquire", "Fork"];
-    private static readonly ImmutableHashSet<string> s_resources = ["Acquire", "Defer", "Fork"];
+    private static readonly ImmutableHashSet<string> steps = ["Run", "Get", "Acquire", "Fork"];
+    private static readonly ImmutableHashSet<string> resources = ["Acquire", "Defer", "Fork"];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
     [
@@ -72,9 +72,9 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             if (identifier.Parent is MemberAccessExpressionSyntax access && access.Expression == identifier)
             {
                 var name = access.Name.Identifier.ValueText;
-                if (s_steps.Contains(name) && InCleanup(context.SemanticModel, identifier, function))
+                if (steps.Contains(name) && InCleanup(context.SemanticModel, identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepInCleanup, access.GetLocation(), access.ToString()));
-                if (s_resources.Contains(name) && InLoop(identifier, function))
+                if (resources.Contains(name) && InLoop(identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ResourceInLoop, access.GetLocation(), access.ToString()));
             }
             else if (Escapes(context.SemanticModel, identifier))

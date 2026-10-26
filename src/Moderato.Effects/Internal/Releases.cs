@@ -10,10 +10,10 @@ namespace Moderato.Effects.Internal;
 /// </summary>
 internal sealed class Releases<R>(Cancellation body)
 {
-    private readonly List<Func<ExitCase, Effect<Unit, Never, R>>> _actions = [];
-    private readonly Lock _lock = new();
-    private ImmutableArray<Outcome<Unit, Never>>.Builder? _childDefects;
-    private bool _bodyEnded;
+    private readonly List<Func<ExitCase, Effect<Unit, Never, R>>> actions = [];
+    private readonly Lock gate = new();
+    private ImmutableArray<Outcome<Unit, Never>>.Builder? childDefects;
+    private bool bodyEnded;
 
     /// <summary>The context the scope's body runs with.</summary>
     internal RunContext BodyContext { get; } = new(body.Token);
@@ -24,10 +24,10 @@ internal sealed class Releases<R>(Cancellation body)
     /// </summary>
     internal bool TryFailFromChild(Outcome<Unit, Never> defect)
     {
-        lock (_lock)
+        lock (gate)
         {
-            if (_bodyEnded) return false;
-            (_childDefects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(defect);
+            if (bodyEnded) return false;
+            (childDefects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(defect);
         }
 
         body.TryCancel(CancellationReason.ChildDefect);
@@ -36,20 +36,20 @@ internal sealed class Releases<R>(Cancellation body)
 
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release)
     {
-        lock (_lock) _actions.Add(release);
+        lock (gate) actions.Add(release);
     }
 
     /// <summary>Releases everything, then decides the final outcome.</summary>
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
         Func<ExitCase, Effect<Unit, Never, R>>[] actions;
-        lock (_lock)
+        lock (gate)
         {
-            _bodyEnded = true;
-            if (_childDefects is { Count: > 0 }) body = AfterChildDefects(body, _childDefects.ToImmutable());
-            if (_actions.Count == 0) return body;
-            actions = [.. _actions];
-            _actions.Clear();
+            bodyEnded = true;
+            if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects.ToImmutable());
+            if (this.actions.Count == 0) return body;
+            actions = [.. this.actions];
+            this.actions.Clear();
         }
 
         // Fixed before any release runs, so a failing release cannot change what the later ones see.
@@ -115,15 +115,15 @@ internal sealed class Releases<R>(Cancellation body)
 /// <summary>Builds <see cref="ExitCase"/> values from outcomes.</summary>
 internal static class ExitCases
 {
-    private static readonly Succeeded s_succeeded = new();
-    private static readonly Interrupted s_interrupted = new();
+    private static readonly Succeeded succeeded = new();
+    private static readonly Interrupted interrupted = new();
 
     internal static ExitCase From<T, E>(Outcome<T, E> outcome) => outcome.Kind switch
     {
-        OutcomeKind.Ok => s_succeeded,
+        OutcomeKind.Ok => succeeded,
         OutcomeKind.Err => Failed(outcome.Error),
         OutcomeKind.Die => ToDie(outcome),
-        _ => s_interrupted,
+        _ => interrupted,
     };
 
     /// <summary>The outcome as a suppressed failure, or <see langword="null"/> if it succeeded.</summary>
@@ -142,5 +142,5 @@ internal static class ExitCases
         return new Failed(error);
     }
 
-    internal static ExitCase Interrupted => s_interrupted;
+    internal static ExitCase Interrupted => interrupted;
 }

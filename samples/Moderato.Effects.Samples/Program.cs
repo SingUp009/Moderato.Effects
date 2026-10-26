@@ -139,21 +139,21 @@ public static class Bank
 
     public static Effect<int, Overdrawn, EmptyEnvironment> Transfer(Transaction tx, int amount)
     {
-        const int balance = 300;
+        const int BALANCE = 300;
         Console.WriteLine($"  transfer {amount} in transaction {tx.Id}");
-        return amount <= balance ? Effect<EmptyEnvironment>.Succeed(balance - amount) : Effect<EmptyEnvironment>.Fail(new Overdrawn(amount - balance));
+        return amount <= BALANCE ? Effect<EmptyEnvironment>.Succeed(BALANCE - amount) : Effect<EmptyEnvironment>.Fail(new Overdrawn(amount - BALANCE));
     }
 }
 
 public static class Remote
 {
-    private static int s_calls;
+    private static int calls;
 
     // Fails its first call, so the retry has something to do.
     public static Effect<string, TimeoutError, DefaultEnvironment> Fetch(string key, TimeSpan latency) => Scope<TimeoutError, DefaultEnvironment>.Gen(async scope =>
     {
         await scope.Run(Effect.Sleep<DefaultEnvironment>(latency));
-        if (Interlocked.Increment(ref s_calls) == 1) throw scope.Fail(new TimeoutError(latency));
+        if (Interlocked.Increment(ref calls) == 1) throw scope.Fail(new TimeoutError(latency));
         return $"{key}:{latency.TotalMilliseconds}ms";
     });
 }

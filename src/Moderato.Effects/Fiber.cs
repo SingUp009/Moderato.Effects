@@ -13,16 +13,16 @@ namespace Moderato.Effects;
 /// <typeparam name="R">The environment.</typeparam>
 public sealed class Fiber<T, E, R>
 {
-    private readonly Cancellation _cancellation;
-    private readonly Task<Outcome<T, E>> _task;
-    private bool _reportedToOwner;
-    private int _joined;
+    private readonly Cancellation cancellation;
+    private readonly Task<Outcome<T, E>> task;
+    private bool reportedToOwner;
+    private int joined;
 
     private Fiber(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R env, Releases<R> owner, Cancellation cancellation)
     {
-        _cancellation = cancellation;
+        this.cancellation = cancellation;
         var context = new RunContext(cancellation.Token);
-        _task = Task.Run(async () =>
+        task = Task.Run(async () =>
         {
             Outcome<T, E> outcome;
             try
@@ -35,7 +35,7 @@ public sealed class Fiber<T, E, R>
             }
 
             if (outcome.Kind == OutcomeKind.Die && !outcome.Consequential)
-                _reportedToOwner = owner.TryFailFromChild(outcome.WithTypes<Unit, Never>());
+                reportedToOwner = owner.TryFailFromChild(outcome.WithTypes<Unit, Never>());
             return outcome;
         });
     }
@@ -57,10 +57,10 @@ public sealed class Fiber<T, E, R>
 
     private async ValueTask<Outcome<T, E>> JoinAsync(RunContext context)
     {
-        Volatile.Write(ref _joined, 1);
+        Volatile.Write(ref joined, 1);
         try
         {
-            return await _task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
+            return await task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
@@ -70,14 +70,14 @@ public sealed class Fiber<T, E, R>
 
     private async ValueTask<Outcome<Unit, Never>> ReleaseAsync()
     {
-        _cancellation.TryCancel(CancellationReason.ParentScopeClosed);
-        var outcome = await _task.ConfigureAwait(false);
-        _cancellation.Dispose();
-        if (Volatile.Read(ref _joined) == 1) return Outcome<Unit, Never>.Ok(Unit.Value);
+        cancellation.TryCancel(CancellationReason.ParentScopeClosed);
+        var outcome = await task.ConfigureAwait(false);
+        cancellation.Dispose();
+        if (Volatile.Read(ref joined) == 1) return Outcome<Unit, Never>.Ok(Unit.Value);
 
         switch (outcome.Kind)
         {
-            case OutcomeKind.Die when !outcome.Consequential && !_reportedToOwner:
+            case OutcomeKind.Die when !outcome.Consequential && !reportedToOwner:
                 // The defect came after the parent's body had ended, so it fails the release instead.
                 return outcome.WithTypes<Unit, Never>();
             case OutcomeKind.Die when outcome.Consequential:

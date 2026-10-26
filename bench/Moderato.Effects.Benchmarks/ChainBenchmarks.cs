@@ -14,14 +14,14 @@ public class ChainBenchmarks
     [Params(false, true)]
     public bool Fail;
 
-    private Effect<int, string, EmptyEnvironment> _combinators;
-    private Effect<int, string, EmptyEnvironment> _gen;
+    private Effect<int, string, EmptyEnvironment> combinators;
+    private Effect<int, string, EmptyEnvironment> gen;
 
     [GlobalSetup]
     public void Setup()
     {
-        _combinators = Source().Map(static x => x + 2).AndThen(static x => Half(x));
-        _gen = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        combinators = Source().Map(static x => x + 2).AndThen(static x => Half(x));
+        gen = Scope<string, EmptyEnvironment>.Gen(async scope =>
         {
             var x = await scope.Run(Source());
             return await scope.Run(Half(x + 2));
@@ -53,9 +53,9 @@ public class ChainBenchmarks
 
     [Benchmark(Description = "Effect (combinators)")]
     [BenchmarkCategory("Chain")]
-    public async ValueTask<int> Effect_Combinators() => (await _combinators.RunAsync().ConfigureAwait(false)).UnwrapOr(-1);
+    public async ValueTask<int> Effect_Combinators() => (await combinators.RunAsync().ConfigureAwait(false)).UnwrapOr(-1);
 
     [Benchmark(Description = "Effect (Gen block)")]
     [BenchmarkCategory("Chain")]
-    public async ValueTask<int> Effect_Gen() => (await _gen.RunAsync().ConfigureAwait(false)).UnwrapOr(-1);
+    public async ValueTask<int> Effect_Gen() => (await gen.RunAsync().ConfigureAwait(false)).UnwrapOr(-1);
 }

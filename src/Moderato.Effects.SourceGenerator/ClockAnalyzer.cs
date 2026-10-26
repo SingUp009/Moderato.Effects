@@ -11,22 +11,22 @@ namespace Moderato.Effects.SourceGenerator;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ClockAnalyzer : DiagnosticAnalyzer
 {
-    private const string UseTimeProvider = "'TimeProvider' from the environment";
-    private const string UseSleep = "'Effect.Sleep'";
+    private const string USE_TIME_PROVIDER = "'TimeProvider' from the environment";
+    private const string USE_SLEEP = "'Effect.Sleep'";
 
-    private static readonly ImmutableDictionary<string, string> s_properties = new[]
+    private static readonly ImmutableDictionary<string, string> properties = new[]
     {
         "System.DateTime.Now", "System.DateTime.UtcNow", "System.DateTime.Today",
         "System.DateTimeOffset.Now", "System.DateTimeOffset.UtcNow",
         "System.TimeProvider.System", "System.Environment.TickCount", "System.Environment.TickCount64",
-    }.ToImmutableDictionary(static p => p, static _ => UseTimeProvider);
+    }.ToImmutableDictionary(static p => p, static _ => USE_TIME_PROVIDER);
 
-    private static readonly ImmutableDictionary<string, string> s_methods = new[]
+    private static readonly ImmutableDictionary<string, string> methods = new[]
     {
-        ("System.Threading.Tasks.Task.Delay", UseSleep),
-        ("System.Threading.Thread.Sleep", UseSleep),
-        ("System.Diagnostics.Stopwatch.GetTimestamp", UseTimeProvider),
-        ("System.Diagnostics.Stopwatch.StartNew", UseTimeProvider),
+        ("System.Threading.Tasks.Task.Delay", USE_SLEEP),
+        ("System.Threading.Thread.Sleep", USE_SLEEP),
+        ("System.Diagnostics.Stopwatch.GetTimestamp", USE_TIME_PROVIDER),
+        ("System.Diagnostics.Stopwatch.StartNew", USE_TIME_PROVIDER),
     }.ToImmutableDictionary(static p => p.Item1, static p => p.Item2);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Diagnostics.SystemClock];
@@ -38,12 +38,12 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         context.RegisterOperationAction(static ctx =>
         {
             var property = ((IPropertyReferenceOperation)ctx.Operation).Property;
-            Check(ctx, $"{property.ContainingType.ToDisplayString()}.{property.Name}", s_properties);
+            Check(ctx, $"{property.ContainingType.ToDisplayString()}.{property.Name}", properties);
         }, OperationKind.PropertyReference);
         context.RegisterOperationAction(static ctx =>
         {
             var method = ((IInvocationOperation)ctx.Operation).TargetMethod;
-            Check(ctx, $"{method.ContainingType.ToDisplayString()}.{method.Name}", s_methods);
+            Check(ctx, $"{method.ContainingType.ToDisplayString()}.{method.Name}", methods);
         }, OperationKind.Invocation);
     }
 

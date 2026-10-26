@@ -6,7 +6,7 @@ namespace Moderato.Effects;
 /// </summary>
 public static class EffectDiagnostics
 {
-    private static Action<ExitCase>? s_handler;
+    private static Action<ExitCase>? handler;
 
     /// <summary>
     /// Receives each unobserved failure: a <see cref="Die"/> or a <see cref="Failed"/>. <see langword="null"/> restores the default,
@@ -14,7 +14,7 @@ public static class EffectDiagnostics
     /// </summary>
     public static Action<ExitCase>? UnobservedFailureHandler
     {
-        get => Volatile.Read(ref s_handler);
-        set => Volatile.Write(ref s_handler, value);
+        get => Volatile.Read(ref handler);
+        set => Volatile.Write(ref handler, value);
     }
 }

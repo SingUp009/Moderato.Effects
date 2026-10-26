@@ -2,7 +2,7 @@ namespace Moderato.Effects.SourceGenerator.Tests;
 
 public class RestOfGeneratorTests
 {
-    private const string Errors = """
+    private const string ERRORS = """
         namespace App;
         public record User(string Name);
         public record NotFound(int Id);
@@ -14,7 +14,7 @@ public class RestOfGeneratorTests
     public void RestOf_LeavesOutOneCase_LetsCatchRemoveIt()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [Error, RestOf<AppError>] public partial union AccessError(Forbidden, TimeoutError);
 
@@ -26,7 +26,7 @@ public class RestOfGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -36,7 +36,7 @@ public class RestOfGeneratorTests
     public void RestOf_CatchingACaseTheRestStillHolds_DoesNotCompile()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [Error, RestOf<AppError>] public partial union AccessError(Forbidden, TimeoutError);
 
@@ -48,7 +48,7 @@ public class RestOfGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("CS0315", build.Errors);
@@ -58,13 +58,13 @@ public class RestOfGeneratorTests
     public void RestOf_LeavesOutTwoCases_ReportsMEFF202()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [RestOf<AppError>] public partial union AccessError(Forbidden);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         var message = build.Single("MEFF202").GetMessage();
@@ -76,13 +76,13 @@ public class RestOfGeneratorTests
     public void RestOf_LeavesOutNothing_ReportsMEFF202()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [RestOf<AppError>] public partial union Everything(NotFound, Forbidden, TimeoutError);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("none", build.Single("MEFF202").GetMessage());
@@ -92,13 +92,13 @@ public class RestOfGeneratorTests
     public void RestOf_SourceIsNotAUnion_ReportsMEFF201()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [RestOf<NotFound>] public partial union AccessError(Forbidden, TimeoutError);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF201", build.Errors);

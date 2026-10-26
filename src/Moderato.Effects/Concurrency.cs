@@ -4,9 +4,9 @@ namespace Moderato.Effects;
 public readonly struct Concurrency : IEquatable<Concurrency>
 {
     // 0: sequential, -1: parallel without a limit, n > 0: parallel with at most n at a time.
-    private readonly int _maxDegree;
+    private readonly int maxDegree;
 
-    private Concurrency(int maxDegree) => _maxDegree = maxDegree;
+    private Concurrency(int maxDegree) => this.maxDegree = maxDegree;
 
     /// <summary>One at a time, in order, on the caller's flow. Safe for services that are not thread-safe.</summary>
     public static Concurrency Sequential => default;
@@ -15,10 +15,10 @@ public readonly struct Concurrency : IEquatable<Concurrency>
     public static Concurrency Parallel => new(-1);
 
     /// <summary>Whether the effects run at the same time.</summary>
-    public bool IsParallel => _maxDegree != 0;
+    public bool IsParallel => maxDegree != 0;
 
     /// <summary>The most effects that run at the same time, or <see langword="null"/> for no limit or for sequential.</summary>
-    public int? MaxDegree => _maxDegree > 0 ? _maxDegree : null;
+    public int? MaxDegree => maxDegree > 0 ? maxDegree : null;
 
     /// <summary>Parallel, with at most <paramref name="maxDegree"/> effects running at the same time.</summary>
     /// <param name="maxDegree">The limit. At least 1.</param>
@@ -31,16 +31,16 @@ public readonly struct Concurrency : IEquatable<Concurrency>
     }
 
     /// <inheritdoc/>
-    public bool Equals(Concurrency other) => _maxDegree == other._maxDegree;
+    public bool Equals(Concurrency other) => maxDegree == other.maxDegree;
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is Concurrency other && Equals(other);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => _maxDegree;
+    public override int GetHashCode() => maxDegree;
 
     /// <inheritdoc/>
-    public override string ToString() => _maxDegree switch
+    public override string ToString() => maxDegree switch
     {
         0 => "Sequential",
         -1 => "Parallel",

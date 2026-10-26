@@ -397,7 +397,7 @@ public class SystemClockTests
 
 public class CatchConstraintTests
 {
-    private const string Errors = """
+    private const string ERRORS = """
         namespace App;
         public record User(string Name);
         public record NotFound(int Id);
@@ -409,7 +409,7 @@ public class CatchConstraintTests
     public void Catch_RestNotDeclaredForTheUnion_ReportsMEFF308()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [Error] public partial union AccessError(Forbidden, TimeoutError);
 
@@ -421,7 +421,7 @@ public class CatchConstraintTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Equal("'AccessError' is not declared [RestOf<AppError>]", build.Single("MEFF308").GetMessage());
@@ -431,7 +431,7 @@ public class CatchConstraintTests
     public void Catch_CaseTheRestStillHolds_ReportsMEFF309()
     {
         // Given
-        const string source = Errors + """
+        const string SOURCE = ERRORS + """
 
             [Error, RestOf<AppError>] public partial union AccessError(Forbidden, TimeoutError);
 
@@ -443,7 +443,7 @@ public class CatchConstraintTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Equal("'AccessError' leaves out 'NotFound', not 'Forbidden'", build.Single("MEFF309").GetMessage());

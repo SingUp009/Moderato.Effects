@@ -1,5 +1,5 @@
 #nullable enable
-const Moderato.Effects.Effect<T, E, R>.SuppressedDataKey = "Moderato.Effects.Suppressed" -> string!
+const Moderato.Effects.Effect<T, E, R>.SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed" -> string!
 Moderato.Effects.Concurrency
 Moderato.Effects.Concurrency.Concurrency() -> void
 Moderato.Effects.Concurrency.Equals(Moderato.Effects.Concurrency other) -> bool

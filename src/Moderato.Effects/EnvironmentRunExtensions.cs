@@ -6,14 +6,14 @@ namespace Moderato.Effects;
 /// <summary>Runs effects whose environment the library provides.</summary>
 public static class EnvironmentRunExtensions
 {
-    private const string TokenJustification = "Overloads differ by environment type; the trailing token follows the async convention.";
+    private const string TOKEN_JUSTIFICATION = "Overloads differ by environment type; the trailing token follows the async convention.";
 
     /// <summary>Runs an effect that needs nothing.</summary>
     /// <param name="effect">The effect.</param>
     /// <param name="cancellationToken">Cancels the run.</param>
     /// <returns>The value, or the expected error.</returns>
-    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TokenJustification)]
-    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TokenJustification)]
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TOKEN_JUSTIFICATION)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TOKEN_JUSTIFICATION)]
     public static ValueTask<Result<T, E>> RunAsync<T, E>(this Effect<T, E, EmptyEnvironment> effect, CancellationToken cancellationToken = default)
         => effect.RunAsync(EmptyEnvironment.Value, cancellationToken);
 
@@ -21,8 +21,8 @@ public static class EnvironmentRunExtensions
     /// <param name="effect">The effect.</param>
     /// <param name="cancellationToken">Cancels the run.</param>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
-    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TokenJustification)]
-    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TokenJustification)]
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TOKEN_JUSTIFICATION)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TOKEN_JUSTIFICATION)]
     public static ValueTask<Exit<T, E>> RunExitAsync<T, E>(this Effect<T, E, EmptyEnvironment> effect, CancellationToken cancellationToken = default)
         => effect.RunExitAsync(EmptyEnvironment.Value, cancellationToken);
 
@@ -30,8 +30,8 @@ public static class EnvironmentRunExtensions
     /// <param name="effect">The effect.</param>
     /// <param name="cancellationToken">Cancels the run.</param>
     /// <returns>The value, or the expected error.</returns>
-    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TokenJustification)]
-    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TokenJustification)]
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TOKEN_JUSTIFICATION)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TOKEN_JUSTIFICATION)]
     public static ValueTask<Result<T, E>> RunAsync<T, E>(this Effect<T, E, DefaultEnvironment> effect, CancellationToken cancellationToken = default)
         => effect.RunAsync(DefaultEnvironment.Value, cancellationToken);
 
@@ -39,8 +39,8 @@ public static class EnvironmentRunExtensions
     /// <param name="effect">The effect.</param>
     /// <param name="cancellationToken">Cancels the run.</param>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
-    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TokenJustification)]
-    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TokenJustification)]
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = TOKEN_JUSTIFICATION)]
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TOKEN_JUSTIFICATION)]
     public static ValueTask<Exit<T, E>> RunExitAsync<T, E>(this Effect<T, E, DefaultEnvironment> effect, CancellationToken cancellationToken = default)
         => effect.RunExitAsync(DefaultEnvironment.Value, cancellationToken);
 }

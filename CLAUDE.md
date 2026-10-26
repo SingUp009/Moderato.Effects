@@ -13,7 +13,8 @@ Effect System for C# on .NET 11 / C# 15 unions. Builds on Moderato.Results.
 
 - Do not write comments in source code, except to explain a *why* the code cannot show. Write those in English.
 - XML doc comments: short and to the point. A one-line `<summary>` of what the member does, plus `<param>` and `<returns>` where they add information.
-- Match Moderato.Results: naming, `ArgumentNullException.ThrowIfNull` on delegates, `default` structs are invalid, `ConfigureAwait(false)` inside the library.
+- Naming: private fields `camelCase` (no `_` or `s_` prefix, static or not), constants `UPPER_SNAKE_CASE`, enum members `PascalCase`. `.editorconfig` enforces it.
+- Match Moderato.Results: `ArgumentNullException.ThrowIfNull` on delegates, `default` structs are invalid, `ConfigureAwait(false)` inside the library.
 
 ## Test conventions
 

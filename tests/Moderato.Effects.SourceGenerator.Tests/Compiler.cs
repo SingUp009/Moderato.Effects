@@ -21,14 +21,14 @@ public sealed record Build(ImmutableArray<Diagnostic> Diagnostics, ImmutableDict
 /// <summary>Builds user code the way the SDK does: with the library, Moderato.Results, the source generators and the analyzers.</summary>
 public static class Compiler
 {
-    private static readonly CSharpParseOptions s_parseOptions = new(LanguageVersion.Preview);
+    private static readonly CSharpParseOptions parseOptions = new(LanguageVersion.Preview);
 
-    private static readonly ImmutableArray<MetadataReference> s_references =
+    private static readonly ImmutableArray<MetadataReference> references =
     [
         .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator).Select(static path => MetadataReference.CreateFromFile(path)),
     ];
 
-    private const string Usings = """
+    private const string USINGS = """
         global using System;
         global using System.Threading;
         global using System.Threading.Tasks;
@@ -40,13 +40,13 @@ public static class Compiler
     {
         var compilation = CSharpCompilation.Create(
             "UserCode",
-            [CSharpSyntaxTree.ParseText(Usings, s_parseOptions), CSharpSyntaxTree.ParseText(source, s_parseOptions)],
-            s_references,
+            [CSharpSyntaxTree.ParseText(USINGS, parseOptions), CSharpSyntaxTree.ParseText(source, parseOptions)],
+            references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new ErrorGenerator().AsSourceGenerator(), new EnvironmentGenerator().AsSourceGenerator(), new RestOfGenerator().AsSourceGenerator()],
-            parseOptions: s_parseOptions);
+            parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 
         var generated = driver.GetRunResult().Results

@@ -11,13 +11,13 @@ namespace Moderato.Effects;
 [DebuggerDisplay("Resource<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly struct Resource<T, E, R>
 {
-    private readonly Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>>? _acquire;
+    private readonly Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>>? acquire;
 
-    internal Resource(Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire) => _acquire = acquire;
+    internal Resource(Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire) => this.acquire = acquire;
 
     /// <summary>Acquires the value and registers its releases with <c>releases</c>.</summary>
     internal Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> Acquire
-        => _acquire ?? ThrowHelper.ThrowUninitializedResource<Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>>>();
+        => acquire ?? ThrowHelper.ThrowUninitializedResource<Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>>>();
 
     /// <summary>A resource that cannot fail to acquire can stand in for one with any error type.</summary>
     public static implicit operator Resource<T, E, R>(Resource<T, Never, R> resource)

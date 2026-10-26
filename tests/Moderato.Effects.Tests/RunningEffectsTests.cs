@@ -47,7 +47,7 @@ public class RunAsyncTests
 
         // Then
         Assert.Same(bug, thrown);
-        Assert.False(thrown.Data.Contains(Effect<int, Never, EmptyEnvironment>.SuppressedDataKey));
+        Assert.False(thrown.Data.Contains(Effect<int, Never, EmptyEnvironment>.SUPPRESSED_DATA_KEY));
     }
 }
 

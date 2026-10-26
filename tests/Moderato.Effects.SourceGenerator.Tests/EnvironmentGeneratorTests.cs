@@ -2,7 +2,7 @@ namespace Moderato.Effects.SourceGenerator.Tests;
 
 public class EnvironmentGeneratorTests
 {
-    private const string Services = """
+    private const string SERVICES = """
         namespace App;
         public interface IUserRepository;
         public interface IAuditLogger;
@@ -13,7 +13,7 @@ public class EnvironmentGeneratorTests
     public void Environment_Record_ImplementsIHasForEachParameter()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed partial record AppEnv(IUserRepository Users, IAuditLogger Audit, TimeProvider Clock);
@@ -26,7 +26,7 @@ public class EnvironmentGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -36,7 +36,7 @@ public class EnvironmentGeneratorTests
     public void Environment_Class_ImplementsIHasForEachParameter()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed partial class AppEnv(IUserRepository users, TimeProvider clock);
@@ -48,7 +48,7 @@ public class EnvironmentGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -58,7 +58,7 @@ public class EnvironmentGeneratorTests
     public void Environment_DeclaresADependencyInterface_SatisfiesIt()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             public interface IProfileDeps : IHas<IUserRepository>, IHas<TimeProvider>;
 
@@ -77,7 +77,7 @@ public class EnvironmentGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -87,7 +87,7 @@ public class EnvironmentGeneratorTests
     public void Environment_ParameterWithExpose_ProvidesTheExposedType()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             public sealed class FakeClock : TimeProvider;
 
@@ -102,7 +102,7 @@ public class EnvironmentGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Empty(build.Errors);
@@ -112,14 +112,14 @@ public class EnvironmentGeneratorTests
     public void Environment_TwoParametersOfTheSameType_ReportsMEFF103()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed partial record AppEnv(IUserRepository Primary, IUserRepository Replica);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("Replica", build.Single("MEFF103").GetMessage());
@@ -129,14 +129,14 @@ public class EnvironmentGeneratorTests
     public void Environment_ExposedTypeNotImplemented_ReportsMEFF104()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed partial record AppEnv([Expose<IAuditLogger>] SqlUsers Users);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF104", build.Errors);
@@ -146,7 +146,7 @@ public class EnvironmentGeneratorTests
     public void Environment_NoPrimaryConstructor_ReportsMEFF102()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed partial class AppEnv
@@ -156,7 +156,7 @@ public class EnvironmentGeneratorTests
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF102", build.Errors);
@@ -166,14 +166,14 @@ public class EnvironmentGeneratorTests
     public void Environment_NotPartial_ReportsMEFF101()
     {
         // Given
-        const string source = Services + """
+        const string SOURCE = SERVICES + """
 
             [Environment]
             public sealed record AppEnv(IUserRepository Users);
             """;
 
         // When
-        var build = Compiler.Build(source);
+        var build = Compiler.Build(SOURCE);
 
         // Then
         Assert.Contains("MEFF101", build.Errors);

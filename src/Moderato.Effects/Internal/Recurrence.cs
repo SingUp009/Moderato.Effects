@@ -120,24 +120,24 @@ internal static class Recurrence
 /// <summary>Turns a schedule into waits for one run of Retry or Repeat: its own start time and its own random number generator.</summary>
 internal sealed class ScheduleClock<R> where R : IHas<TimeProvider>
 {
-    private readonly ScheduleSpec _spec;
-    private readonly TimeProvider _time;
-    private readonly long _started;
-    private readonly Random? _random;
+    private readonly ScheduleSpec spec;
+    private readonly TimeProvider time;
+    private readonly long started;
+    private readonly Random? random;
 
     internal ScheduleClock(ScheduleSpec spec, R env)
     {
-        _spec = spec;
-        _time = env.Resolve<TimeProvider>();
-        _started = _time.GetTimestamp();
-        if (spec.Jittered) _random = Derive(((IHas<Random>)env).Resolve());
+        this.spec = spec;
+        time = env.Resolve<TimeProvider>();
+        started = time.GetTimestamp();
+        if (spec.Jittered) random = Derive(((IHas<Random>)env).Resolve());
     }
 
     /// <summary>Waits before recurrence <paramref name="recurrence"/>, or decides to stop.</summary>
     internal Effect<bool, Never, R> WaitBefore(int recurrence)
     {
         // Only one Retry runs this clock at a time, so its private Random needs no lock.
-        if (_spec.Next(recurrence, _time.GetElapsedTime(_started), _random) is not { } delay) return Effect<R>.Succeed(false);
+        if (spec.Next(recurrence, time.GetElapsedTime(started), random) is not { } delay) return Effect<R>.Succeed(false);
         return Effect.Sleep<R>(delay).Map(static _ => true);
     }
 
