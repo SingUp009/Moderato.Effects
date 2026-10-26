@@ -538,6 +538,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - 生成器のテストは `Moderato.Effects.SourceGenerator.Tests` で、Roslyn 5.9.0（union をコンパイルできる最初の公開版）を使い、利用者のコードをテストの中でコンパイルして確かめる。S1 でコンパイルエラーになるべきとした5件と、jitter 付きの Schedule を `IHas<Random>` のない環境で使う場合も、ここでエラーコードまで確かめる。
 - 入れ子の union の case は、`(Middle)value` のように内側の union を経由して広げ、`self is Middle m && m is Inner found` のように順に狭める。
 - null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、ある union の中で null を許す case がちょうど1つなら、その union の null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。入れ子の union の case でも同じで、途中の union までは型で狭め、最後の union の値が null かを調べる（Issue #48）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
+- C# の union は値を `object? Value` の1つしか持たないので、null を許す case に null が入った union と、初期化されていない `default` の union は区別できない（`Equals` も true になる）。そのため、null を許す case がちょうど1つの union では、`default` もその case の null として扱われ、「`default` は無効」という方針をこの union には当てはめられない。null を許す case には警告（MEFF005）を出し、record で包むことを勧める（Issue #51）。警告を抑えた場合の動きは上のとおりで、変わらない。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
 - 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
 - `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。
@@ -549,6 +550,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF002 | Error | ジェネリックな型には未対応 |
 | MEFF003 | Warning | 同じ case に届く道が複数ある |
 | MEFF004 | Error | 入れ子の型には未対応 |
+| MEFF005 | Warning | union の case が null を許す（null の値と、初期化されていない `default` の union を区別できない） |
 | MEFF101 | Error | `[Environment]` の対象が partial ではない |
 | MEFF102 | Error | `[Environment]` の対象にプライマリコンストラクタがない |
 | MEFF103 | Error | 同じ型のサービスを2つの引数が公開している |

@@ -9,6 +9,7 @@ MEFF001 | Moderato.Effects | Error | Diagnostics
 MEFF002 | Moderato.Effects | Error | Diagnostics
 MEFF003 | Moderato.Effects | Warning | Diagnostics
 MEFF004 | Moderato.Effects | Error | Diagnostics
+MEFF005 | Moderato.Effects | Warning | Diagnostics
 MEFF101 | Moderato.Effects | Error | Diagnostics
 MEFF102 | Moderato.Effects | Error | Diagnostics
 MEFF103 | Moderato.Effects | Error | Diagnostics

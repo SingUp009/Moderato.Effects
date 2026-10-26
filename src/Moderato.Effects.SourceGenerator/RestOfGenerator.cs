@@ -70,7 +70,10 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             .Where(c => c != missing[0])
             .Select(c => new Rest(c, held[c].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
-        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], Shapes.NullCase(sourceCases), rests, default);
+        // An [Error] union reports its nullable cases itself.
+        var isError = type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "Moderato.Effects.ErrorAttribute");
+        var nullable = isError ? default : Shapes.NullableCases(type, location).ToEquatableArray();
+        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], Shapes.NullCase(sourceCases), rests, nullable);
     }
 
     // A case of the rest that E cannot produce is extra; a union the rest adds to group E's cases is looked into instead.

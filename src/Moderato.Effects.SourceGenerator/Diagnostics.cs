@@ -23,6 +23,11 @@ internal static class Diagnostics
         "MEFF004", "Nested types are not supported", "[{0}] does not support nested type '{1}'",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor NullableCase = new(
+        "MEFF005", "Union case admits null",
+        "Case '{1}' admits null, which '{0}' cannot tell apart from its default value; wrap it in a record",
+        CATEGORY, DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NeedsPartialType = new(
         "MEFF101", "Needs a partial type", "'{0}' must be partial to use [Environment]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
