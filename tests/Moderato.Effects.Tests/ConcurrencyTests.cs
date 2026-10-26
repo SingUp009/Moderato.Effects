@@ -347,6 +347,74 @@ public class AllErrorsTests
     }
 
     [Fact]
+    public async Task AllErrors_CallerCancelsBeforeTheLastRuns_IsInterruptedWithTheEarlierErrorAsContext()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var laterRan = false;
+        var first = Validate("name", "").TapErr(_ => cts.Cancel());
+        Effect<string, string, EmptyEnvironment> later = Effect<EmptyEnvironment>.Sync(() =>
+        {
+            laterRan = true;
+            return "ada@example.com";
+        });
+
+        // When
+        var exit = await Effect.AllErrors([first, later]).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.False(laterRan);
+    }
+
+    [Fact]
+    public async Task AllErrors_CallerCancelsBeforeAParallelWorkerStarts_IsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var laterRan = false;
+        var first = Validate("name", "").TapErr(_ => cts.Cancel());
+        Effect<string, string, EmptyEnvironment> later = Effect<EmptyEnvironment>.Sync(() =>
+        {
+            laterRan = true;
+            return "ada@example.com";
+        });
+
+        // When
+        var exit = await Effect.AllErrors([first, later], Concurrency.Parallel.WithMaxDegree(1))
+            .RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.False(laterRan);
+    }
+
+    [Fact]
+    public async Task AllErrors_CallerCancelsAfterADefect_DiesWithTheDefect()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var bug = new InvalidOperationException("bug");
+        var broken = Scope<string, EmptyEnvironment>.Gen<string>(async scope =>
+        {
+            scope.Defer(_ => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                cts.Cancel();
+                return Unit.Value;
+            }));
+            await Task.Yield();
+            throw bug;
+        });
+
+        // When
+        var exit = await Effect.AllErrors([Validate("name", ""), broken, Validate("city", "")]).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(bug, die.Exception);
+    }
+
+    [Fact]
     public async Task AllErrors_OneThrows_Dies()
     {
         // Given

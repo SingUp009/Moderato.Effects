@@ -154,6 +154,9 @@ public static partial class Effect
                 return Concurrent.Fail<T, E, T[], E[]>(ends, primary, static error => [error]);
             }
 
+            // Errors from only the children that ran would look like a complete validation; they stay as context instead.
+            if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
+
             if (ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err))
             {
                 var (others, omitted) = Concurrent.Others(ends, null, includeErrs: false);
