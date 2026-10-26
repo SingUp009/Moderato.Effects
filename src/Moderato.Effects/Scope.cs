@@ -159,10 +159,18 @@ public sealed class Scope<E, R>
             {
                 outcome = await task.ConfigureAwait(false);
             }
+            catch (Exception exception)
+            {
+                // A step should end in an outcome, not throw; if it does anyway, waiters must still be released.
+                outcome = Defects.From<T, E>(exception, context);
+            }
             finally
             {
                 Leave();
             }
+
+            // Whether this step's Err is the one the block records as its own, before Unwrap records it.
+            var recordsError = outcome.Kind == OutcomeKind.Err && !failed;
 
             // Finished only after Unwrap, so the block never reads the scope's state while the step is still recording on it.
             T value;
@@ -172,12 +180,12 @@ public sealed class Scope<E, R>
             }
             catch (Exception exception)
             {
-                pending.Finish(outcome);
+                pending.Finish(outcome, recordsError);
                 pending.Fail(exception);
                 return;
             }
 
-            pending.Finish(outcome);
+            pending.Finish(outcome, recordsError);
             pending.Succeed(value);
         }
     }
@@ -198,12 +206,16 @@ public sealed class Scope<E, R>
 
         internal bool Consequential { get; private set; }
 
+        /// <summary>Whether the step's Err became the block's own error, so the block already carries it.</summary>
+        internal bool RecordedError { get; private set; }
+
         protected void Observe() => Volatile.Write(ref observed, 1);
 
-        protected void Finish(ExitCase? failure, ExceptionDispatchInfo? defect, bool consequential)
+        protected void Finish(ExitCase? failure, ExceptionDispatchInfo? defect, bool consequential, bool recordedError)
         {
             Defect = defect;
             Consequential = consequential;
+            RecordedError = recordedError;
             done.SetResult(failure);
         }
     }
@@ -214,8 +226,8 @@ public sealed class Scope<E, R>
 
         internal ValueTask<T> Result => new(this, core.Version);
 
-        internal void Finish(Outcome<T, E> outcome)
-            => Finish(ExitCases.FailureOf(outcome), outcome.Kind == OutcomeKind.Die ? outcome.Defect : null, outcome.Consequential);
+        internal void Finish(Outcome<T, E> outcome, bool recordedError)
+            => Finish(ExitCases.FailureOf(outcome), outcome.Kind == OutcomeKind.Die ? outcome.Defect : null, outcome.Consequential, recordedError);
 
         internal void Succeed(T value) => core.SetResult(value);
 
@@ -278,13 +290,18 @@ public sealed class Scope<E, R>
         if (Volatile.Read(ref running) is { Observed: false } last) steps.Add(last);
         if (steps.Count == 0) return outcome;
 
-        if (steps.Exists(static step => !step.Done.IsCompleted)) cancellation.TryCancel(CancellationReason.ParentScopeClosed);
-        foreach (var step in steps)
+        // A step that ended while the body was running has already put an Err it recorded on the outcome: as the block's Err,
+        // or as context of what the body ended with instead.
+        var endedWithBody = steps.ConvertAll(static step => step.Done.IsCompleted);
+        if (endedWithBody.Contains(false)) cancellation.TryCancel(CancellationReason.ParentScopeClosed);
+        for (var i = 0; i < steps.Count; i++)
         {
+            var step = steps[i];
             if (await step.Done.ConfigureAwait(false) is not { Value: not Interrupted } failure || step.Observed) continue;
+            if (endedWithBody[i] && step.RecordedError) continue;
 
-            // The step's failure was recorded on this scope; a block that would otherwise succeed ends with the first one,
-            // as it would have if the step had been awaited. A block that already failed keeps its own failure first.
+            // A block that would otherwise succeed ends with the first failure, as it would have if the step had been awaited.
+            // A block that already failed keeps its own failure first.
             if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
                 outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential);
             else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)

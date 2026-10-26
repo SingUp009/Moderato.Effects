@@ -406,6 +406,80 @@ public class ResourceLinqTests
 
 public class AcquireTests
 {
+    // An effect that breaks the contract and throws from its run instead of ending in an outcome.
+    private static Effect<int, string, EmptyEnvironment> ThrowsFromItsRun()
+        => new((_, _) => new ValueTask<Internal.Outcome<int, string>>(Task.FromException<Internal.Outcome<int, string>>(new InvalidOperationException("faulted run"))));
+
+    [Fact]
+    public async Task Run_AwaitedStepWhoseRunThrows_DiesInsteadOfHanging()
+    {
+        // Given
+        var work = Scope<string, EmptyEnvironment>.Gen(async scope => await scope.Run(ThrowsFromItsRun()));
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("faulted run", die.Exception.Message);
+    }
+
+    [Fact]
+    public async Task Run_NotAwaitedStepWhoseRunThrows_DiesInsteadOfHanging()
+    {
+        // Given
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Not awaited on purpose: the block settles it when it ends.
+#pragma warning disable MEFF310
+            _ = scope.Run(ThrowsFromItsRun());
+#pragma warning restore MEFF310
+            return ValueTask.FromResult(0);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("faulted run", die.Exception.Message);
+    }
+
+    [Fact]
+    public async Task Run_NotAwaitedErrBeforeAFailingRelease_KeepsTheErrOnce()
+    {
+        // Given
+        var go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await go.Task;
+            failing.SetResult();
+            return 1;
+        });
+        var fails = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail("abandoned failure"));
+        var work = Scope<string, EmptyEnvironment>.Gen<int>(async scope =>
+        {
+            scope.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw new IOException("release failed")));
+            // Not awaited on purpose: the step fails while the block is still running.
+#pragma warning disable MEFF310
+            _ = scope.Run(fails);
+#pragma warning restore MEFF310
+            go.SetResult();
+            await failing.Task;
+            await Task.Delay(50);
+            return 0;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<IOException>(die.Exception);
+        Assert.Single(die.Suppressed, s => s.Case.Value is Failed { Error: "abandoned failure" });
+    }
+
     [Fact]
     public async Task Run_NotAwaitedAndDyingBeforeTheBlockEnds_EndsTheBlockWithItsDefect()
     {
@@ -440,10 +514,11 @@ public class AcquireTests
     public async Task Run_NotAwaitedAndFailingBeforeTheBlockEnds_EndsTheBlockWithItsErr()
     {
         // Given
+        var go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Effect<int, string, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
         {
-            await Task.Yield();
+            await go.Task;
             failing.SetResult();
             return 1;
         });
@@ -454,6 +529,7 @@ public class AcquireTests
 #pragma warning disable MEFF310
             _ = scope.Run(fails);
 #pragma warning restore MEFF310
+            go.SetResult();
             await failing.Task;
             await Task.Delay(50);
             return 0;
