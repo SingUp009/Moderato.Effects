@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
+using System.Threading.Tasks.Sources;
 using Moderato.Effects.Internal;
 using Moderato.Results;
 
@@ -26,7 +27,8 @@ public sealed class Scope<E, R>
     private E error = default!;
     private int busy;
     private bool closed;
-    private TaskCompletionSource<ExitCase?>? running;
+    private PendingStep? running;
+    private List<PendingStep>? unobserved;
 
     private Scope(R env, RunContext context)
     {
@@ -140,37 +142,108 @@ public sealed class Scope<E, R>
 
         if (!task.IsCompletedSuccessfully)
         {
-            var done = new TaskCompletionSource<ExitCase?>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Volatile.Write(ref running, done);
-            return AwaitAsync(task, done);
+            // The step before this one was left behind without being awaited (MEFF310); it is settled when the block ends.
+            if (Volatile.Read(ref running) is { Observed: false } previous) (unobserved ??= []).Add(previous);
+            var pending = new PendingStep<T>();
+            Volatile.Write(ref running, pending);
+            _ = CompleteAsync(task, pending);
+            return pending.Result;
         }
 
         Leave();
         return new(Unwrap(task.Result));
 
-        async ValueTask<T> AwaitAsync(ValueTask<Outcome<T, E>> pending, TaskCompletionSource<ExitCase?> done)
+        async ValueTask CompleteAsync(ValueTask<Outcome<T, E>> task, PendingStep<T> pending)
         {
-            ExitCase? failure = null;
+            Outcome<T, E> outcome;
             try
             {
-                Outcome<T, E> outcome;
-                try
-                {
-                    outcome = await pending.ConfigureAwait(false);
-                }
-                finally
-                {
-                    Leave();
-                }
-
-                failure = ExitCases.FailureOf(outcome);
-                return Unwrap(outcome);
+                outcome = await task.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // A step should end in an outcome, not throw; if it does anyway, waiters must still be released.
+                outcome = Defects.From<T, E>(exception, context);
             }
             finally
             {
-                done.SetResult(failure);
+                Leave();
             }
+
+            // Whether this step's Err is the one the block records as its own, before Unwrap records it.
+            var recordsError = outcome.Kind == OutcomeKind.Err && !failed;
+
+            // Finished only after Unwrap, so the block never reads the scope's state while the step is still recording on it.
+            T value;
+            try
+            {
+                value = Unwrap(outcome);
+            }
+            catch (Exception exception)
+            {
+                pending.Finish(outcome, recordsError);
+                pending.Fail(exception);
+                return;
+            }
+
+            pending.Finish(outcome, recordsError);
+            pending.Succeed(value);
         }
+    }
+
+    /// <summary>A step that did not finish at once. It knows whether the body read its result, so a failure nobody saw is not lost.</summary>
+    private abstract class PendingStep
+    {
+        private readonly TaskCompletionSource<ExitCase?> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int observed;
+
+        /// <summary>Whether the body read the step's result (or its failure).</summary>
+        internal bool Observed => Volatile.Read(ref observed) == 1;
+
+        /// <summary>Completes with the step's failure, if any, once its outcome is recorded on the scope.</summary>
+        internal Task<ExitCase?> Done => done.Task;
+
+        internal ExceptionDispatchInfo? Defect { get; private set; }
+
+        internal bool Consequential { get; private set; }
+
+        /// <summary>Whether the step's Err became the block's own error, so the block already carries it.</summary>
+        internal bool RecordedError { get; private set; }
+
+        protected void Observe() => Volatile.Write(ref observed, 1);
+
+        protected void Finish(ExitCase? failure, ExceptionDispatchInfo? defect, bool consequential, bool recordedError)
+        {
+            Defect = defect;
+            Consequential = consequential;
+            RecordedError = recordedError;
+            done.SetResult(failure);
+        }
+    }
+
+    private sealed class PendingStep<T> : PendingStep, IValueTaskSource<T>
+    {
+        private ManualResetValueTaskSourceCore<T> core;
+
+        internal ValueTask<T> Result => new(this, core.Version);
+
+        internal void Finish(Outcome<T, E> outcome, bool recordedError)
+            => Finish(ExitCases.FailureOf(outcome), outcome.Kind == OutcomeKind.Die ? outcome.Defect : null, outcome.Consequential, recordedError);
+
+        internal void Succeed(T value) => core.SetResult(value);
+
+        internal void Fail(Exception exception) => core.SetException(exception);
+
+        public T GetResult(short token)
+        {
+            Observe();
+            return core.GetResult(token);
+        }
+
+        public ValueTaskSourceStatus GetStatus(short token) => core.GetStatus(token);
+
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+            => core.OnCompleted(continuation, state, token, flags);
     }
 
     private async ValueTask<Outcome<T, E>> RunBodyAsync<T>(Func<Scope<E, R>, ValueTask<T>> body)
@@ -199,23 +272,7 @@ public sealed class Scope<E, R>
             if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         }
 
-        // A step the body did not await (MEFF310) would outlive the block, and a resource it acquired afterwards would never be
-        // released. It is canceled and waited for, so what it registered is released with the rest.
-        if (Volatile.Read(ref running) is { Task.IsCompleted: false } step)
-        {
-            cancellation.TryCancel(CancellationReason.ParentScopeClosed);
-            if (await step.Task.ConfigureAwait(false) is { Value: not Interrupted } abandoned)
-            {
-                // The step's Unwrap recorded its failure on this scope; a block that would otherwise succeed ends with it,
-                // as it would have if the step had been awaited. A block that already failed keeps its own failure first.
-                if (outcome.Kind == OutcomeKind.Ok && abandoned.Value is Die && rethrown is { } defect)
-                    outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
-                else if (outcome.Kind == OutcomeKind.Ok && failed)
-                    outcome = Outcome<T, E>.Err(error);
-                else
-                    AddSuppressed(new Suppressed(abandoned, Relation.Sequential));
-            }
-        }
+        outcome = await SettleUnobservedAsync(outcome).ConfigureAwait(false);
 
         closed = true;
         if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.ToImmutable() ?? [], omitted);
@@ -227,6 +284,38 @@ public sealed class Scope<E, R>
         {
             cancellation.Dispose();
         }
+    }
+
+    // A step the body did not await (MEFF310) would outlive the block, and a resource it acquired afterwards would never be
+    // released; one that already ended would take its failure with it. Running ones are canceled and waited for, so what they
+    // registered is released with the rest. A step the body awaited is the body's business, even if it caught the failure.
+    private async ValueTask<Outcome<T, E>> SettleUnobservedAsync<T>(Outcome<T, E> outcome)
+    {
+        var steps = unobserved ?? [];
+        if (Volatile.Read(ref running) is { Observed: false } last) steps.Add(last);
+        if (steps.Count == 0) return outcome;
+
+        // A step that ended while the body was running has already put an Err it recorded on the outcome: as the block's Err,
+        // or as context of what the body ended with instead.
+        var endedWithBody = steps.ConvertAll(static step => step.Done.IsCompleted);
+        if (endedWithBody.Contains(false)) cancellation.TryCancel(CancellationReason.ParentScopeClosed);
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            if (await step.Done.ConfigureAwait(false) is not { Value: not Interrupted } failure || step.Observed) continue;
+            if (endedWithBody[i] && step.RecordedError) continue;
+
+            // A block that would otherwise succeed ends with the first failure, as it would have if the step had been awaited.
+            // A block that already failed keeps its own failure first.
+            if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
+                outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential);
+            else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
+                outcome = Outcome<T, E>.Err(error);
+            else
+                AddSuppressed(new Suppressed(failure, Relation.Sequential));
+        }
+
+        return outcome;
     }
 
     private T Unwrap<T>(Outcome<T, E> outcome)

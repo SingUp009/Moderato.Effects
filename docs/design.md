@@ -572,7 +572,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF308 | Error | `Catch<TCase, F>` で、F が `[RestOf<E>]` ではない（CS0315 の言い換え） | '{0}' is not declared [RestOf<{1}>] |
 | MEFF309 | Error | `Catch<TCase, F>` で、F が除いた case と TCase が違う（CS0315 の言い換え） | '{0}' leaves out '{1}', not '{2}' |
 
-実行時にも守る（Issue #36）：MEFF310 を無視して await しなかった step がまだ動いているうちに Gen の本体が終わったら、その step のトークンをキャンセルし、終わるまで待ってから解放処理を始める。後から確保されたリソースも、ほかと一緒に解放される。その step の失敗（Interrupted 以外）は、Sequential の付属情報として残す。
+実行時にも守る（Issue #36、#52）：await しなかった step（MEFF310）は、Gen の本体が終わったときにまとめて片付ける。まだ動いているものはトークンをキャンセルし、終わるまで待ってから解放処理を始めるので、後から確保されたリソースもほかと一緒に解放される。キャンセルに応じない step があると、ブロックはそれが終わるまで終わらない（構造化並行性のため、意図した動き）。本体が結果を読まなかった step の失敗（Interrupted 以外）は、本体が成功していればブロックの結果になり、すでに失敗していれば Sequential の付属情報になる。本体が await して自分で catch した失敗は、本体が処理したものとして扱う（step の ValueTask の結果が読まれたかどうかで区別する）。
 
 - `catch (FormatException)` のような型を指定した `catch` の中の `scope.Run` は、Err の後には実行されないので指摘しない（その `catch` は ScopeFailure を捕まえないため）。
 - scope をヘルパーメソッドの引数に渡すことは、同じ流れの中で使う限り安全なので指摘しない。
