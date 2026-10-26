@@ -151,7 +151,7 @@ public sealed record Interrupted;
 - 実行 API（D16）：
   - `RunAsync` は `Result<T, E>` を返す。Die と Interrupted は例外として投げる（普段はこちら）。
   - `RunExitAsync` は `Exit<T, E>` を返す。例外を投げずに、すべての結果を値で見たいとき用。
-- **`RunAsync` で Die を投げるとき**は、元の例外を `ExceptionDispatchInfo` でそのまま投げ直す（F14）。例外の型を保ち、ミドルウェアの `catch` に影響させないため。付属情報は `Exception.Data` に入れる。キーは名前空間付きの1つだけを使い、追加ではなく上書きする（F24。使い回された例外や、再実行で同じ例外が投げられたときに情報がたまらないように）。すべての情報が必要なときは `RunExitAsync` を使う。
+- **`RunAsync` で Die を投げるとき**は、元の例外を `ExceptionDispatchInfo` でそのまま投げ直す（F14）。例外の型を保ち、ミドルウェアの `catch` に影響させないため。付属情報は `Exception.Data` に入れる。キーは名前空間付きの1つだけを使い、追加ではなく上書きする（F24。使い回された例外や、再実行で同じ例外が投げられたときに情報がたまらないように）。すべての情報が必要なときは `RunExitAsync` を使う。上限（D18）を超えて省いた件数も `Exception.Data` には入れず、`RunExitAsync` の `Die.OmittedSuppressed` でだけ分かるようにする（レビューで確認）。
 - 失敗が複数のとき、どれを主とし、残りをどう付属情報にするかは **D18** で決める。Err を全部集めたいときは `AllErrors`（`E[]`）か `AllSettled`（`Exit[]`）を使う（D10）。
 - **`Interrupted` は、呼び出し側のトークンによるキャンセルだけ**を表す。判定の規則は「**呼び出し側の ct がキャンセル済み、かつ OCE**」（F12）。内部では連動したトークン（linked token）を使うので、OCE の `CancellationToken` プロパティでは判定しない。よそのトークンによるキャンセル（`HttpClient` のタイムアウトなど）と呼び出し側のキャンセルがほぼ同時に起きた場合も、呼び出し側のキャンセルを優先して Interrupted とする。
 - 呼び出し側がキャンセルしたとき、API によっては OCE ではなく `ObjectDisposedException` や `IOException` を投げる。これは**仕様として Die** とする（F26）。アプリの停止時にエラーログが出ることがあると、ドキュメントに書く。
