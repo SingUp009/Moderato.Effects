@@ -406,7 +406,7 @@ public class ResourceLinqTests
 
 public class AcquireTests
 {
-    // A step that ends right as the block ends lands on either side of it; enough runs make both sides happen.
+    // Enough runs land the step's end on both sides of the block's end.
     private const int RACE_RUNS = 20_000;
 
     // An effect that breaks the contract and throws from its run instead of ending in an outcome.

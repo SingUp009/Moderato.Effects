@@ -18,7 +18,7 @@ public sealed class Scope<E, R>
     private readonly RunContext context;
     private readonly Cancellation cancellation;
     private readonly Releases<R> releases;
-    // A step the body did not await records on the scope from another thread, so recording and the body's end take turns.
+    // An unawaited step records from another thread, so recording and the block's end take turns.
     private readonly Lock gate = new();
     private ImmutableArray<Suppressed>.Builder? suppressed;
     private int omitted;
@@ -176,7 +176,7 @@ public sealed class Scope<E, R>
             Exception? failure = null;
             lock (gate)
             {
-                // Whether this step's Err is the one the block records as its own, before Unwrap records it.
+                // Whether this Err becomes the block's own, read before Unwrap records it.
                 var recordsError = outcome.Kind == OutcomeKind.Err && !failed;
                 try
                 {
@@ -191,7 +191,7 @@ public sealed class Scope<E, R>
                 pending.Finish(outcome, recordsError);
             }
 
-            // Outside the lock: the awaiting body may continue inline.
+            // Outside the lock, since the awaiting body may continue inline.
             if (failure is null) pending.Succeed(value);
             else pending.Fail(failure);
         }
@@ -274,7 +274,7 @@ public sealed class Scope<E, R>
             else outcome = failed ? Outcome<T, E>.Err(error) : Outcome<T, E>.Ok(value);
             steps = unobserved ?? [];
             if (Volatile.Read(ref running) is { Observed: false } last) steps.Add(last);
-            // A step that ended by now has recorded an Err on the outcome: as the block's Err, or as context.
+            // A step ended by now has its Err on the outcome already.
             endedWithBody = steps.ConvertAll(static step => step.Done.IsCompleted);
         }
 
@@ -296,8 +296,7 @@ public sealed class Scope<E, R>
     {
         if (exception is ScopeFailure failure && ReferenceEquals(failure.Owner, this)) return Outcome<T, E>.Err(error);
 
-        // A Die rethrown by Run keeps its own classification; the token may have been canceled only afterwards.
-        // So does an interruption: an inner one, such as a fiber whose scope has ended, comes while this token is not canceled.
+        // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
         if (rethrown is { } defect && ReferenceEquals(exception, defect.SourceException))
             outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
@@ -305,14 +304,12 @@ public sealed class Scope<E, R>
             outcome = Outcome<T, E>.Interrupted();
         else
             outcome = Defects.From<T, E>(exception, context);
-        // An Err that came first is kept as context for the defect or interruption that replaced it.
+        // An earlier Err stays as context for what replaced it.
         if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
         return outcome;
     }
 
-    // A step the body did not await (MEFF310) would outlive the block, and a resource it acquired afterwards would never be
-    // released; one that already ended would take its failure with it. Running ones are canceled and waited for, so what they
-    // registered is released with the rest. A step the body awaited is the body's business, even if it caught the failure.
+    // Unawaited steps (MEFF310) are canceled and awaited, so none outlives the block or loses its failure.
     private async ValueTask<Outcome<T, E>> SettleUnobservedAsync<T>(Outcome<T, E> outcome, List<PendingStep> steps, List<bool> endedWithBody)
     {
         if (steps.Count == 0) return outcome;
@@ -325,11 +322,10 @@ public sealed class Scope<E, R>
 
             lock (gate)
             {
-                // An Err that was not the block's own is already context; the block's own is on the outcome if the step ended in time.
+                // An Err is already on the outcome unless it is the block's own and the step ended after the snapshot.
                 if (failure.Value is Failed && (!step.RecordedError || endedWithBody[i])) continue;
 
-                // A block that would otherwise succeed ends with the first failure, as it would have if the step had been awaited.
-                // A block that already failed keeps its own failure first.
+                // An Ok block takes the step's failure, while a failed block keeps its own first.
                 if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
                     outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential);
                 else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
