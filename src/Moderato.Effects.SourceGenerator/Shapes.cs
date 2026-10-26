@@ -133,6 +133,14 @@ internal static class Shapes
         return admitting.Count == 1 ? admitting[0] : null;
     }
 
+    /// <summary>
+    /// MEFF005 for each direct case of <paramref name="union"/> that admits null. A union holds only its value, so a null case and
+    /// an uninitialized union are the same; the generated code still treats null as that case (see <see cref="NullCase"/>).
+    /// </summary>
+    public static IEnumerable<DiagnosticInfo> NullableCases(INamedTypeSymbol union, Location location)
+        => Cases(union).Select(Name).Where(static c => c.EndsWith("?", StringComparison.Ordinal))
+            .Select(c => DiagnosticInfo.Create(Diagnostics.NullableCase, location, union.Name, c.Substring(c.LastIndexOf('.') + 1)));
+
     /// <summary>A pattern test that narrows <paramref name="value"/> through the cases of <paramref name="path"/> to a null value in its last union.</summary>
     public static string NarrowToNull(CasePath path, string value)
     {

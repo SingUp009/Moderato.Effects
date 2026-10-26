@@ -50,6 +50,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.AmbiguousCase, location, type.Name, Short(entry.Key), routes));
         }
 
+        diagnostics.AddRange(Shapes.NullableCases(type, location));
         return new Model(Shapes.Declare(type, node), cases.ToEquatableArray(), diagnostics.ToEquatableArray());
     }
 

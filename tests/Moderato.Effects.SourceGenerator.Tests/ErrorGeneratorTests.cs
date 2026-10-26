@@ -224,4 +224,70 @@ public class ErrorGeneratorTests
         // Then
         Assert.Empty(build.Errors);
     }
+
+    [Fact]
+    public void Error_NullableCase_ReportsMEFF005()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Note(string?, int);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Contains("string?", build.Single("MEFF005").GetMessage());
+    }
+
+    [Fact]
+    public void Error_NoNullableCase_ReportsNothing()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Code(string, int);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.DoesNotContain("MEFF005", build.Ids);
+    }
+
+    [Fact]
+    public void RestOf_NullableCaseOnAnErrorUnion_ReportsMEFF005Once()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Note(string?, int);
+            [Error, RestOf<Note>] public partial union NoteText(string?);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Single(build.Diagnostics, static d => d.Id == "MEFF005" && d.GetMessage().Contains("'NoteText'"));
+    }
+
+    [Fact]
+    public void RestOf_NullableCaseWithoutError_ReportsMEFF005()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App;
+            [Error] public partial union Note(string?, int);
+            [RestOf<Note>] public partial union NoteText(string?);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Single(build.Diagnostics, static d => d.Id == "MEFF005" && d.GetMessage().Contains("'NoteText'"));
+    }
 }

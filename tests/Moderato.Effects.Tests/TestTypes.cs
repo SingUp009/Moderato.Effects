@@ -99,6 +99,8 @@ public partial union StoreError(DbError, NotFound);
 [Error, RestOf<AppError>]
 public partial union Denied(Forbidden);
 
+// These unions hold nullable cases on purpose, to test how the generated code treats a null value.
+#pragma warning disable MEFF005
 [Error]
 public partial union Note(string?, int);
 
@@ -116,6 +118,7 @@ public partial union WrappedCount(Count, bool);
 
 [Error]
 public partial union Either(string?, int?);
+#pragma warning restore MEFF005
 
 [Error]
 public partial union WrappedEither(Either, bool);

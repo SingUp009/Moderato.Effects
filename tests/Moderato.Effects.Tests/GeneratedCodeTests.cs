@@ -240,3 +240,70 @@ public class NestedNullableCaseTests
         Assert.Equal<Result<string, WrappedEither>>(Result.Err(error), result);
     }
 }
+
+public class DefaultUnionTests
+{
+    private static bool TryGet<TUnion, TCase>(TUnion union, out TCase value) where TUnion : IUnionCase<TUnion, TCase>
+        => TUnion.TryGet(union, out value);
+
+    private static bool TrySplit<TRest, TSource, TCase>(TSource source, out TCase caught, out TRest rest)
+        where TRest : IUnionRest<TRest, TSource, TCase>
+        => TRest.TrySplit(source, out caught, out rest);
+
+    [Fact]
+    public void TryGet_DefaultUnionWithoutANullableCase_MatchesNoCase()
+    {
+        // Given
+        AppError uninitialized = default;
+
+        // When
+        var isNotFound = TryGet<AppError, NotFound>(uninitialized, out _);
+        var isForbidden = TryGet<AppError, Forbidden>(uninitialized, out _);
+
+        // Then
+        Assert.False(isNotFound);
+        Assert.False(isForbidden);
+    }
+
+    [Fact]
+    public void TrySplit_DefaultUnionWithoutANullableCase_Throws()
+    {
+        // Given
+        AppError uninitialized = default;
+
+        // When
+        void Act() => TrySplit<Denied, AppError, NotFound>(uninitialized, out _, out _);
+
+        // Then
+        Assert.Throws<InvalidOperationException>(Act);
+    }
+
+    [Fact]
+    public void TryGet_DefaultUnionWithANullableCase_IsThatCaseHoldingNull()
+    {
+        // Given
+        Note uninitialized = default;
+
+        // When
+        var isText = TryGet<Note, string?>(uninitialized, out var text);
+
+        // Then
+        Assert.True(isText);
+        Assert.Null(text);
+    }
+
+    [Fact]
+    public void TrySplit_DefaultUnionWithANullableCase_CatchesThatCaseHoldingNull()
+    {
+        // Given
+        Note uninitialized = default;
+
+        // When
+        var isText = TrySplit<NoteNumber, Note, string?>(uninitialized, out var text, out _);
+
+        // Then
+        Assert.True(isText);
+        Assert.Null(text);
+    }
+}
+
