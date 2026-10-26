@@ -426,6 +426,45 @@ public class RetryTests
     }
 
     [Fact]
+    public async Task Retry_CallerCancelsDuringAnAttempt_IsInterruptedWithoutRunningThePolicy()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var policyCalls = 0;
+        Effect<int, AppError, EmptyEnvironment> fail = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+        var broken = fail.TapErr(_ => cts.Cancel());
+
+        // When
+        var exit = await broken.Retry(_ =>
+        {
+            policyCalls++;
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(0, policyCalls);
+    }
+
+    [Fact]
+    public async Task Retry_CallerCancelsWhileThePolicyDecidesToStop_FailsWithTheLastErr()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        Effect<int, AppError, EmptyEnvironment> broken = Effect<EmptyEnvironment>.Fail<AppError>(new NotFound(1));
+
+        // When
+        var exit = await broken.Retry(_ =>
+        {
+            cts.Cancel();
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.Equal<Exit<int, AppError>>(new Err<AppError>(new NotFound(1)), exit);
+    }
+
+    [Fact]
     public async Task Retry_WaitBeyondWhatTheClockSupports_IsCappedInsteadOfDying()
     {
         // Given
@@ -541,6 +580,26 @@ public class RepeatTests
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
         Assert.Equal(2, repetitions);
+    }
+
+    [Fact]
+    public async Task Repeat_CallerCancelsDuringARepetition_IsInterruptedWithoutRunningThePolicy()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var policyCalls = 0;
+        var tick = Effect<EmptyEnvironment>.Succeed(1).Tap(_ => cts.Cancel());
+
+        // When
+        var exit = await tick.Repeat(_ =>
+        {
+            policyCalls++;
+            return Effect<EmptyEnvironment>.Succeed(false);
+        }).RunExitAsync(EmptyEnvironment.Value, cts.Token);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(0, policyCalls);
     }
 
     [Fact]

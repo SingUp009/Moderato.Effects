@@ -37,6 +37,7 @@ internal static class Recurrence
         {
             var outcome = await RunOnceAsync(run, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Err) return outcome;
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
             var decision = await DecideAsync(() => policy(new RetryContext<E>(attempt, outcome.Error)), env, context).ConfigureAwait(false);
             if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
@@ -67,6 +68,7 @@ internal static class Recurrence
         {
             var outcome = await RunOnceAsync(run, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
             var decision = await DecideAsync(() => policy(new RepeatContext<T>(repetition, outcome.Value)), env, context).ConfigureAwait(false);
             if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
@@ -103,6 +105,7 @@ internal static class Recurrence
     }
 
     // An attempt or a policy that ignores the token would otherwise go on, possibly forever without yielding.
+    // A policy that decides to stop despite a cancellation still ends the run with the last outcome: no further work was skipped.
     private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
     {
         UnobservedFailures.ReportDefects(decision.Suppressed);
