@@ -245,6 +245,21 @@ public class ResourceTests
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.IsType<InvalidOperationException>(die.Exception);
     }
+
+    [Fact]
+    public async Task MapErr_MapperThrows_DiesKeepingTheOriginalErr()
+    {
+        // Given
+        var db = Refused(404).MapErr<string>(_ => throw new InvalidOperationException("bug"));
+
+        // When
+        var exit = await db.Use(connection => Effect<EmptyEnvironment>.Succeed(connection.Name)).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        var kept = Assert.Single(die.Suppressed);
+        Assert.True(kept.Case is Failed(NotFound { Id: 404 }));
+    }
 }
 
 public class ResourceLinqTests

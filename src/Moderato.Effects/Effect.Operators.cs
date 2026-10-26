@@ -232,7 +232,7 @@ public readonly partial struct Effect<T, E, R>
             }
             catch (Exception exception)
             {
-                return new(Defects.From<U, F>(exception, context).After(outcome));
+                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
             }
         }
     }

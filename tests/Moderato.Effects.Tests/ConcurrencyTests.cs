@@ -509,3 +509,45 @@ public class EffectDiagnosticsTests
         }
     }
 }
+
+[Collection(nameof(DiagnosticsCollection))]
+public class AllSettledCancellationTests
+{
+    [Fact]
+    public async Task AllSettled_CallerCancelsAfterADefect_KeepsTheDefectForTheDiagnosticsHandler()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        using var cts = new CancellationTokenSource();
+        var died = new TaskCompletionSource();
+        Effect<int, AppError, EmptyEnvironment> broken = Effect<EmptyEnvironment>.Async<int>(_ =>
+        {
+            died.SetResult();
+            throw new InvalidOperationException("bug");
+        });
+        Effect<int, AppError, EmptyEnvironment> waits = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return 0;
+        });
+
+        try
+        {
+            // When
+            var running = Effect.AllSettled([broken, waits], Concurrency.Parallel).RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+            await died.Task;
+            await cts.CancelAsync();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
+            Assert.IsType<InvalidOperationException>(die.Exception);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+}

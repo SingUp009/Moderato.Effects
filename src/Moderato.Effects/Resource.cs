@@ -95,7 +95,7 @@ public readonly struct Resource<T, E, R>
             }
             catch (Exception exception)
             {
-                return Defects.From<T, F>(exception, context).After(outcome);
+                return Defects.From<T, F>(exception, context).Replacing(outcome);
             }
         }));
     }

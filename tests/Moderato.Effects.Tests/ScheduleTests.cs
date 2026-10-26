@@ -81,6 +81,32 @@ public class ScheduleTests
         // Then
         Assert.Throws<ArgumentOutOfRangeException>(Act);
     }
+
+    [Fact]
+    public void Exponential_FactorIsNaN_Throws()
+    {
+        // Given
+        var baseDelay = TimeSpan.FromMilliseconds(100);
+
+        // When
+        void Act() => Schedule.Exponential(baseDelay, factor: double.NaN);
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void Exponential_FactorIsInfinite_Throws()
+    {
+        // Given
+        var baseDelay = TimeSpan.FromMilliseconds(100);
+
+        // When
+        void Act() => Schedule.Exponential(baseDelay, factor: double.PositiveInfinity);
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
 }
 
 public class RetryTests
@@ -340,6 +366,22 @@ public class RetryTests
 
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
+
+    [Fact]
+    public async Task Retry_WaitBeyondWhatTheClockSupports_IsCappedInsteadOfDying()
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<TimeEnvironment>(int.MaxValue, new Counter());
+
+        // When
+        var result = await broken.Retry(Schedule.Exponential(TimeSpan.FromDays(30), factor: 1000).UpTo(2))
+            .RunAsync(new TimeEnvironment(clock), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(3)), result);
+        Assert.All(clock.Waits, wait => Assert.True(wait <= TimeSpan.FromMilliseconds(uint.MaxValue - 1)));
     }
 }
 

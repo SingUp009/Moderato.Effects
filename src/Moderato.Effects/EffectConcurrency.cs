@@ -130,7 +130,7 @@ public static partial class Effect
         return new((env, context) => Guard<Exit<T, E>[], Never>(context, async () =>
         {
             var ends = await Concurrent.RunAsync(runs, env, context, concurrency, StopOn.Nothing).ConfigureAwait(false);
-            if (Interrupted(ends, context)) return Outcome<Exit<T, E>[], Never>.Interrupted();
+            if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, Exit<T, E>[], Never>(ends);
             return Outcome<Exit<T, E>[], Never>.Ok([.. ends.Select(static end => Exits.From(end.Outcome))]);
         }));
     }
@@ -242,9 +242,16 @@ public static partial class Effect
         => ends.Any(static end => !end.Ran || end.Outcome.Kind == OutcomeKind.Interrupted) && context.CancellationToken.IsCancellationRequested;
 
     // Every child ran and none failed; a child that never ran means the caller canceled before it could start.
+    // Cancellation decides the outcome, but what the children already failed with stays as context rather than vanishing.
+    private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)
+    {
+        var (others, omitted) = Concurrent.Others(ends, null);
+        return Outcome<U, F>.Interrupted().WithSuppressed(others, omitted);
+    }
+
     private static Outcome<U, F> Succeeded<T, E, U, F>(ChildEnd<T, E>[] ends, Func<T[], U> build)
     {
-        if (ends.Any(static end => !end.Ran)) return Outcome<U, F>.Interrupted();
+        if (ends.Any(static end => !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);
         var (others, omitted) = Concurrent.Others(ends, null);
         return Outcome<U, F>.Ok(build([.. ends.Select(static end => end.Outcome.Value)])).WithSuppressed(others, omitted);
     }

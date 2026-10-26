@@ -73,6 +73,21 @@ public class MapErrTests
         Assert.Equal<Result<int, int>>(Result.Ok(1), result);
         Assert.Equal(0, calls);
     }
+
+    [Fact]
+    public async Task MapErr_MapperThrows_DiesKeepingTheOriginalErr()
+    {
+        // Given
+        Effect<int, string, EmptyEnvironment> failing = Effect<EmptyEnvironment>.Fail("database unavailable");
+
+        // When
+        var exit = await failing.MapErr<int>(_ => throw new InvalidOperationException("error mapping failed")).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<InvalidOperationException>(die.Exception);
+        Assert.Equal([new Suppressed(new Failed("database unavailable"), Relation.Sequential)], die.Suppressed);
+    }
 }
 
 public class AndThenTests
@@ -242,6 +257,21 @@ public class OrElseTests
 
         // Then
         Assert.Equal<Result<int, int>>(Result.Err(4), result);
+    }
+
+    [Fact]
+    public async Task OrElse_HandlerThrows_DiesKeepingTheOriginalErr()
+    {
+        // Given
+        Effect<int, string, EmptyEnvironment> failing = Effect<EmptyEnvironment>.Fail("database unavailable");
+
+        // When
+        var exit = await failing.OrElse<string>(_ => throw new InvalidOperationException("recovery failed")).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<InvalidOperationException>(die.Exception);
+        Assert.Equal([new Suppressed(new Failed("database unavailable"), Relation.Sequential)], die.Suppressed);
     }
 }
 
