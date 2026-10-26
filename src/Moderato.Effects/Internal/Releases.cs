@@ -93,7 +93,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
             suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
         suppressed.AddRange(body.Suppressed);
-        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: first.Omitted + body.Omitted);
+        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + defects.Sum(static d => d.Omitted));
     }
 
     // Each failed release brings its own suppressed failures along, so a release that failed twice loses neither.
