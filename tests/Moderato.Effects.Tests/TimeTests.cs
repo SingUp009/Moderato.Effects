@@ -52,6 +52,35 @@ public class SleepTests
     }
 
     [Fact]
+    public void Sleep_DurationBeyondTheTimersLimit_Throws()
+    {
+        // Given
+        var duration = TimeSpan.FromDays(50);
+
+        // When
+        void Act() => Effect.Sleep<TimeEnvironment>(duration);
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public async Task Sleep_LongestDurationTheTimerHolds_CompletesWhenTheClockGetsThere()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var longest = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+        var nap = Effect.Sleep<TimeEnvironment>(longest);
+
+        // When
+        var running = nap.RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(longest);
+
+        // Then
+        Assert.Equal<Result<Unit, Never>>(Result.Ok(Unit.Value), await running);
+    }
+
+    [Fact]
     public async Task Sleep_InfiniteDuration_WaitsUntilCanceled()
     {
         // Given
@@ -369,6 +398,32 @@ public class TimeoutTests
 
         // Then
         Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void Timeout_LimitBeyondTheTimersLimit_Throws()
+    {
+        // Given
+        var nap = Effect.Sleep<TimeEnvironment>(oneSecond);
+
+        // When
+        void Act() => nap.Timeout(TimeSpan.FromDays(50));
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public async Task Timeout_LongestLimitTheTimerHolds_RunsOnTheSystemClock()
+    {
+        // Given
+        var quick = Effect<TimeEnvironment>.Succeed(1).Timeout(TimeSpan.FromMilliseconds(uint.MaxValue - 1));
+
+        // When
+        var exit = await quick.RunExitAsync(new TimeEnvironment(TimeProvider.System), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, TimeoutError>>(new Ok<int>(1), exit);
     }
 
     [Fact]

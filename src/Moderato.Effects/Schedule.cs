@@ -1,3 +1,5 @@
+using Moderato.Effects.Internal;
+
 namespace Moderato.Effects;
 
 /// <summary>
@@ -81,9 +83,6 @@ public sealed class Schedule<TNeed>
 /// <summary>The data behind both schedule types.</summary>
 internal sealed record ScheduleSpec(TimeSpan BaseDelay, double Factor)
 {
-    // The longest wait Task.Delay accepts; a growing schedule waits this long rather than failing the run.
-    private static readonly TimeSpan longestWait = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
-
     internal int? MaxRecurrences { get; init; }
 
     internal TimeSpan? MaxElapsed { get; init; }
@@ -120,6 +119,7 @@ internal sealed record ScheduleSpec(TimeSpan BaseDelay, double Factor)
         var ticks = BaseDelay == TimeSpan.Zero ? 0 : BaseDelay.Ticks * Math.Pow(Factor, recurrence - 1);
         if (Jittered && random is not null) ticks *= 0.8 + (random.NextDouble() * 0.4);
         if (MaxDelay is { } max) ticks = Math.Min(ticks, max.Ticks);
-        return TimeSpan.FromTicks((long)Math.Min(ticks, longestWait.Ticks));
+        // A growing schedule waits the longest the timer can hold rather than failing the run.
+        return TimeSpan.FromTicks((long)Math.Min(ticks, Timeouts.LongestWait.Ticks));
     }
 }

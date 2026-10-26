@@ -15,9 +15,15 @@ internal static class Timeouts
         return new((env, context) => RunAsync(run, env, context, after, error, passthrough, timedOut));
     }
 
+    /// <summary>The longest wait <c>Task.Delay</c> and the system timer accept.</summary>
+    internal static TimeSpan LongestWait { get; } = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
+    // Rejected here, so a wait the timer cannot hold is a usage error rather than a defect when the effect runs.
     internal static void ThrowIfInvalid(TimeSpan after)
     {
-        if (after != Timeout.InfiniteTimeSpan) ArgumentOutOfRangeException.ThrowIfLessThan(after, TimeSpan.Zero);
+        if (after == Timeout.InfiniteTimeSpan) return;
+        ArgumentOutOfRangeException.ThrowIfLessThan(after, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(after, LongestWait);
     }
 
     private static async ValueTask<Outcome<U, F>> RunAsync<T, E, U, F, R>(
