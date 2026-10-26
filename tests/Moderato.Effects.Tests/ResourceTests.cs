@@ -260,6 +260,47 @@ public class ResourceTests
         var kept = Assert.Single(die.Suppressed);
         Assert.True(kept.Case is Failed(NotFound { Id: 404 }));
     }
+
+    [Fact]
+    public async Task Use_FactoryThrowsAfterAnAcquisitionWithASuppressedDefect_KeepsItAndReleases()
+    {
+        // Given
+        var released = false;
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, Never, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, Never, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            try
+            {
+                loserStarted.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException("loser failed");
+            }
+
+            return 2;
+        });
+        var resource = Resource.Make(Effect.Race(winner, loser), (_, _) => Effect<EmptyEnvironment>.Sync(() =>
+        {
+            released = true;
+            return Unit.Value;
+        }));
+
+        // When
+        var exit = await resource.Use<int>(_ => throw new FormatException("factory failed")).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("factory failed", die.Exception.Message);
+        Assert.Contains(die.Suppressed, s => s.Case.Value is Die d && d.Exception.Message == "loser failed");
+        Assert.True(released);
+    }
 }
 
 public class ResourceLinqTests
