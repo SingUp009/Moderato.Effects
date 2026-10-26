@@ -235,4 +235,17 @@ public class ExitTests
         // Then
         Assert.True(equal);
     }
+
+    [Fact]
+    public void Suppressed_SucceededCase_Throws()
+    {
+        // Given
+        ExitCase success = new Succeeded();
+
+        // When
+        void Act() => _ = new Suppressed(success, Relation.Sequential);
+
+        // Then
+        Assert.Throws<ArgumentException>(Act);
+    }
 }

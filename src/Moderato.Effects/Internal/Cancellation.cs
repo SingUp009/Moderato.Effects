@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace Moderato.Effects.Internal;
 
 /// <summary>Why a cancellation unit canceled its work.</summary>
@@ -22,6 +24,7 @@ internal sealed class Cancellation : IDisposable
 
     private readonly CancellationTokenSource source;
     private int state;
+    private ExceptionDispatchInfo? callbackFailure;
 
     internal Cancellation(CancellationToken parent) => source = CancellationTokenSource.CreateLinkedTokenSource(parent);
 
@@ -42,9 +45,23 @@ internal sealed class Cancellation : IDisposable
         catch (ObjectDisposedException)
         {
         }
+        catch (AggregateException exception)
+        {
+            // A callback registered on the token threw. The owner still has to wait for its work, so the defect is kept for it instead.
+            // Linked tokens nest one AggregateException per level.
+            var flat = exception.Flatten();
+            callbackFailure = ExceptionDispatchInfo.Capture(flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat);
+        }
 
         return true;
     }
+
+    /// <summary>The defect thrown by a callback on the token when this unit canceled it, if any.</summary>
+    internal ExceptionDispatchInfo? CallbackFailure => Volatile.Read(ref callbackFailure);
+
+    /// <summary>Puts the callback defect, if any, on the outcome as a failure that followed from the cancellation.</summary>
+    internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
+        => CallbackFailure is { } failure ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)]) : outcome;
 
     /// <summary>Marks the work as finished. Returns false if a reason won first.</summary>
     internal bool TrySettle() => Interlocked.CompareExchange(ref state, SETTLED, 0) == 0;

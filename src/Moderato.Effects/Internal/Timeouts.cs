@@ -46,6 +46,7 @@ internal static class Timeouts
                 }
 
                 timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
+                inner = cancellation.WithCallbackFailure(inner);
             }
         }
         catch (Exception exception)

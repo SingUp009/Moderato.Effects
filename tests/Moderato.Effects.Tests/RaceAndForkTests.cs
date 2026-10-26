@@ -314,3 +314,68 @@ public class UnjoinedFiberTests
         }
     }
 }
+
+public class ForkCleanupTests
+{
+    [Fact]
+    public async Task Fork_FibersCancellationCallbackThrows_WaitsForTheFiberAndDiesWithTheCallbackDefect()
+    {
+        // Given
+        var log = new List<string>();
+        var registered = new TaskCompletionSource();
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            await scope.Fork(Scope<Never, EmptyEnvironment>.Gen(async child =>
+            {
+                child.Defer(_ => Steps.Record(log, "fiber released"));
+                child.CancellationToken.Register(() => throw new InvalidOperationException("callback failed"));
+                registered.SetResult();
+                await Task.Delay(Timeout.Infinite, child.CancellationToken);
+                return 0;
+            }));
+            await registered.Task;
+            return "done";
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var loggedWhenTheBlockEnded = log.ToArray();
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("callback failed", die.Exception.Message);
+        Assert.Equal(["fiber released"], loggedWhenTheBlockEnded);
+    }
+
+    [Fact]
+    public async Task Join_CanceledBeforeTheFiberEnds_StillReportsTheFibersLaterReleaseFailure()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var started = new TaskCompletionSource();
+        var gate = new TaskCompletionSource();
+        var fiberWork = Scope<Never, EmptyEnvironment>.Gen(async child =>
+        {
+            child.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw new IOException("close failed")));
+            started.SetResult();
+            await gate.Task;
+            return 1;
+        });
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            var fiber = await scope.Fork(fiberWork);
+            return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var running = work.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+        await started.Task;
+        await cts.CancelAsync();
+        gate.SetResult();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<IOException>(die.Exception);
+    }
+}

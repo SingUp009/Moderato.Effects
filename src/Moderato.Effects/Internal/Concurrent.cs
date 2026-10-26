@@ -84,9 +84,10 @@ internal static class Concurrent
             }
 
             var afterCancel = group.Token.IsCancellationRequested;
+            var reason = stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure;
+            // The child that cancels the group carries any defect a cancellation callback threw.
+            if (Stops(outcome.Kind, stopOn) && group.TryCancel(reason)) outcome = group.WithCallbackFailure(outcome);
             ends[i] = new(outcome, afterCancel, Interlocked.Increment(ref order));
-            if (Stops(outcome.Kind, stopOn))
-                group.TryCancel(stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure);
         }
     }
 

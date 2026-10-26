@@ -57,10 +57,12 @@ public sealed class Fiber<T, E, R>
 
     private async ValueTask<Outcome<T, E>> JoinAsync(RunContext context)
     {
-        Volatile.Write(ref joined, 1);
         try
         {
-            return await task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
+            var outcome = await task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
+            // Only an outcome the joiner actually received counts as observed; a canceled wait leaves it to the release.
+            Volatile.Write(ref joined, 1);
+            return outcome;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
@@ -72,7 +74,19 @@ public sealed class Fiber<T, E, R>
     {
         cancellation.TryCancel(CancellationReason.ParentScopeClosed);
         var outcome = await task.ConfigureAwait(false);
+        var callbackFailure = cancellation.CallbackFailure;
         cancellation.Dispose();
+        var released = Observe(outcome);
+        if (callbackFailure is null) return released;
+
+        // A callback that threw while the fiber was being canceled is a defect of the release, raised only after the fiber has ended.
+        return released.Kind == OutcomeKind.Die
+            ? released.After([new Suppressed(ExitCases.Die(callbackFailure), Relation.Sequential)])
+            : Outcome<Unit, Never>.Die(callbackFailure);
+    }
+
+    private Outcome<Unit, Never> Observe(Outcome<T, E> outcome)
+    {
         if (Volatile.Read(ref joined) == 1) return Outcome<Unit, Never>.Ok(Unit.Value);
 
         switch (outcome.Kind)
@@ -87,7 +101,7 @@ public sealed class Fiber<T, E, R>
                 UnobservedFailures.Report(ExitCases.Failed(outcome.Error));
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
                 break;
-            case OutcomeKind.Ok:
+            case OutcomeKind.Ok or OutcomeKind.Interrupted:
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
                 break;
         }

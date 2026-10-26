@@ -50,6 +50,26 @@ public class SleepTests
         // Then
         Assert.Throws<ArgumentOutOfRangeException>(Act);
     }
+
+    [Fact]
+    public async Task Sleep_InfiniteDuration_WaitsUntilCanceled()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var time = new FakeTimeProvider();
+        var nap = Effect.Sleep<TimeEnvironment>(Timeout.InfiniteTimeSpan);
+
+        // When
+        var running = nap.RunExitAsync(new TimeEnvironment(time), cts.Token).AsTask();
+        time.Advance(TimeSpan.FromDays(365));
+        var finishedEarly = running.IsCompleted;
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.False(finishedEarly);
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
 }
 
 public class TimeoutTests
@@ -349,5 +369,26 @@ public class TimeoutTests
 
         // Then
         Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public async Task Timeout_CancellationCallbackThrows_StillFailsWithTimeoutError()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var work = Effect<TimeEnvironment>.Async<int>(async ct =>
+        {
+            ct.Register(() => throw new InvalidOperationException("callback failed"));
+            await Task.Delay(Timeout.Infinite, ct);
+            return 1;
+        });
+
+        // When
+        var running = work.Timeout(oneSecond).RunAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken).AsTask();
+        time.Advance(oneSecond);
+        var result = await running;
+
+        // Then
+        Assert.Equal<Result<int, TimeoutError>>(Result.Err(new TimeoutError(oneSecond)), result);
     }
 }

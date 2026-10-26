@@ -461,4 +461,51 @@ public class EffectDiagnosticsTests
             EffectDiagnostics.UnobservedFailureHandler = null;
         }
     }
+
+    [Fact]
+    public async Task UnobservedFailureHandler_InterruptedRunWithASuppressedDefect_ReceivesTheDefect()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        using var cts = new CancellationTokenSource();
+        using var bothStarted = new CountdownEvent(2);
+        Effect<int, AppError, EmptyEnvironment> waits = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            bothStarted.Signal();
+            await Task.Delay(Timeout.Infinite, ct);
+            return 0;
+        });
+        Effect<int, AppError, EmptyEnvironment> throwsWhenCanceled = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            bothStarted.Signal();
+            try
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            throw new IOException("connection reset");
+        });
+
+        try
+        {
+            // When
+            var running = Effect.All([waits, throwsWhenCanceled], Concurrency.Parallel).RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
+            bothStarted.Wait(TestContext.Current.CancellationToken);
+            await cts.CancelAsync();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
+            Assert.IsType<IOException>(die.Exception);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
 }

@@ -83,6 +83,7 @@ public readonly partial struct Effect<T, E, R>
                 AttachSuppressed(exception, outcome.Suppressed);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
+                UnobservedFailures.ReportDefects(outcome.Suppressed);
                 return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
         }
     }

@@ -612,6 +612,36 @@ public class DeferTests
     }
 }
 
+public class DeferredReleaseFailureTests
+{
+    [Fact]
+    public async Task Defer_ReleaseFailsAndSoDoesItsOwnRelease_KeepsBothDefects()
+    {
+        // Given
+        var release = Scope<Never, EmptyEnvironment>.Gen<Unit>(async inner =>
+        {
+            inner.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw new IOException("inner release failed")));
+            await Task.Yield();
+            throw new InvalidOperationException("release failed");
+        });
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(_ => release);
+            await Task.Yield();
+            return 1;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("release failed", die.Exception.Message);
+        var kept = Assert.Single(die.Suppressed);
+        Assert.True(kept.Case is Die(IOException { Message: "inner release failed" }));
+    }
+}
+
 public class ScopeMisuseTests
 {
     [Fact]

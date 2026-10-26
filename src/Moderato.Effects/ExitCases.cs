@@ -42,4 +42,10 @@ public enum Relation
 /// <summary>A failure that was not chosen as the outcome.</summary>
 /// <param name="Case">How it failed. Never <see cref="Succeeded"/>.</param>
 /// <param name="Relation">How it relates to the outcome that was kept.</param>
-public sealed record Suppressed(ExitCase Case, Relation Relation);
+public sealed record Suppressed(ExitCase Case, Relation Relation)
+{
+    /// <summary>How it failed. Never <see cref="Succeeded"/>.</summary>
+    public ExitCase Case { get; init; } = Case.Value is null or Succeeded
+        ? throw new ArgumentException("A suppressed failure must be a Failed, Die or Interrupted case.", nameof(Case))
+        : Case;
+}
