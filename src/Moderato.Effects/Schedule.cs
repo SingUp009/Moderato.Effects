@@ -39,7 +39,10 @@ public sealed class Schedule
     /// <returns>The limited schedule.</returns>
     public Schedule UpTo(int times) => new(Spec.UpTo(times));
 
-    /// <summary>Stops trying again once <paramref name="total"/> has passed since the first attempt started.</summary>
+    /// <summary>
+    /// Stops trying again once <paramref name="total"/> has passed since the first attempt started. It checks before each wait and
+    /// does not shorten the wait, so it is not a strict time limit; use <c>Retry(...).Timeout(...)</c> for that.
+    /// </summary>
     /// <param name="total">The limit.</param>
     /// <returns>The limited schedule.</returns>
     public Schedule During(TimeSpan total) => new(Spec.During(total));
