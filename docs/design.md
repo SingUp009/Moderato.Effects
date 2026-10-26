@@ -536,6 +536,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - 生成器は3つ（`ErrorGenerator` / `EnvironmentGenerator` / `RestOfGenerator`）。どれも Roslyn 4.14 に対して作り、SDK の新しいコンパイラの上で動く。
 - 生成器のテストは `Moderato.Effects.SourceGenerator.Tests` で、Roslyn 5.9.0（union をコンパイルできる最初の公開版）を使い、利用者のコードをテストの中でコンパイルして確かめる。S1 でコンパイルエラーになるべきとした5件と、jitter 付きの Schedule を `IHas<Random>` のない環境で使う場合も、ここでエラーコードまで確かめる。
 - 入れ子の union の case は、`(Middle)value` のように内側の union を経由して広げ、`self is Middle m && m is Inner found` のように順に狭める。
+- null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、null を許す直接の case がちょうど1つなら、null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
 - 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
 - `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。
