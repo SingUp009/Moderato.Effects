@@ -48,6 +48,10 @@ internal static class Diagnostics
         "'{0}' must hold all cases of '{1}' but one; it leaves out {2}",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor RestOfExtraCases = new(
+        "MEFF203", "Rest holds cases the union does not", "'{0}' holds cases that '{1}' does not: {2}",
+        CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor CatchAllInGen = new(
         "MEFF301", "Catch clause catches ScopeFailure", "Catch clause swallows ScopeFailure; filter it out with 'when (ex is not ScopeFailure)'",
         CATEGORY, DiagnosticSeverity.Warning, isEnabledByDefault: true);

@@ -519,7 +519,7 @@ public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) whe
 Source Generator の処理：
 
 1. **F の側で `[RestOf<E>]` を付けたものだけを対象にする**（F17）。公開 API にインターフェースが勝手に増えず、何が生成されるかが宣言から分かる（原則3）。
-2. 取り除く case X は、「E の case のうち F に含まれないもの」として決まる。ちょうど1つでなければ診断を出す（`Catch` は1つの case を取り除く操作のため）。E の残りの case は、すべて F に含まれている必要がある（推移的に含まれる場合も数える）。
+2. 取り除く case X は、「E の case のうち F に含まれないもの」として決まる。ちょうど1つでなければ診断を出す（`Catch` は1つの case を取り除く操作のため）。E の残りの case は、すべて F に含まれている必要がある（推移的に含まれる場合も数える）。逆に、F は E の残りの case（とその内側の case）以外を持ってはいけない（MEFF203。Issue #4）。`[RestOf<E>]` は「E から1つ除いたもの」だけを表す。F が E の case をまとめるために自分で足した union は、その中身で判断する。
 3. **X に指定できるのは E の直接の case だけ**とする（F16）。入れ子の union の内側の case（`DbError` の中の `ConnFailed` など）は、最初は対象にしない。
 4. `TrySplit` は、E に対する `switch` として生成する。X なら `caught` に、それ以外の case なら F に広げて `rest` に入れる。
 5. 条件を満たさない F を指定すると、コンパイルエラー（CS0315）になる。そのままではメッセージが分かりにくいので、Analyzer が「AccessError には AppError の case のうち Forbidden が足りない」のように言い換える。
@@ -551,6 +551,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF104 | Error | `[Expose<T>]` の T として引数を公開できない |
 | MEFF201 | Error | `[RestOf<E>]` の E が union ではない |
 | MEFF202 | Error | E の case のうち、ちょうど1つを除いたものになっていない |
+| MEFF203 | Error | `[RestOf<E>]` の union が、E にない case を持っている |
 
 **Analyzer（P7）**：指摘の文章は、Roslyn やほかの Analyzer にならって短い英文にする（生成器の診断も同じ）。Analyzer は生成器と同じアセンブリに入れる。
 
