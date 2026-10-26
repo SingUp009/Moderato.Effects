@@ -5,12 +5,17 @@ namespace Moderato.Effects.Tests;
 public class NeverTests
 {
     [Fact]
-    public void Never_HasNoValues()
+    public void Never_Declaration_HasNoWayToCreateAValue()
     {
+        // Given
         var type = typeof(Never);
 
+        // When
+        var publicConstructors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+
+        // Then
         Assert.False(type.IsValueType);
         Assert.True(type.IsSealed);
-        Assert.Empty(type.GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+        Assert.Empty(publicConstructors);
     }
 }

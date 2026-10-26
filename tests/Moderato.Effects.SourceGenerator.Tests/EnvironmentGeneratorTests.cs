@@ -178,4 +178,41 @@ public class EnvironmentGeneratorTests
         // Then
         Assert.Contains("MEFF101", build.Errors);
     }
+
+    [Fact]
+    public void Environment_GenericType_ReportsMEFF002()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            [Environment]
+            public sealed partial record AppEnv<T>(IUserRepository Users, T Extra);
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Contains("[Environment]", build.Single("MEFF002").GetMessage());
+    }
+
+    [Fact]
+    public void Environment_NestedType_ReportsMEFF004()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            public static partial class Environments
+            {
+                [Environment]
+                public sealed partial record AppEnv(IUserRepository Users);
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Contains("[Environment]", build.Single("MEFF004").GetMessage());
+    }
 }

@@ -103,4 +103,23 @@ public class RestOfGeneratorTests
         // Then
         Assert.Contains("MEFF201", build.Errors);
     }
+
+    [Fact]
+    public void RestOf_NestedUnion_ReportsMEFF004()
+    {
+        // Given
+        const string SOURCE = ERRORS + """
+
+            public static partial class Errors
+            {
+                [RestOf<AppError>] public partial union AccessError(Forbidden, TimeoutError);
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Contains("[RestOf]", build.Single("MEFF004").GetMessage());
+    }
 }

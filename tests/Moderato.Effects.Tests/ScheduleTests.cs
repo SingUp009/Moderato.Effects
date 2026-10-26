@@ -29,6 +29,58 @@ public class ScheduleTests
         // Then
         Assert.Throws<ArgumentOutOfRangeException>(Act);
     }
+
+    [Fact]
+    public void Spaced_NegativeDelay_Throws()
+    {
+        // Given
+        var delay = TimeSpan.FromSeconds(-1);
+
+        // When
+        void Act() => Schedule.Spaced(delay);
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void Exponential_NegativeBaseDelay_Throws()
+    {
+        // Given
+        var baseDelay = TimeSpan.FromSeconds(-1);
+
+        // When
+        void Act() => Schedule.Exponential(baseDelay);
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void During_NegativeTotal_Throws()
+    {
+        // Given
+        var schedule = Schedule.Spaced(TimeSpan.FromSeconds(1));
+
+        // When
+        void Act() => schedule.During(TimeSpan.FromSeconds(-1));
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void WithMaxDelay_NegativeMax_Throws()
+    {
+        // Given
+        var schedule = Schedule.Exponential(TimeSpan.FromSeconds(1));
+
+        // When
+        void Act() => schedule.WithMaxDelay(TimeSpan.FromSeconds(-1));
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
 }
 
 public class RetryTests
@@ -371,5 +423,22 @@ public class RepeatTests
 
         // Then
         Assert.Equal<Result<int, Never>>(Result.Ok(4), result);
+    }
+
+    [Fact]
+    public async Task Repeat_CallerCancelsWhileWaiting_IsInterrupted()
+    {
+        // Given
+        using var cts = new CancellationTokenSource();
+        var counter = new Counter();
+        var tick = Effect<TimeEnvironment>.Sync(counter.Next);
+
+        // When
+        var running = tick.Repeat(Schedule.Spaced(TimeSpan.FromHours(1))).RunExitAsync(new TimeEnvironment(new FakeTimeProvider()), cts.Token).AsTask();
+        await cts.CancelAsync();
+        var exit = await running;
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
     }
 }

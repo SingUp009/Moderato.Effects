@@ -203,6 +203,48 @@ public class ResourceTests
         Assert.Equal<Result<string, AppError>>(Result.Ok("DB"), result);
         Assert.Equal(["open db", "close db (Succeeded)"], log);
     }
+
+    [Fact]
+    public async Task MapErr_AcquireFails_TransformsTheError()
+    {
+        // Given
+        var db = Refused(404).MapErr(error => error.Value is NotFound n ? $"no database {n.Id}" : "unknown");
+
+        // When
+        var result = await db.Use(connection => Effect<EmptyEnvironment>.Succeed(connection.Name)).RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, string>>(Result.Err("no database 404"), result);
+    }
+
+    [Fact]
+    public async Task MapErr_AcquireSucceeds_KeepsTheValueAndReleasesIt()
+    {
+        // Given
+        var log = new List<string>();
+        var db = Open(log, "db").MapErr(_ => "unused");
+
+        // When
+        var result = await db.Use(connection => Effect<EmptyEnvironment>.Succeed(connection.Name)).RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, string>>(Result.Ok("db"), result);
+        Assert.Equal(["open db", "close db (Succeeded)"], log);
+    }
+
+    [Fact]
+    public async Task MapErr_MapperThrows_Dies()
+    {
+        // Given
+        var db = Refused(404).MapErr<string>(_ => throw new InvalidOperationException("bug"));
+
+        // When
+        var exit = await db.Use(connection => Effect<EmptyEnvironment>.Succeed(connection.Name)).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<InvalidOperationException>(die.Exception);
+    }
 }
 
 public class ResourceLinqTests
