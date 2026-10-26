@@ -160,3 +160,77 @@ public class FailureModelTests
         return 1;
     });
 }
+
+[Collection(nameof(DiagnosticsCollection))]
+public class CallerCancellationCallbackTests
+{
+    [Fact]
+    public async Task RunExitAsync_CallerCancelsAndACallbackOnTheScopeTokenThrows_IsInterruptedAndReportsTheDefect()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        using var caller = new CancellationTokenSource();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            using var registration = scope.CancellationToken.Register(() => throw new InvalidOperationException("callback failed"));
+            ready.SetResult();
+            await Task.Delay(Timeout.Infinite, scope.CancellationToken);
+            return 42;
+        });
+
+        try
+        {
+            // When
+            var running = work.RunExitAsync(EmptyEnvironment.Value, caller.Token).AsTask();
+            await ready.Task;
+            caller.Cancel();
+            var exit = await running;
+
+            // Then
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
+            Assert.Equal("callback failed", die.Exception.Message);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_CallerCancelsAsyncAndACallbackOnTheScopeTokenThrows_ThrowsCanceledAndReportsTheDefect()
+    {
+        // Given
+        var reported = new List<ExitCase>();
+        EffectDiagnostics.UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); };
+        using var caller = new CancellationTokenSource();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            using var registration = scope.CancellationToken.Register(() => throw new InvalidOperationException("callback failed"));
+            ready.SetResult();
+            await Task.Delay(Timeout.Infinite, scope.CancellationToken);
+            return 42;
+        });
+
+        try
+        {
+            // When
+            var running = work.RunAsync(EmptyEnvironment.Value, caller.Token).AsTask();
+            await ready.Task;
+            await caller.CancelAsync();
+            async Task Act() => await running;
+
+            // Then
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(Act);
+            var die = Assert.IsType<Die>(Assert.Single(reported).Value);
+            Assert.Equal("callback failed", die.Exception.Message);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+        }
+    }
+}

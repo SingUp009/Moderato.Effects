@@ -45,7 +45,7 @@ public readonly partial struct Effect<T, E, R>
         var run = Run;
         if (cancellationToken.IsCancellationRequested) return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
 
-        var task = run(environment, new RunContext(cancellationToken));
+        var task = Start(run, environment, cancellationToken);
         return task.IsCompletedSuccessfully ? ToResult(task.Result, cancellationToken) : Await(task, cancellationToken);
 
         static async ValueTask<Result<T, E>> Await(ValueTask<Outcome<T, E>> task, CancellationToken cancellationToken)
@@ -61,10 +61,32 @@ public readonly partial struct Effect<T, E, R>
         var run = Run;
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(new Interrupted()));
 
-        var task = run(environment, new RunContext(cancellationToken));
+        var task = Start(run, environment, cancellationToken);
         return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task);
 
         static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task) => ToExit(await task.ConfigureAwait(false));
+    }
+
+    private static ValueTask<Outcome<T, E>> Start(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R environment, CancellationToken cancellationToken)
+    {
+        if (!cancellationToken.CanBeCanceled) return run(environment, new RunContext(cancellationToken));
+        return Isolated(run, environment, cancellationToken);
+
+        static async ValueTask<Outcome<T, E>> Isolated(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R environment, CancellationToken cancellationToken)
+        {
+            using var caller = Cancellation.ForCaller(cancellationToken);
+            Outcome<T, E> outcome;
+            try
+            {
+                outcome = await run(environment, new RunContext(caller.Token)).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                outcome = Defects.From<T, E>(exception, new RunContext(caller.Token));
+            }
+
+            return caller.CloseForCaller(outcome);
+        }
     }
 
     private static ValueTask<Result<T, E>> ToResult(Outcome<T, E> outcome, CancellationToken cancellationToken)
