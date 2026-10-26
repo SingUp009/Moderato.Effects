@@ -17,8 +17,8 @@ internal sealed record DiagnosticInfo(DiagnosticDescriptor Descriptor, Location?
     public Diagnostic ToDiagnostic() => Diagnostic.Create(Descriptor, Location, [.. Arguments.Items]);
 }
 
-/// <summary>Where and how a partial declaration of the target type is written.</summary>
-internal sealed record Declaration(string Namespace, string Keyword, string Name)
+/// <summary>Where and how a partial declaration of the target type is written. Names are escaped for code; the hint name is not.</summary>
+internal sealed record Declaration(string Namespace, string Keyword, string Name, string Hint)
 {
     public string Open() => Namespace.Length == 0 ? "" : $"namespace {Namespace};\n\n";
 }
@@ -83,9 +83,18 @@ internal static class Shapes
         var keyword = node is RecordDeclarationSyntax record && !record.ClassOrStructKeyword.IsKind(SyntaxKind.None)
             ? $"{record.Keyword.Text} {record.ClassOrStructKeyword.Text}"
             : node.Keyword.Text;
-        var ns = type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString();
-        return new Declaration(ns, keyword, type.Name);
+        var global = type.ContainingNamespace.IsGlobalNamespace;
+        var hint = global ? type.Name : $"{type.ContainingNamespace.ToDisplayString(unescapedNamespace)}.{type.Name}";
+        return new Declaration(global ? "" : type.ContainingNamespace.ToDisplayString(), keyword, Escape(type.Name), hint);
     }
+
+    // Hint names allow no '@', so they use the names as declared.
+    private static readonly SymbolDisplayFormat unescapedNamespace = new(
+        globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
+
+    // A type may be named with a keyword, such as @class; the generated declaration has to keep the @.
+    private static string Escape(string name) => SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None ? name : "@" + name;
 
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
     public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location)

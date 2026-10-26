@@ -167,6 +167,31 @@ public class ErrorGeneratorTests
     }
 
     [Fact]
+    public void Error_KeywordTypeNameInAKeywordNamespace_Compiles()
+    {
+        // Given
+        const string SOURCE = """
+            namespace App.@event;
+            public record A(int X);
+            public record B(int Y);
+            [Error] public partial union @class(A, B);
+            [RestOf<@class>] public partial union @int(B);
+
+            public static class Use
+            {
+                public static @class Widen(A a) => a;
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Empty(build.Warnings);
+    }
+
+    [Fact]
     public void Error_NullableReferenceCase_Compiles()
     {
         // Given

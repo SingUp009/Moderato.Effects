@@ -22,7 +22,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         {
             foreach (var diagnostic in model.Diagnostics) spc.ReportDiagnostic(diagnostic.ToDiagnostic());
             if (model.Declaration is { } declaration && model.Cases.Length > 0)
-                spc.AddSource($"{Hint(declaration)}.Error.g.cs", Emit(declaration, model.Cases));
+                spc.AddSource($"{declaration.Hint}.Error.g.cs", Emit(declaration, model.Cases));
         });
     }
 
@@ -56,8 +56,6 @@ public sealed class ErrorGenerator : IIncrementalGenerator
     private static Model Failed(DiagnosticInfo diagnostic) => new(null, default, new[] { diagnostic }.ToEquatableArray());
 
     private static string Short(string fullName) => fullName.Substring(fullName.LastIndexOf('.') + 1);
-
-    private static string Hint(Declaration declaration) => declaration.Namespace.Length == 0 ? declaration.Name : $"{declaration.Namespace}.{declaration.Name}";
 
     private static string Emit(Declaration declaration, EquatableArray<CasePath> cases)
     {
