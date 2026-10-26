@@ -82,8 +82,12 @@ The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderat
 dotnet build
 dotnet test -c Release
 dotnet run --project samples/Moderato.Effects.Samples
-dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*'
+dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*' --inProcess
 ```
+
+See the [performance measurements](docs/performance/README.md) for execution time, allocations, measurement conditions and reproduction commands. BenchmarkDotNet 0.15.8 requires `--inProcess` with the current .NET 11 preview.
+
+The [zero-allocation contract](docs/performance/zero-allocation/README.md) defines the supported execution paths and their regression tests, including LINQ and custom Retry/Repeat policies.
 
 ## Changelog
 

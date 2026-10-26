@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Moderato.Effects\Moderato.Effects.csproj" />
+    <Compile Include="..\..\tests\Shared\AllocationScenarios.cs" Link="AllocationScenarios.cs" />
   </ItemGroup>
 
 </Project>

@@ -14,12 +14,36 @@ internal static class Steps
             => next(await task.ConfigureAwait(false));
     }
 
+    /// <summary>Continues with explicit state, avoiding a per-run closure.</summary>
+    internal static ValueTask<Outcome<C, D>> Then<A, B, C, D, TState>(
+        ValueTask<Outcome<A, B>> task, TState state, Func<Outcome<A, B>, TState, Outcome<C, D>> next)
+    {
+        return task.IsCompletedSuccessfully ? new(next(task.Result, state)) : Await(task, state, next);
+
+        static async ValueTask<Outcome<C, D>> Await(
+            ValueTask<Outcome<A, B>> task, TState state, Func<Outcome<A, B>, TState, Outcome<C, D>> next)
+            => next(await task.ConfigureAwait(false), state);
+    }
+
     /// <summary>Runs synchronous user code; exceptions become outcomes.</summary>
     internal static ValueTask<Outcome<T, E>> Run<T, E>(Func<T> body, RunContext context)
     {
         try
         {
             return new(Outcome<T, E>.Ok(body()));
+        }
+        catch (Exception exception)
+        {
+            return new(Defects.From<T, E>(exception, context));
+        }
+    }
+
+    /// <summary>Runs synchronous user code with explicit state.</summary>
+    internal static ValueTask<Outcome<T, E>> Run<T, E, TState>(Func<TState, T> body, TState state, RunContext context)
+    {
+        try
+        {
+            return new(Outcome<T, E>.Ok(body(state)));
         }
         catch (Exception exception)
         {
@@ -40,18 +64,35 @@ internal static class Steps
             return new(Defects.From<T, E>(exception, context));
         }
 
-        return task.IsCompletedSuccessfully ? new(Outcome<T, E>.Ok(task.Result)) : Await(task, context);
+        return task.IsCompletedSuccessfully ? new(Outcome<T, E>.Ok(task.Result)) : Await<T, E>(task, context);
+    }
 
-        static async ValueTask<Outcome<T, E>> Await(ValueTask<T> task, RunContext context)
+    /// <summary>Runs asynchronous user code with explicit state.</summary>
+    internal static ValueTask<Outcome<T, E>> RunAsync<T, E, TState>(
+        Func<TState, CancellationToken, ValueTask<T>> body, TState state, RunContext context)
+    {
+        ValueTask<T> task;
+        try
         {
-            try
-            {
-                return Outcome<T, E>.Ok(await task.ConfigureAwait(false));
-            }
-            catch (Exception exception)
-            {
-                return Defects.From<T, E>(exception, context);
-            }
+            task = body(state, context.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return new(Defects.From<T, E>(exception, context));
+        }
+
+        return task.IsCompletedSuccessfully ? new(Outcome<T, E>.Ok(task.Result)) : Await<T, E>(task, context);
+    }
+
+    private static async ValueTask<Outcome<T, E>> Await<T, E>(ValueTask<T> task, RunContext context)
+    {
+        try
+        {
+            return Outcome<T, E>.Ok(await task.ConfigureAwait(false));
+        }
+        catch (Exception exception)
+        {
+            return Defects.From<T, E>(exception, context);
         }
     }
 

@@ -39,7 +39,7 @@ internal static class Recurrence
             if (outcome.Kind != OutcomeKind.Err) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
-            var decision = await DecideAsync(() => policy(new RetryContext<E>(attempt, outcome.Error)), env, context).ConfigureAwait(false);
+            var decision = await DecideAsync(policy, new RetryContext<E>(attempt, outcome.Error), env, context).ConfigureAwait(false);
             if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome);
@@ -70,7 +70,7 @@ internal static class Recurrence
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
-            var decision = await DecideAsync(() => policy(new RepeatContext<T>(repetition, outcome.Value)), env, context).ConfigureAwait(false);
+            var decision = await DecideAsync(policy, new RepeatContext<T>(repetition, outcome.Value), env, context).ConfigureAwait(false);
             if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome);
@@ -92,11 +92,12 @@ internal static class Recurrence
         }
     }
 
-    private static async ValueTask<Outcome<bool, Never>> DecideAsync<R>(Func<Effect<bool, Never, R>> policy, R env, RunContext context)
+    private static async ValueTask<Outcome<bool, Never>> DecideAsync<TState, R>(
+        Func<TState, Effect<bool, Never, R>> policy, TState state, R env, RunContext context)
     {
         try
         {
-            return await policy().Run(env, context).ConfigureAwait(false);
+            return await policy(state).Run(env, context).ConfigureAwait(false);
         }
         catch (Exception exception)
         {

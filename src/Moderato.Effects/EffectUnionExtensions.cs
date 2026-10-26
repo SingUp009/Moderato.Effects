@@ -25,7 +25,12 @@ public static class EffectUnionExtensions
         where E : IUnionCase<E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return Catch<T, E, R, TCase>(effect, caught => handler(caught));
+        return effect.Then<T, E>((outcome, env, context) =>
+        {
+            if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
+            UnobservedFailures.ReportDefects(outcome.Suppressed);
+            return Steps.Then(handler(caught).Run(env, context), static end => end.WithErrorType<E>());
+        });
     }
 
     private static Effect<T, E, R> Catch<T, E, R, TCase>(Effect<T, E, R> effect, Func<TCase, Effect<T, E, R>> handler)
