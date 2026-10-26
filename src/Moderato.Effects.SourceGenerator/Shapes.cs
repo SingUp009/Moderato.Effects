@@ -23,8 +23,11 @@ internal sealed record Declaration(string Namespace, string Keyword, string Name
     public string Open() => Namespace.Length == 0 ? "" : $"namespace {Namespace};\n\n";
 }
 
-/// <summary>How one type is reached from a union through its cases: the cases on the way, ending with the type itself.</summary>
-internal sealed record CasePath(EquatableArray<string> Steps)
+/// <summary>
+/// How one type is reached from a union through its cases: the cases on the way, ending with the type itself.
+/// <paramref name="HoldsNull"/> says a null value in the last union on the way belongs to this type (see <see cref="Shapes.NullCase"/>).
+/// </summary>
+internal sealed record CasePath(EquatableArray<string> Steps, bool HoldsNull = false)
 {
     public string Target => Steps.Items[Steps.Length - 1];
 
@@ -60,12 +63,14 @@ internal static class Shapes
 
         void Visit(INamedTypeSymbol current, ImmutableArray<string> path)
         {
-            foreach (var @case in Cases(current))
+            var cases = Cases(current);
+            var nullCase = NullCase(cases.Select(Name));
+            foreach (var @case in cases)
             {
                 var steps = path.Add(Name(@case));
                 var name = Name(@case);
                 if (!found.TryGetValue(name, out var paths)) found[name] = paths = [];
-                paths.Add(new CasePath(steps.ToEquatableArray()));
+                paths.Add(new CasePath(steps.ToEquatableArray(), name == nullCase));
 
                 if (@case is INamedTypeSymbol nested && IsUnion(nested) && onPath.Add(nested))
                 {
@@ -126,6 +131,21 @@ internal static class Shapes
     {
         var admitting = directCases.Where(static c => c.EndsWith("?", StringComparison.Ordinal)).Take(2).ToList();
         return admitting.Count == 1 ? admitting[0] : null;
+    }
+
+    /// <summary>A pattern test that narrows <paramref name="value"/> through the cases of <paramref name="path"/> to a null value in its last union.</summary>
+    public static string NarrowToNull(CasePath path, string value)
+    {
+        var tests = new List<string>();
+        var current = value;
+        for (var i = 0; i < path.Steps.Length - 1; i++)
+        {
+            tests.Add($"{current} is {PatternType(path.Steps.Items[i])} null{i}");
+            current = $"null{i}";
+        }
+
+        tests.Add($"{current} is null");
+        return string.Join(" && ", tests);
     }
 
     /// <summary>A pattern test that narrows <paramref name="value"/> through each case of <paramref name="path"/> into <paramref name="result"/>.</summary>

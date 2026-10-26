@@ -104,3 +104,18 @@ public partial union Note(string?, int);
 
 [Error, RestOf<Note>]
 public partial union NoteNumber(int);
+
+[Error]
+public partial union WrappedNote(Note, bool);
+
+[Error]
+public partial union Count(int?, string);
+
+[Error]
+public partial union WrappedCount(Count, bool);
+
+[Error]
+public partial union Either(string?, int?);
+
+[Error]
+public partial union WrappedEither(Either, bool);

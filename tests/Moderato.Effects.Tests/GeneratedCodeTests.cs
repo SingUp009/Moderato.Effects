@@ -180,3 +180,63 @@ public class NullableCaseTests
         Assert.Equal<Result<string, NoteNumber>>(Result.Err<NoteNumber>(7), result);
     }
 }
+
+public class NestedNullableCaseTests
+{
+    [Fact]
+    public async Task CatchCase_NestedNullableCaseHoldingNull_RecoversWithNull()
+    {
+        // Given
+        Effect<string, WrappedNote, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<WrappedNote>((Note)(string?)null);
+
+        // When
+        var result = await load.CatchCase((string? note) => Effect<EmptyEnvironment>.Succeed($"noted {note ?? "null"}"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, WrappedNote>>(Result.Ok("noted null"), result);
+    }
+
+    [Fact]
+    public async Task CatchCase_NestedNullableCaseWithAValue_RecoversFromIt()
+    {
+        // Given
+        Effect<string, WrappedNote, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<WrappedNote>((Note)"missing");
+
+        // When
+        var result = await load.CatchCase((string? note) => Effect<EmptyEnvironment>.Succeed($"noted {note ?? "null"}"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, WrappedNote>>(Result.Ok("noted missing"), result);
+    }
+
+    [Fact]
+    public async Task CatchCase_NestedNullableValueCaseHoldingNull_RecoversWithNull()
+    {
+        // Given
+        Effect<string, WrappedCount, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail<WrappedCount>((Count)(int?)null);
+
+        // When
+        var result = await load.CatchCase((int? count) => Effect<EmptyEnvironment>.Succeed($"counted {count?.ToString() ?? "null"}"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, WrappedCount>>(Result.Ok("counted null"), result);
+    }
+
+    [Fact]
+    public async Task CatchCase_NestedUnionWithTwoNullableCasesHoldingNull_DoesNotRecover()
+    {
+        // Given
+        WrappedEither error = (Either)(string?)null;
+        Effect<string, WrappedEither, EmptyEnvironment> load = Effect<EmptyEnvironment>.Fail(error);
+
+        // When
+        var result = await load.CatchCase((string? text) => Effect<EmptyEnvironment>.Succeed("recovered"))
+            .RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<string, WrappedEither>>(Result.Err(error), result);
+    }
+}
