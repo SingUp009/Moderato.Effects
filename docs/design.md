@@ -175,6 +175,7 @@ public sealed record Interrupted;
   2. `Timeout(ts, onTimeout: t => error)`：自分のエラーに変換する。E は変わらない。
   3. `TimeoutResult(ts)`：`Effect<Result<T, TimeoutError>, E, R>`。値の側で表す（UniTask の `TimeoutWithoutException` に相当）。
 - いずれも `where R : IHas<TimeProvider>` を要求する（D14）。
+- `Sleep` の待ち時間と `Timeout` の制限時間は、0 以上で、タイマーが扱える最大（`uint.MaxValue - 1` ミリ秒、約 49.7 日）以下とする。`Timeout.InfiniteTimeSpan` は例外として受け付ける。範囲外は作るときに `ArgumentOutOfRangeException` を投げる（Issue #24）。実行時の Die にしないため。`Schedule` は計算した待ち時間を同じ最大で切る（D15）。
 - 時間切れのときは、内側のキャンセルが**終わるまで待つ**（finalizer が終わってから戻る）。
 - **Timeout は協調的なタイムアウト（cooperative timeout）**。キャンセルに応じない処理では、時間の上限として働かない（F9）。ドキュメントに次の表を載せる（G4）。
 
