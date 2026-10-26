@@ -25,6 +25,7 @@ public sealed class Scope<E, R>
     private E error = default!;
     private int busy;
     private bool closed;
+    private TaskCompletionSource<ExitCase?>? running;
 
     private Scope(R env, RunContext context)
     {
@@ -136,23 +137,38 @@ public sealed class Scope<E, R>
             throw;
         }
 
-        if (!task.IsCompletedSuccessfully) return AwaitAsync(task);
+        if (!task.IsCompletedSuccessfully)
+        {
+            var done = new TaskCompletionSource<ExitCase?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Volatile.Write(ref running, done);
+            return AwaitAsync(task, done);
+        }
+
         Leave();
         return new(Unwrap(task.Result));
 
-        async ValueTask<T> AwaitAsync(ValueTask<Outcome<T, E>> pending)
+        async ValueTask<T> AwaitAsync(ValueTask<Outcome<T, E>> pending, TaskCompletionSource<ExitCase?> done)
         {
-            Outcome<T, E> outcome;
+            ExitCase? failure = null;
             try
             {
-                outcome = await pending.ConfigureAwait(false);
+                Outcome<T, E> outcome;
+                try
+                {
+                    outcome = await pending.ConfigureAwait(false);
+                }
+                finally
+                {
+                    Leave();
+                }
+
+                failure = ExitCases.FailureOf(outcome);
+                return Unwrap(outcome);
             }
             finally
             {
-                Leave();
+                done.SetResult(failure);
             }
-
-            return Unwrap(outcome);
         }
     }
 
@@ -176,6 +192,14 @@ public sealed class Scope<E, R>
                 : Defects.From<T, E>(exception, context);
             // An Err that came first is kept as context for the defect or interruption that replaced it.
             if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
+        }
+
+        // A step the body did not await (MEFF310) would outlive the block, and a resource it acquired afterwards would never be
+        // released. It is canceled and waited for, so what it registered is released with the rest.
+        if (Volatile.Read(ref running) is { Task.IsCompleted: false } step)
+        {
+            cancellation.TryCancel(CancellationReason.ParentScopeClosed);
+            if (await step.Task.ConfigureAwait(false) is { Value: not Interrupted } abandoned) AddSuppressed(new Suppressed(abandoned, Relation.Sequential));
         }
 
         closed = true;
