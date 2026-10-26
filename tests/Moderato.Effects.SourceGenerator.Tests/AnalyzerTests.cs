@@ -113,6 +113,44 @@ public class CatchAllInGenTests
         // Then
         Assert.DoesNotContain("MEFF301", build.Ids);
     }
+
+    [Fact]
+    public void GenBlock_CatchAllAroundANestedGenBlockOnly_ReportsNothing()
+    {
+        // Given
+        var source = Code.InGen("""
+            try
+            {
+                var inner = Scope<AppError, R>.Gen(async s2 => await s2.Run(Load()));
+                Console.WriteLine(inner);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("failed");
+            }
+
+            return await scope.Run(Load());
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.DoesNotContain("MEFF301", build.Ids);
+    }
+
+    [Fact]
+    public void GenBlock_CatchAllThatRethrowsOnlySometimes_ReportsMEFF301()
+    {
+        // Given
+        var source = Code.InGen("try { return await scope.Run(Load()); } catch (Exception ex) { if (ex is TimeoutException) throw; return 0; }");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("MEFF301", build.Ids);
+    }
 }
 
 public class StepInCleanupTests
@@ -226,6 +264,19 @@ public class ScopeEscapesTests
         // Then
         Assert.Empty(build.Diagnostics);
     }
+
+    [Fact]
+    public void GenBlock_ScopeStoredInACollection_ReportsMEFF304()
+    {
+        // Given
+        var source = Code.InGen("object[] boxed = { scope }; Holder.Saved = boxed; return await scope.Run(Load());");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("MEFF304", build.Ids);
+    }
 }
 
 public class ResourceInLoopTests
@@ -309,6 +360,19 @@ public class BlockingWaitTests
 
         // Then
         Assert.Empty(build.Diagnostics);
+    }
+
+    [Fact]
+    public void GenBlock_ResultInsideALambda_ReportsMEFF306()
+    {
+        // Given
+        var source = Code.InGen("Func<int, int> twice = i => Task.FromResult(i * 2).Result; await Task.Yield(); return twice(1);");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("MEFF306", build.Ids);
     }
 }
 

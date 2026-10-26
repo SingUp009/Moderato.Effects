@@ -35,6 +35,11 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 
     internal static bool IsFunction(SyntaxNode node) => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax;
 
+    private static bool IsGenBlock(SemanticModel model, SyntaxNode node)
+        => node is AnonymousFunctionExpressionSyntax function
+            && model.GetSymbolInfo(function).Symbol is IMethodSymbol method
+            && method.Parameters.Any(static p => IsScope(p.Type));
+
     private static void AnalyzeFunction(SyntaxNodeAnalysisContext context)
     {
         var function = (AnonymousFunctionExpressionSyntax)context.Node;
@@ -46,7 +51,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         if (body is null) return;
 
         AnalyzeScopeUses(context, function, body, scopes);
-        AnalyzeCatchClauses(context, body);
+        AnalyzeCatchClauses(context, body, scopes);
         AnalyzeBlockingWaits(context, body);
     }
 
@@ -100,20 +105,23 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         => node.Ancestors().TakeWhile(a => a != function)
             .Any(static a => a is ForStatementSyntax or ForEachStatementSyntax or WhileStatementSyntax or DoStatementSyntax);
 
+    // Passing the scope to a method is fine; storing it in something that can outlive the block is not.
     private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
     {
         AssignmentExpressionSyntax assignment when assignment.Right == identifier
             => model.GetSymbolInfo(assignment.Left).Symbol is IFieldSymbol or IPropertySymbol,
         ReturnStatementSyntax or ArrowExpressionClauseSyntax => true,
+        InitializerExpressionSyntax or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax => true,
+        ArgumentSyntax { Parent: TupleExpressionSyntax } => true,
         _ => false,
     };
 
-    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode body)
+    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode body, ImmutableArray<IParameterSymbol> scopes)
     {
         foreach (var clause in body.DescendantNodes(static n => !IsFunction(n)).OfType<CatchClauseSyntax>())
         {
-            if (clause.Filter is not null || !CatchesScopeFailure(context.SemanticModel, clause) || Rethrows(clause)) continue;
-            if (clause.Parent is not TryStatementSyntax tryStatement || !UsesScope(context.SemanticModel, tryStatement.Block)) continue;
+            if (clause.Filter is not null || !CatchesScopeFailure(context.SemanticModel, clause) || Rethrows(context.SemanticModel, clause)) continue;
+            if (clause.Parent is not TryStatementSyntax tryStatement || !UsesScope(context.SemanticModel, tryStatement.Block, scopes)) continue;
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CatchAllInGen, clause.CatchKeyword.GetLocation()));
         }
     }
@@ -125,15 +133,25 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         return model.GetTypeInfo(clause.Declaration.Type).Type?.ToDisplayString() is "System.Exception";
     }
 
-    private static bool Rethrows(CatchClauseSyntax clause)
-        => clause.Block.DescendantNodes(static n => !IsFunction(n)).OfType<ThrowStatementSyntax>().Any(static t => t.Expression is null);
+    // Only a catch that always rethrows lets ScopeFailure through: it cannot fall off its end or return, and it has a bare throw.
+    private static bool Rethrows(SemanticModel model, CatchClauseSyntax clause)
+    {
+        var statements = clause.Block.DescendantNodes(static n => !IsFunction(n)).ToList();
+        if (!statements.OfType<ThrowStatementSyntax>().Any(static t => t.Expression is null)) return false;
+        if (statements.OfType<ReturnStatementSyntax>().Any()) return false;
+        return model.AnalyzeControlFlow(clause.Block) is { Succeeded: true, EndPointIsReachable: false };
+    }
 
-    private static bool UsesScope(SemanticModel model, SyntaxNode node)
-        => node.DescendantNodes().OfType<IdentifierNameSyntax>().Any(i => IsScope(model.GetTypeInfo(i).Type));
+    // Only this block's own scope can throw a ScopeFailure that the catch would swallow; a nested Gen block catches its own.
+    private static bool UsesScope(SemanticModel model, SyntaxNode node, ImmutableArray<IParameterSymbol> scopes)
+        => node.DescendantNodes().OfType<IdentifierNameSyntax>()
+            .Any(i => model.GetSymbolInfo(i).Symbol is IParameterSymbol p && scopes.Contains(p, SymbolEqualityComparer.Default));
 
     private static void AnalyzeBlockingWaits(SyntaxNodeAnalysisContext context, SyntaxNode body)
     {
-        foreach (var access in body.DescendantNodes(static n => !IsFunction(n)).OfType<MemberAccessExpressionSyntax>())
+        // A lambda inside the block still runs on its flow; a nested Gen block is analyzed on its own.
+        var model = context.SemanticModel;
+        foreach (var access in body.DescendantNodes(n => !IsGenBlock(model, n)).OfType<MemberAccessExpressionSyntax>())
         {
             var name = access.Name.Identifier.ValueText;
             if (name is not ("Result" or "Wait" or "GetResult")) continue;
