@@ -734,3 +734,82 @@ public class AllSettledCancellationTests
         }
     }
 }
+
+[Collection(nameof(DiagnosticsCollection))]
+public class DiagnosticsOutputTests
+{
+    private sealed class ClosedWriter : StringWriter
+    {
+        public override void WriteLine(string? value) => throw new IOException("stderr closed");
+    }
+
+    private sealed record Unprintable
+    {
+        public override string ToString() => throw new FormatException("cannot print");
+    }
+
+    private static Effect<int, Never, EmptyEnvironment> SucceedsWithAnUnjoinedFailure<E>(E error) => Scope<Never, EmptyEnvironment>.Gen(async scope =>
+    {
+        await scope.Fork(Effect<EmptyEnvironment>.Fail(error));
+        return 7;
+    });
+
+    [Fact]
+    public async Task RunExitAsync_NoHandlerAndStderrClosed_KeepsTheResult()
+    {
+        // Given
+        var original = Console.Error;
+        Console.SetError(new ClosedWriter());
+        var work = SucceedsWithAnUnjoinedFailure("unjoined");
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+    }
+
+    [Fact]
+    public async Task RunExitAsync_HandlerThrowsAndStderrClosed_KeepsTheResult()
+    {
+        // Given
+        var original = Console.Error;
+        Console.SetError(new ClosedWriter());
+        EffectDiagnostics.UnobservedFailureHandler = _ => throw new InvalidOperationException("handler failed");
+        var work = SucceedsWithAnUnjoinedFailure("unjoined");
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
+        }
+        finally
+        {
+            EffectDiagnostics.UnobservedFailureHandler = null;
+            Console.SetError(original);
+        }
+    }
+
+    [Fact]
+    public async Task RunExitAsync_NoHandlerAndAnErrorThatCannotBePrinted_KeepsTheResult()
+    {
+        // Given
+        var work = SucceedsWithAnUnjoinedFailure(new Unprintable());
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
+    }
+}

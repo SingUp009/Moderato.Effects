@@ -20,7 +20,7 @@ internal static class UnobservedFailures
         var handler = EffectDiagnostics.UnobservedFailureHandler;
         if (handler is null)
         {
-            Console.Error.WriteLine($"Moderato.Effects unobserved failure: {Describe(failure)}");
+            Write(failure, static failure => $"Moderato.Effects unobserved failure: {Describe(failure)}");
             return;
         }
 
@@ -30,8 +30,20 @@ internal static class UnobservedFailures
         }
         catch (Exception exception)
         {
-            // A diagnostics hook must not turn into a failure of the work it observes.
-            Console.Error.WriteLine($"Moderato.Effects unobserved failure handler threw: {exception}");
+            Write(exception, static exception => $"Moderato.Effects unobserved failure handler threw: {exception}");
+        }
+    }
+
+    // Reporting must not turn into a failure of the work it observes (EffectDiagnostics): a closed stderr or a ToString that throws
+    // while building the message is dropped, since there is nowhere left to report it.
+    private static void Write<TState>(TState state, Func<TState, string> message)
+    {
+        try
+        {
+            Console.Error.WriteLine(message(state));
+        }
+        catch (Exception)
+        {
         }
     }
 
