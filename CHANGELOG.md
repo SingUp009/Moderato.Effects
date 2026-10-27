@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Fill group result arrays directly without allocating intermediate LINQ iterators.
+
 - Skip failure aggregation buffers when a group has no stored secondary failures, retaining omitted counts.
 - Allocate release action lists only when needed and read remaining release defects without copying their array.
 

@@ -128,7 +128,9 @@ public static partial class Effect
         {
             var ends = await Concurrent.RunAsync(runs, env, context, concurrency, StopOn.Nothing).ConfigureAwait(false);
             if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, Exit<T, E>[], Never>(ends);
-            return Outcome<Exit<T, E>[], Never>.Ok([.. ends.Select(static end => Exits.From(end.Outcome))]);
+            Exit<T, E>[] exits = ends.Length == 0 ? [] : new Exit<T, E>[ends.Length];
+            for (var i = 0; i < ends.Length; i++) exits[i] = Exits.From(ends[i].Outcome);
+            return Outcome<Exit<T, E>[], Never>.Ok(exits);
         }));
     }
 
@@ -151,10 +153,16 @@ public static partial class Effect
             // Errors from a partial or canceled run would pass for a full validation, so they stay as context.
             if (Interrupted(ends, context) || CanceledIntoErr(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
 
-            if (ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err))
+            var errorCount = 0;
+            foreach (var end in ends)
+                if (end.Outcome.Kind == OutcomeKind.Err) errorCount++;
+            if (errorCount > 0)
             {
                 var (others, omitted) = Concurrent.Others(ends, null, includeErrs: false);
-                E[] errors = [.. ends.Where(static end => end.Outcome.Kind == OutcomeKind.Err).Select(static end => end.Outcome.Error)];
+                var errors = new E[errorCount];
+                var index = 0;
+                foreach (var end in ends)
+                    if (end.Outcome.Kind == OutcomeKind.Err) errors[index++] = end.Outcome.Error;
                 return Outcome<T[], E[]>.Err(errors).WithSuppressed(others, omitted);
             }
 
@@ -247,7 +255,9 @@ public static partial class Effect
     {
         if (ends.Any(static end => end.Outcome.Kind != OutcomeKind.Ok || !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);
         var (others, omitted) = Concurrent.Others(ends, null);
-        return Outcome<U, F>.Ok(build([.. ends.Select(static end => end.Outcome.Value)])).WithSuppressed(others, omitted);
+        T[] values = ends.Length == 0 ? [] : new T[ends.Length];
+        for (var i = 0; i < ends.Length; i++) values[i] = ends[i].Outcome.Value;
+        return Outcome<U, F>.Ok(build(values)).WithSuppressed(others, omitted);
     }
 
     private static async ValueTask<Outcome<T, E>> Guard<T, E>(RunContext context, Func<ValueTask<Outcome<T, E>>> body)
