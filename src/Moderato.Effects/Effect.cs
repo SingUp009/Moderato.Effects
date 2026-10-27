@@ -6,28 +6,44 @@ using Moderato.Results;
 namespace Moderato.Effects;
 
 /// <summary>A lazy, rerunnable description of work that needs <typeparamref name="R"/> and ends with <typeparamref name="T"/> or <typeparamref name="E"/>; <c>default</c> is invalid.</summary>
+/// <remarks>Equality and hash codes depend on internal representation and do not establish equivalent computations.</remarks>
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly partial struct Effect<T, E, R>
 {
+    private readonly Result<T, E> constant;
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
     internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run) => this.run = run;
 
-    internal Func<R, RunContext, ValueTask<Outcome<T, E>>> Run
-        => run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>();
+    internal Effect(Result<T, E> constant) => this.constant = constant;
+
+    internal Effect<T, E, R> Validate()
+        => constant.HasValue || run is not null ? this : ThrowHelper.ThrowUninitializedEffect<Effect<T, E, R>>();
+
+    internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context)
+        => constant.HasValue ? new(Steps.FromResult(constant))
+            : (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
     {
-        var run = effect.Run;
-        return new((env, context) => Steps.Then(run(env, context), static outcome => outcome.WithErrorType<E>()));
+        effect = effect.Validate();
+        if (effect.constant.TryGetOk(out var value)) return new(new Result<T, E>(new Ok<T>(value)));
+        return Deferred(effect);
+
+        static Effect<T, E, R> Deferred(Effect<T, Never, R> effect)
+            => new((env, context) => Steps.Then(effect.Run(env, context), static outcome => outcome.WithErrorType<E>()));
     }
 
     /// <summary>An effect that cannot succeed can stand in for one with any value type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<Never, E, R> effect)
     {
-        var run = effect.Run;
-        return new((env, context) => Steps.Then(run(env, context), static outcome => outcome.WithValueType<T>()));
+        effect = effect.Validate();
+        if (effect.constant.TryGetErr(out var error)) return new(new Result<T, E>(new Err<E>(error)));
+        return Deferred(effect);
+
+        static Effect<T, E, R> Deferred(Effect<Never, E, R> effect)
+            => new((env, context) => Steps.Then(effect.Run(env, context), static outcome => outcome.WithValueType<T>()));
     }
 
     /// <summary>An effect that ends in the result.</summary>
@@ -39,10 +55,11 @@ public readonly partial struct Effect<T, E, R>
     /// <returns>The value, or the expected error.</returns>
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken = default)
     {
-        var run = Run;
+        Validate();
         if (cancellationToken.IsCancellationRequested) return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
+        if (constant.HasValue) return new(constant);
 
-        var task = Start(run, environment, cancellationToken);
+        var task = Start(environment, cancellationToken);
         return task.IsCompletedSuccessfully ? ToResult(task.Result, cancellationToken) : Await(task, cancellationToken);
 
         static async ValueTask<Result<T, E>> Await(ValueTask<Outcome<T, E>> task, CancellationToken cancellationToken)
@@ -55,27 +72,28 @@ public readonly partial struct Effect<T, E, R>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
     {
-        var run = Run;
+        Validate();
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
+        if (constant.HasValue) return new(ToExit(Steps.FromResult(constant)));
 
-        var task = Start(run, environment, cancellationToken);
+        var task = Start(environment, cancellationToken);
         return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task);
 
         static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task) => ToExit(await task.ConfigureAwait(false));
     }
 
-    private static ValueTask<Outcome<T, E>> Start(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R environment, CancellationToken cancellationToken)
+    private ValueTask<Outcome<T, E>> Start(R environment, CancellationToken cancellationToken)
     {
-        if (!cancellationToken.CanBeCanceled) return run(environment, new RunContext(cancellationToken));
-        return Isolated(run, environment, cancellationToken);
+        if (!cancellationToken.CanBeCanceled) return Run(environment, new RunContext(cancellationToken));
+        return Isolated(this, environment, cancellationToken);
 
-        static async ValueTask<Outcome<T, E>> Isolated(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R environment, CancellationToken cancellationToken)
+        static async ValueTask<Outcome<T, E>> Isolated(Effect<T, E, R> effect, R environment, CancellationToken cancellationToken)
         {
             using var caller = Cancellation.ForCaller(cancellationToken);
             Outcome<T, E> outcome;
             try
             {
-                outcome = await run(environment, new RunContext(caller.Token)).ConfigureAwait(false);
+                outcome = await effect.Run(environment, new RunContext(caller.Token)).ConfigureAwait(false);
             }
             catch (Exception exception)
             {

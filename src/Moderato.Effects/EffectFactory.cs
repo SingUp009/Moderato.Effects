@@ -12,8 +12,7 @@ public static class Effect<R>
     /// <returns>An effect that cannot fail.</returns>
     public static Effect<T, Never, R> Succeed<T>(T value)
     {
-        var outcome = Outcome<T, Never>.Ok(value);
-        return new((_, _) => new(outcome));
+        return new(new Result<T, Never>(new Ok<T>(value)));
     }
 
     /// <summary>An effect that fails with the error; name its type, as in <c>Fail&lt;AppError&gt;(new NotFound(id))</c>.</summary>
@@ -21,8 +20,7 @@ public static class Effect<R>
     /// <returns>An effect that cannot succeed.</returns>
     public static Effect<Never, E, R> Fail<E>(E error)
     {
-        var outcome = Outcome<Never, E>.Err(error);
-        return new((_, _) => new(outcome));
+        return new(new Result<Never, E>(new Err<E>(error)));
     }
 
     /// <summary>An effect that ends in the result.</summary>
@@ -32,8 +30,7 @@ public static class Effect<R>
     public static Effect<T, E, R> FromResult<T, E>(Result<T, E> result)
     {
         if (!result.HasValue) ThrowHelper.ThrowUninitializedResult();
-        var outcome = Steps.FromResult(result);
-        return new((_, _) => new(outcome));
+        return new(result);
     }
 
     /// <summary>An effect that runs synchronous code on each run; exceptions are defects.</summary>

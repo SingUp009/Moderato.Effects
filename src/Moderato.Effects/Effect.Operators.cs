@@ -156,7 +156,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R2> Provide<R2>(Func<R2, R> build)
     {
         ArgumentNullException.ThrowIfNull(build);
-        var run = Run;
+        var effect = Validate();
         return new((outer, context) =>
         {
             R inner;
@@ -169,7 +169,7 @@ public readonly partial struct Effect<T, E, R>
                 return new(Defects.From<T, E>(exception, context));
             }
 
-            return run(inner, context);
+            return effect.Run(inner, context);
         });
     }
 
@@ -177,8 +177,8 @@ public readonly partial struct Effect<T, E, R>
     /// <returns>An effect for the wider environment.</returns>
     public Effect<T, E, R2> WidenEnv<R2>() where R2 : R
     {
-        var run = Run;
-        return new((env, context) => run(env, context));
+        var effect = Validate();
+        return new((env, context) => effect.Run(env, context));
     }
 
     /// <summary>A resource running the effect as a fiber, canceled and awaited on release (in a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>).</summary>
@@ -189,12 +189,12 @@ public readonly partial struct Effect<T, E, R>
     /// <returns>The same effect, started on the thread pool.</returns>
     public Effect<T, E, R> OnThreadPool()
     {
-        var run = Run;
+        var effect = Validate();
         return new((env, context) => new(Task.Run(async () =>
         {
             try
             {
-                return await run(env, context).ConfigureAwait(false);
+                return await effect.Run(env, context).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -206,10 +206,10 @@ public readonly partial struct Effect<T, E, R>
     /// <summary>Continues with this effect's outcome; exceptions from <paramref name="next"/> are defects.</summary>
     internal Effect<U, F, R> Then<U, F>(Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next)
     {
-        var run = Run;
+        var effect = Validate();
         return new((env, context) =>
         {
-            var task = run(env, context);
+            var task = effect.Run(env, context);
             return task.IsCompletedSuccessfully ? Continue(next, task.Result, env, context) : Await(task, next, env, context);
         });
 

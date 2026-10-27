@@ -6,7 +6,7 @@ namespace Moderato.Effects.Testing;
 public enum AllocationCase
 {
     Sync, CompletedAsync, Access, AccessAsync, Try, TryAsync, FromResultAsync,
-    Map, MapErr, AndThen, AndThrough, OrElse, Tap, TapErr, Match,
+    Map, MapErr, AndThen, AndThenNewConstant, AndThrough, OrElse, OrElseNewConstant, Tap, TapErr, Match,
     UnwrapOr, UnwrapOrElse, Attempt, Provide,
     LinqSameError, LinqSourceError, LinqNextError, LinqSecondNever,
     LinqFirstNever, LinqBothNever, LinqChain, CatchCaseNever,
@@ -47,10 +47,14 @@ public static class AllocationScenarios
                 return (failed.MapErr(static _ => "mapped"), Result.Err("mapped"));
             case AllocationCase.AndThen:
                 return (source.AndThen(_ => next), Result.Ok(22));
+            case AllocationCase.AndThenNewConstant:
+                return (source.AndThen(static value => Effect<EmptyEnvironment>.Succeed(value + 22)), Result.Ok(42));
             case AllocationCase.AndThrough:
                 return (source.AndThrough(_ => next), Result.Ok(20));
             case AllocationCase.OrElse:
                 return (failed.OrElse(_ => next), Result.Ok(22));
+            case AllocationCase.OrElseNewConstant:
+                return (failed.OrElse<string>(static error => Effect<EmptyEnvironment>.Fail(error)), Result.Err("failed"));
             case AllocationCase.Tap:
                 return (source.Tap(static _ => { }), Result.Ok(20));
             case AllocationCase.TapErr:
