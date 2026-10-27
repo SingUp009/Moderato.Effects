@@ -52,6 +52,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Reuse bounded context merging when settling group failures and race winners.
 
+- Synchronize release ownership on its private owner without a separate lock allocation.
+
 - Reuse bounded context merging when a Retry or Repeat policy fails.
 
 - Reuse existing context when a successful body has a single failed release.

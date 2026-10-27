@@ -7,8 +7,8 @@ namespace Moderato.Effects.Internal;
 /// <summary>The lifetime of one scope (Gen block or <c>Use</c>): its body's token, its release actions and its children's defects.</summary>
 internal sealed class Releases<R>(Cancellation bodyCancellation)
 {
+    // The owner never escapes to user code, so it can be its own gate.
     private List<Func<ExitCase, Effect<Unit, Never, R>>>? actions;
-    private readonly Lock gate = new();
     private ImmutableArray<Outcome<Unit, Never>>.Builder? childDefects;
     private bool bodyEnded;
 
@@ -18,7 +18,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     /// <summary>Records a forked child's defect and cancels the body (D10); false once the body has ended.</summary>
     internal bool TryFailFromChild(Outcome<Unit, Never> defect)
     {
-        lock (gate)
+        lock (this)
         {
             if (bodyEnded) return false;
             (childDefects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(defect);
@@ -30,14 +30,14 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
 
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release)
     {
-        lock (gate) (actions ??= []).Add(release);
+        lock (this) (actions ??= []).Add(release);
     }
 
     /// <summary>Releases everything, then decides the final outcome.</summary>
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
         List<Func<ExitCase, Effect<Unit, Never, R>>> actions;
-        lock (gate)
+        lock (this)
         {
             bodyEnded = true;
             if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects);
