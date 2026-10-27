@@ -6,6 +6,7 @@ using Moderato.Results;
 namespace Moderato.Effects;
 
 /// <summary>A lazy, rerunnable description of work that needs <typeparamref name="R"/> and ends with <typeparamref name="T"/> or <typeparamref name="E"/>; <c>default</c> is invalid.</summary>
+/// <remarks>Equality and hash codes depend on internal representation and do not establish equivalent computations.</remarks>
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly partial struct Effect<T, E, R>
 {

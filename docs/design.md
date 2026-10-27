@@ -42,6 +42,7 @@
 - `Succeed`・`Fail`・`FromResult` は、確定した `Result<T, E>` を構造体に直接保持する。それ以外は `Func<R, RunContext, ValueTask<Outcome<T, E>>>`（内部の型。D18）で遅延実行する。定数の `Never` 変換も値を直接移し、クロージャを作らない。
 - 内部の実行メソッドは定数と遅延処理を判別する。合成や並行処理は Effect 自体を保持し、インスタンスメソッドのデリゲート化によるボックス化を避ける。定数用フィールドは遅延処理にも含まれるため、大きな値型では Effect のコピーコストも考慮する。
 - `default` は不正な状態（Results と同じ方針）。
+- Effect 同士の `Equals`・`GetHashCode` は内部表現に依存し、計算の同値性を表す契約は持たない。同じ値を返す計算でも一致するとは限らず、内部表現の変更で比較結果が変わりうる。計算結果を比較するときは、実行して得た Result または Exit を比較する。
 - **Never を使った2つの暗黙変換**を持つ。どちらも型パラメータの数が同じなので、型推論も変換も通る（RC2 で確認済み）。
   - `Effect<T, Never, R>` → `Effect<T, E, R>`：失敗しない Effect は、どのエラー型の Effect としても使える。
   - `Effect<Never, E, R>` → `Effect<T, E, R>`：失敗しかしない Effect（`Effect<R>.Fail`）は、どの値の型の Effect としても使える。
