@@ -1028,6 +1028,51 @@ public class BrokenUnionErrorTests
     }
 
     [Fact]
+    public async Task Use_ErrorWhoseUnionValueThrowsAfterEarlierFailures_GivesTheReleaseThemToo()
+    {
+        // Given
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, BrokenError, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, BrokenError, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async token =>
+        {
+            loserStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            throw new IOException("earlier");
+        });
+        Die? released = null;
+        var resource = Resource.Make<int, BrokenError, EmptyEnvironment>(
+            acquire: Effect<EmptyEnvironment>.Succeed(1),
+            release: (_, exit) => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                released = exit.Value as Die;
+                return Unit.Value;
+            }));
+        var use = resource.Use(_ => Effect.Race(winner, loser).AndThen<int>(_ => Effect<EmptyEnvironment>.Fail(new BrokenError())));
+
+        // When
+        var exit = await use.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.NotNull(released);
+        Assert.Same(die.Exception, released.Exception);
+        Assert.Equal(die.Suppressed, released.Suppressed);
+        Assert.Equal(die.OmittedSuppressed, released.OmittedSuppressed);
+        Assert.Contains(released.Suppressed, s => s.Case.Value is Die { Exception.Message: "earlier" });
+    }
+
+    [Fact]
     public async Task Run_PendingStepFailsWithErrorWhoseUnionValueThrows_Completes()
     {
         // Given
