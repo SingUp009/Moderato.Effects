@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Build retained retry failure context directly without copying discarded entries or intermediate arrays.
+
 - Avoid a per-acquisition bound delegate when registering resource releases.
 - Skip discarded retry context arrays when the policy failure already fills the context limit.
 

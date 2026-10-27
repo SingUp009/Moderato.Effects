@@ -65,6 +65,65 @@ public class AllocationTests
     }
 
     [Theory]
+    [InlineData(0)]
+    [InlineData(50)]
+    [InlineData(99)]
+    public async Task RunExitAsync_RetryContextExceedsLimit_AllocatesLikeRetainedPrefix(int policyCount)
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var policyContext = context.Take(policyCount).ToArray();
+        var retained = 99 - policyCount;
+        var defect = new IOException("policy");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(defect);
+        var decision = Outcome<bool, Never>.Die(captured, [.. policyContext], omitted: 3);
+        var policy = new Effect<bool, Never, EmptyEnvironment>((_, _) => new(decision));
+        var effects = new[] { retained, 100 }.Select(count =>
+        {
+            var last = Outcome<int, string>.Err("last").WithSuppressed([.. context.Take(count)], 2);
+            var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(last));
+            return source.Retry(_ => policy);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(defect, die.Exception);
+            Assert.Equal(100, die.Suppressed.Count);
+            Assert.Equal(policyContext, die.Suppressed.Take(policyCount));
+            Assert.True(die.Suppressed[policyCount].Case is Failed("last"));
+            Assert.Equal(Relation.Sequential, die.Suppressed[policyCount].Relation);
+            Assert.Equal(context.Take(retained), die.Suppressed.Skip(policyCount + 1));
+            Assert.Equal(5 + (scenario == 0 ? 0 : 100 - retained), die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Retained attempt: {allocated[0]}; full attempt: {allocated[1]}");
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RunExitAsync_SaturatedPolicyContext_DoesNotCopyDiscardedAttemptContext(bool retry)

@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace Moderato.Effects.Internal;
 
 /// <summary>Runs Retry and Repeat as a loop, so many recurrences do not nest tasks (F15).</summary>
@@ -131,10 +129,14 @@ internal static class Recurrence
         if (failure.Suppressed.Length == SuppressedLimit.MAX)
             return failure.WithSuppressed(failure.Suppressed, failure.Omitted + last.Omitted + last.Suppressed.Length + (lastFailure is null ? 0 : 1));
 
-        ImmutableArray<Suppressed> context = lastFailure is { } retainedFailure
-            ? [new Suppressed(retainedFailure, Relation.Sequential), .. last.Suppressed]
-            : last.Suppressed;
-        return failure.WithSuppressed(context, last.Omitted).After(failure);
+        if (lastFailure is { } retainedFailure)
+        {
+            var retained = Math.Min(last.Suppressed.Length, SuppressedLimit.MAX - failure.Suppressed.Length - 1);
+            return failure.WithSuppressed([.. failure.Suppressed, new Suppressed(retainedFailure, Relation.Sequential), .. last.Suppressed.AsSpan()[..retained]],
+                failure.Omitted + last.Omitted + last.Suppressed.Length - retained);
+        }
+
+        return failure.WithSuppressed(last.Suppressed, last.Omitted).After(failure);
     }
 }
 
