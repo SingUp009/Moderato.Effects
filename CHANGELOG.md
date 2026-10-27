@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Skip unobserved-step tracking lists when a Gen block has no steps left to settle.
+
 - Use one async wrapper for Sleep so suspended waits avoid an intermediate result state.
 - Avoid parallel-worker capture state in sequential groups and skip internal execution state for empty groups.
 

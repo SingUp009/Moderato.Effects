@@ -263,19 +263,19 @@ public sealed class Scope<E, R>
         }
 
         Outcome<T, E> outcome;
-        List<PendingStep> steps;
-        List<bool> endedWithBody;
+        List<PendingStep>? steps;
+        List<bool>? endedWithBody;
         lock (gate)
         {
             if (thrown is not null) outcome = Thrown<T>(thrown);
             else outcome = failed ? Outcome<T, E>.Err(error) : Outcome<T, E>.Ok(value);
-            steps = unobserved ?? [];
-            if (Volatile.Read(ref running) is { Observed: false } last) steps.Add(last);
+            steps = unobserved;
+            if (Volatile.Read(ref running) is { Observed: false } last) (steps ??= []).Add(last);
             // A step ended by now has its Err on the outcome already.
-            endedWithBody = steps.ConvertAll(static step => step.Done.IsCompleted);
+            endedWithBody = steps?.ConvertAll(static step => step.Done.IsCompleted);
         }
 
-        outcome = await SettleUnobservedAsync(outcome, steps, endedWithBody).ConfigureAwait(false);
+        if (steps is not null) outcome = await SettleUnobservedAsync(outcome, steps, endedWithBody!).ConfigureAwait(false);
 
         closed = true;
         if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.ToImmutable() ?? [], omitted);
