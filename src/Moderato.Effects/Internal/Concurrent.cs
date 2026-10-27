@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace Moderato.Effects.Internal;
 
@@ -90,6 +91,8 @@ internal static class Concurrent
         await Task.WhenAll(workers).ConfigureAwait(false);
         return ends;
 
+        // Each worker awaits this ValueTask exactly once before starting its next child.
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder))]
         async ValueTask RunChildAsync(int i)
         {
             Outcome<T, E> outcome;

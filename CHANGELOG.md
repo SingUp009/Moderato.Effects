@@ -75,6 +75,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Reuse bounded context merging when settling group failures and race winners.
 
+- Reuse private parallel-child await state between waits without changing execution boundaries.
+
 - Synchronize release ownership on its private owner without a separate lock allocation.
 
 - Reuse bounded context merging when a Retry or Repeat policy fails.
