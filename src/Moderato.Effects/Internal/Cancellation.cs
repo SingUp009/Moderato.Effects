@@ -81,8 +81,17 @@ internal sealed class Cancellation : IDisposable
     private void Keep(AggregateException exception)
     {
         // Linked tokens nest one AggregateException per level.
-        var flat = exception.Flatten();
-        var failure = ExceptionDispatchInfo.Capture(flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat);
+        Exception single = exception;
+        while (single is AggregateException aggregate && aggregate.InnerExceptions.Count == 1)
+            single = aggregate.InnerExceptions[0];
+        if (single is AggregateException)
+        {
+            // Flatten the original aggregate to preserve its message.
+            var flat = exception.Flatten();
+            single = flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat;
+        }
+
+        var failure = ExceptionDispatchInfo.Capture(single);
         if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
     }
 

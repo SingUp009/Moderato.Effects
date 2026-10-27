@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Unwrap single callback failures without building flattened aggregate exceptions.
+
 - Copy only the retained prefix when combined failure context exceeds its limit.
 
 - Reuse saturated failure context in continuations while counting later failures as omitted.
