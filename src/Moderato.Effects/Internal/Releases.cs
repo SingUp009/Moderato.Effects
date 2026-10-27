@@ -99,12 +99,14 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     {
         var first = defects[0];
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
-        suppressed.AddRange(first.Suppressed);
+        var discarded = AddContext(suppressed, first.Suppressed);
         for (var i = 1; i < defects.Count; i++)
         {
             var other = defects[i];
-            suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
-            suppressed.AddRange(other.Suppressed);
+            if (suppressed.Count < SuppressedLimit.MAX)
+                suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
+            else discarded++;
+            discarded += AddContext(suppressed, other.Suppressed);
         }
 
         // A joined child's defect also reached the body, so it is not counted twice.
@@ -121,11 +123,15 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         }
 
         if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
-            suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
-        suppressed.AddRange(body.Suppressed);
+        {
+            if (suppressed.Count < SuppressedLimit.MAX)
+                suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
+            else discarded++;
+        }
+        discarded += AddContext(suppressed, body.Suppressed);
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
-        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + omitted);
+        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + omitted + discarded);
     }
 
     // Each failed release keeps its own suppressed failures.
