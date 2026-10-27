@@ -10,6 +10,9 @@ public class GroupContextBenchmarks
     private Effect<int[], string[], EmptyEnvironment> allErrors;
     private Effect<int[], string[], EmptyEnvironment> defect;
 
+    private Effect<Exit<int, string>[], Never, EmptyEnvironment> settled;
+    private Effect<int[], string[], EmptyEnvironment> mixed;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -18,10 +21,14 @@ public class GroupContextBenchmarks
         var withDefect = errors.ToArray();
         var failure = new IOException("defect");
         withDefect[^1] = Effect<EmptyEnvironment>.Sync<int>(() => throw failure);
+        settled = Effect.AllSettled(successes);
+        mixed = Effect.AllErrors([successes[0], errors[0], successes[1], errors[1], successes[2], errors[2], successes[3], errors[3]]);
         all = Effect.All(successes);
         allErrors = Effect.AllErrors(errors);
         defect = Effect.AllErrors(withDefect);
-        if (!All().Result.TryGetOk(out var values) || values.Length != 8
+        if (!Settled().Result.TryGetOk(out var exits) || exits.Length != 8
+            || !MixedErrors().Result.TryGetErr(out var mixedFailures) || mixedFailures.Length != 4
+            || !All().Result.TryGetOk(out var values) || values.Length != 8
             || !AllErrors().Result.TryGetErr(out var failures) || failures.Length != 8
             || !WithDefect().Result.TryGetValue(out Die? die) || die.Suppressed.Count != 7)
         {
@@ -29,6 +36,8 @@ public class GroupContextBenchmarks
         }
     }
 
+    [Benchmark] public ValueTask<Result<Exit<int, string>[], Never>> Settled() => settled.RunAsync();
+    [Benchmark] public ValueTask<Result<int[], string[]>> MixedErrors() => mixed.RunAsync();
     [Benchmark] public ValueTask<Result<int[], string>> All() => all.RunAsync();
     [Benchmark] public ValueTask<Result<int[], string[]>> AllErrors() => allErrors.RunAsync();
     [Benchmark] public ValueTask<Exit<int[], string[]>> WithDefect() => defect.RunExitAsync();
