@@ -58,6 +58,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Transfer completed context buffers to immutable results when their capacity is fully used.
 
+- Store cancellation bookkeeping on the owned token source to avoid a separate wrapper allocation.
+
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
 
 ## [0.1.0-preview.1] - 2026-10-27

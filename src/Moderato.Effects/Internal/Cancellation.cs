@@ -15,29 +15,26 @@ internal enum CancellationReason
 }
 
 /// <summary>A cancellation unit linked to its parent, where settling or the first reason wins for good.</summary>
-internal sealed class Cancellation : IDisposable
+internal sealed class Cancellation : CancellationTokenSource
 {
     private const int SETTLED = -1;
 
     private static readonly object closed = new();
 
-    private readonly CancellationTokenSource source;
     private int state;
-    private CancellationTokenRegistration callerLink;
+    private CancellationTokenRegistration parentLink;
     private object? callbackFailure;
 
-    internal Cancellation(CancellationToken parent) => source = CancellationTokenSource.CreateLinkedTokenSource(parent);
+    internal Cancellation(CancellationToken parent)
+        => parentLink = parent.UnsafeRegister(static self => ((Cancellation)self!).CancelFromParent(), this);
 
     /// <summary>A unit for the caller's token, canceled from a registration so a throwing callback stays out of the caller's <c>Cancel()</c>.</summary>
     internal static Cancellation ForCaller(CancellationToken caller)
     {
         var unit = new Cancellation(CancellationToken.None);
-        unit.callerLink = caller.UnsafeRegister(static self => ((Cancellation)self!).CancelForCaller(), unit);
+        unit.parentLink = caller.UnsafeRegister(static self => ((Cancellation)self!).CancelForCaller(), unit);
         return unit;
     }
-
-    /// <summary>The token for the owned work.</summary>
-    internal CancellationToken Token => source.Token;
 
     /// <summary>The reason that won, or <see cref="CancellationReason.None"/> if the work settled first.</summary>
     internal CancellationReason Reason => Volatile.Read(ref state) is var current and > 0 ? (CancellationReason)current : CancellationReason.None;
@@ -48,7 +45,7 @@ internal sealed class Cancellation : IDisposable
         if (Interlocked.CompareExchange(ref state, (int)reason, 0) != 0) return false;
         try
         {
-            source.Cancel();
+            Cancel();
         }
         catch (ObjectDisposedException)
         {
@@ -62,11 +59,23 @@ internal sealed class Cancellation : IDisposable
         return true;
     }
 
+    // Disposal must not turn parent cancellation into a callback failure.
+    private void CancelFromParent()
+    {
+        try
+        {
+            Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
     private void CancelForCaller()
     {
         try
         {
-            source.Cancel();
+            Cancel();
         }
         catch (ObjectDisposedException)
         {
@@ -105,9 +114,9 @@ internal sealed class Cancellation : IDisposable
     /// <summary>Marks the work finished; false if a reason won first.</summary>
     internal bool TrySettle() => Interlocked.CompareExchange(ref state, SETTLED, 0) == 0;
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        callerLink.Dispose();
-        source.Dispose();
+        if (disposing) parentLink.Dispose();
+        base.Dispose(disposing);
     }
 }
