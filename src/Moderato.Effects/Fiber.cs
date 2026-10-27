@@ -36,7 +36,7 @@ public sealed class Fiber<T, E, R>
         });
     }
 
-    /// <summary>Waits for the fiber and takes on its outcome; canceling the wait leaves the fiber running.</summary>
+    /// <summary>Waits for the fiber and takes on its outcome; canceling the wait leaves the fiber running, and a defect that failed the parent comes without the suppressed failures the parent already keeps.</summary>
     /// <returns>An effect with the fiber's outcome.</returns>
     public Effect<T, E, R> Join() => new((_, context) => JoinAsync(context));
 
@@ -58,7 +58,8 @@ public sealed class Fiber<T, E, R>
             var outcome = await task.WaitAsync(context.CancellationToken).ConfigureAwait(false);
             // Only an outcome the joiner received counts as observed.
             Volatile.Write(ref joined, 1);
-            return outcome;
+            // The owner already carries a reported defect's suppressed failures, so Join hands over the defect alone.
+            return reportedToOwner ? Outcome<T, E>.Die(outcome.Defect!) : outcome;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
