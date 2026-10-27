@@ -93,9 +93,13 @@ internal readonly struct Outcome<T, E>
     internal Outcome<T, E> After<U, F>(Outcome<U, F> earlier) => After(earlier.Suppressed, earlier.Omitted);
 
     /// <summary>Follows an outcome this one replaced, keeping its Err as context.</summary>
-    internal Outcome<T, E> Replacing<U, F>(Outcome<U, F> earlier) => earlier.Kind == OutcomeKind.Err
-        ? After([new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential), .. earlier.Suppressed], earlier.Omitted)
-        : After(earlier);
+    internal Outcome<T, E> Replacing<U, F>(Outcome<U, F> earlier)
+    {
+        if (earlier.Kind != OutcomeKind.Err) return After(earlier);
+        var failure = new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential);
+        var retained = Math.Min(earlier.Suppressed.Length, SuppressedLimit.MAX - 1);
+        return After([failure, .. earlier.Suppressed.AsSpan()[..retained]], earlier.Omitted + earlier.Suppressed.Length - retained);
+    }
 
     /// <summary>This outcome with its suppressed failures replaced.</summary>
     internal Outcome<T, E> WithSuppressed(ImmutableArray<Suppressed> suppressed, int omitted)

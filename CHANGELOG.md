@@ -39,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Filter timeout failure context directly without allocating a LINQ sequence.
 
+- Copy only retained error context when a mapper replaces an error with a defect.
+
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
 
 ## [0.1.0-preview.1] - 2026-10-27
