@@ -84,6 +84,7 @@ internal static class Recurrence
         }
     }
 
+    // Pooling is safe because every call site awaits this ValueTask exactly once.
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private static async ValueTask<Outcome<T, E>> RunOnceAsync<T, E, R>(Effect<T, E, R> effect, R env, RunContext context)
     {
@@ -97,6 +98,7 @@ internal static class Recurrence
         }
     }
 
+    // Pooling is safe because every call site awaits this ValueTask exactly once.
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private static async ValueTask<Outcome<bool, Never>> DecideAsync<TState, R, TPolicy>(
         TPolicy policy, TState state, R env, RunContext context)
