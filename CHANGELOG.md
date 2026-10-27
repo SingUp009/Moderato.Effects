@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.1] - 2026-10-27
+
 ### Added
 
 - `Effect<T, E, R>`: a lazy, re-runnable description of work with its value, expected error and environment in the type. `Never` for effects that cannot fail or cannot succeed.
@@ -20,5 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Source generators: `[Error]` (`IUnionCase`, including the cases of cases), `[Environment]` and `[Expose<T>]` (`IHas<T>`), `[RestOf<E>]` (`IUnionRest`, for `Catch`).
 - Source generator diagnostics: MEFF001 to MEFF005 for `[Error]` and `[RestOf<E>]` targets, MEFF101 to MEFF104 for `[Environment]`, and MEFF201 to MEFF203 for `[RestOf<E>]` unions.
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
+- Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/commits/main
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...HEAD
+[0.1.0-preview.1]: https://github.com/SingUp009/Moderato.Effects/releases/tag/v0.1.0-preview.1
