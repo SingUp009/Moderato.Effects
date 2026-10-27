@@ -5,6 +5,59 @@ namespace Moderato.Effects.Tests;
 
 public class ContinuationTests
 {
+    [Fact]
+    public async Task MapErr_MapperThrowsWithSaturatedContext_KeepsOriginalErrorBeforeContext()
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var original = Outcome<int, string>.Err("original").WithSuppressed([.. context], 2);
+        var defect = new IOException("mapper failed");
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(original));
+        var effect = source.MapErr<int>(_ => throw defect);
+
+        // When
+        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(defect, die.Exception);
+        Assert.Equal(100, die.Suppressed.Count);
+        Assert.True(die.Suppressed[0].Case is Failed("original"));
+        Assert.Equal(Relation.Sequential, die.Suppressed[0].Relation);
+        Assert.Equal(context.Take(99), die.Suppressed.Skip(1));
+        Assert.Equal(3, die.OmittedSuppressed);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(0, 2)]
+    [InlineData(99, 2)]
+    [InlineData(100, 0)]
+    [InlineData(100, 2)]
+    [InlineData(101, 2)]
+    [InlineData(110, 120)]
+    public async Task AndThen_CombinesFailureContext_PreservesPrefixAndOmittedCount(int earlierCount, int laterCount)
+    {
+        // Given
+        var earlier = Enumerable.Range(0, earlierCount).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var later = Enumerable.Range(earlierCount, laterCount).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var defect = new IOException("next step failed");
+        var first = Outcome<int, string>.Ok(1).WithSuppressed([.. earlier], 2);
+        var last = Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(defect), [.. later], omitted: 3);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(first));
+        var next = new Effect<int, string, EmptyEnvironment>((_, _) => new(last));
+        var effect = source.AndThen(_ => next);
+
+        // When
+        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(defect, die.Exception);
+        Assert.Equal(earlier.Concat(later).Take(100), die.Suppressed);
+        Assert.Equal(5 + Math.Max(0, earlierCount + laterCount - 100), die.OmittedSuppressed);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
