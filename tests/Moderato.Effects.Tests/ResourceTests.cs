@@ -475,7 +475,7 @@ public class AcquireTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -506,7 +506,7 @@ public class AcquireTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -539,7 +539,7 @@ public class AcquireTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Exit<int, string>>(new Err<string>("abandoned failure"), exit);
@@ -571,7 +571,7 @@ public class AcquireTests
 
         // When
         var exits = new List<Exit<int, string>>();
-        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken));
+        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         // Then
         Assert.All(exits, exit => Assert.Equal<Exit<int, string>>(new Err<string>("abandoned failure"), exit));
@@ -603,7 +603,7 @@ public class AcquireTests
 
         // When
         var exits = new List<Exit<int, string>>();
-        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken));
+        for (var i = 0; i < RACE_RUNS; i++) exits.Add(await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         // Then
         Assert.All(exits, exit =>
@@ -666,9 +666,9 @@ public class AcquireTests
 
         // When
         var running = work.RunExitAsync(TestContext.Current.CancellationToken).AsTask();
-        await bodyEnded.Task;
+        await bodyEnded.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         gate.SetResult();
-        var exit = await running;
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Exit<int, string>>(new Err<string>("late failure"), exit);
@@ -740,9 +740,9 @@ public class AcquireTests
 
         // When
         var running = work.RunExitAsync(TestContext.Current.CancellationToken).AsTask();
-        await bodyEnded.Task;
+        await bodyEnded.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         gate.SetResult();
-        var exit = await running;
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
@@ -779,7 +779,7 @@ public class AcquireTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
@@ -932,7 +932,7 @@ public class AbandonedStepCallbackTests
         try
         {
             // When
-            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             // Then
             Assert.Equal<Exit<int, Never>>(new Ok<int>(0), exit);
