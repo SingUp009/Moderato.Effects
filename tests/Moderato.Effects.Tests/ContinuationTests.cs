@@ -6,22 +6,31 @@ namespace Moderato.Effects.Tests;
 public class ContinuationTests
 {
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(99)]
-    [InlineData(100)]
-    [InlineData(101)]
-    public async Task MapErr_MapperThrowsWithContext_KeepsOriginalErrorBeforeContext(int count)
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(99, false)]
+    [InlineData(99, true)]
+    [InlineData(100, false)]
+    [InlineData(100, true)]
+    [InlineData(101, false)]
+    [InlineData(101, true)]
+    public async Task MapErr_MapperThrowsWithContext_KeepsOriginalErrorBeforeContext(int count, bool pending)
     {
         // Given
         var context = Enumerable.Range(0, count).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
         var original = Outcome<int, string>.Err("original").WithSuppressed([.. context], 2);
         var defect = new IOException("mapper failed");
-        var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(original));
+        var completion = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(completion.Task) : new(original));
         var effect = source.MapErr<int>(_ => throw defect);
 
         // When
-        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+        var running = effect.RunExitAsync(TestContext.Current.CancellationToken);
+        if (pending) Assert.False(running.IsCompleted);
+        completion.SetResult(original);
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -169,6 +178,65 @@ public class ContinuationTests
 
         // Then
         Assert.Equal<Result<int, string>>(fail ? Result.Err("failed") : Result.Ok(5), result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AndThen_ConcurrentPendingSources_KeepTheirOwnEnvironmentAndToken(bool fail)
+    {
+        // Given
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var tokens = new CancellationToken[3];
+        var effect = Effect<int>.AccessAsync(async (env, token) =>
+        {
+            tokens[env / 10 - 1] = token;
+            await release.Task;
+            return env;
+        }).AndThen(value =>
+        {
+            Interlocked.Increment(ref calls);
+            return Effect<int>.AccessAsync((env, token) =>
+            {
+                if (fail) throw new OperationCanceledException(token);
+                return new ValueTask<int>(value + env);
+            });
+        });
+        using var canceled = new CancellationTokenSource();
+        Assert.Equal(0, calls);
+
+        // When
+        var first = effect.RunExitAsync(10, TestContext.Current.CancellationToken);
+        var second = effect.RunExitAsync(20, TestContext.Current.CancellationToken);
+        var third = effect.RunExitAsync(30, canceled.Token);
+        Assert.False(first.IsCompleted);
+        Assert.False(second.IsCompleted);
+        Assert.False(third.IsCompleted);
+        Assert.Equal(0, calls);
+        canceled.Cancel();
+        release.SetResult();
+        var exits = await Task.WhenAll(first.AsTask(), second.AsTask(), third.AsTask()).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(3, calls);
+        if (fail)
+        {
+            Assert.True(exits[0].TryGetValue(out Die? firstDie));
+            Assert.True(exits[1].TryGetValue(out Die? secondDie));
+            Assert.Equal(tokens[0], Assert.IsType<OperationCanceledException>(firstDie.Exception).CancellationToken);
+            Assert.Equal(tokens[1], Assert.IsType<OperationCanceledException>(secondDie.Exception).CancellationToken);
+            Assert.True(exits[2].TryGetValue(out Interrupted? _));
+        }
+        else
+        {
+            Assert.True(exits[0].TryGetValue(out Ok<int> firstValue));
+            Assert.True(exits[1].TryGetValue(out Ok<int> secondValue));
+            Assert.True(exits[2].TryGetValue(out Ok<int> thirdValue));
+            Assert.Equal(20, firstValue.Value);
+            Assert.Equal(40, secondValue.Value);
+            Assert.Equal(60, thirdValue.Value);
+        }
     }
 
     [Fact]
