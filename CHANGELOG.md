@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Copy only the retained prefix when combined failure context exceeds its limit.
+- Register fiber cleanup without allocating a separate closure to retain the fiber.
 
 - Reuse saturated failure context in continuations while counting later failures as omitted.
 - Pass resource acquisition continuation state explicitly instead of capturing it on every run.

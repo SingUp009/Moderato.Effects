@@ -46,10 +46,12 @@ public sealed class Fiber<T, E, R>
         return new((env, context, releases) =>
         {
             var fiber = new Fiber<T, E, R>(effect, env, releases, new Cancellation(context.CancellationToken));
-            releases.Add(_ => new((_, _) => fiber.ReleaseAsync()));
+            releases.Add(fiber.Release);
             return new(Outcome<Fiber<T, E, R>, Never>.Ok(fiber));
         });
     }
+
+    private Effect<Unit, Never, R> Release(ExitCase _) => new((_, _) => ReleaseAsync());
 
     private async ValueTask<Outcome<T, E>> JoinAsync(RunContext context)
     {
