@@ -7,6 +7,56 @@ namespace Moderato.Effects.Tests;
 public class ReleaseDefectTests
 {
     [Theory]
+    [InlineData(0, false)]
+    [InlineData(50, false)]
+    [InlineData(100, false)]
+    [InlineData(0, true)]
+    [InlineData(50, true)]
+    [InlineData(100, true)]
+    public async Task Defer_CarriedContextExceedsLimit_KeepsFinalFailureContextThenReleaseOrder(int bodyCount, bool releaseFails)
+    {
+        // Given
+        var failure = new IOException("body");
+        var releaseFailure = new IOException("release");
+        var bodyContext = Enumerable.Range(0, bodyCount).Select(i => new Suppressed(new Failed($"body {i}"), Relation.Parallel)).ToArray();
+        var firstContext = Enumerable.Range(0, 60).Select(i => new Suppressed(new Failed($"first {i}"), Relation.Sequential)).ToArray();
+        var lastContext = Enumerable.Range(0, 60).Select(i => new Suppressed(new Failed($"last {i}"), Relation.Consequence)).ToArray();
+        var failedContext = new Suppressed(new Failed("failed release context"), Relation.Parallel);
+        var order = new List<int>();
+        var firstOutcome = Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([.. firstContext], 2);
+        var lastOutcome = Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([.. lastContext], 3);
+        var middleOutcome = releaseFails
+            ? Outcome<Unit, Never>.Die(ExceptionDispatchInfo.Capture(releaseFailure), [failedContext], omitted: 5)
+            : Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([], 5);
+        var first = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(1); return new(firstOutcome); });
+        var middle = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(2); return new(middleOutcome); });
+        var last = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(3); return new(lastOutcome); });
+        var bodyOutcome = Outcome<int, Never>.Die(ExceptionDispatchInfo.Capture(failure), [.. bodyContext], omitted: 7);
+        var body = new Effect<int, Never, EmptyEnvironment>((_, _) => new(bodyOutcome));
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(_ => last);
+            scope.Defer(_ => middle);
+            scope.Defer(_ => first);
+            return await scope.Run(body);
+        });
+        Suppressed[] expected = releaseFails
+            ? [.. bodyContext, new(new Die(releaseFailure, []), Relation.Sequential), failedContext, .. firstContext, .. lastContext]
+            : [.. bodyContext, .. firstContext, .. lastContext];
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal([1, 2, 3], order);
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Equal(expected.Take(100), die.Suppressed);
+        Assert.Equal(17 + expected.Length - 100, die.OmittedSuppressed);
+        for (var i = 0; i < bodyCount; i++) Assert.Same(bodyContext[i], die.Suppressed[i]);
+    }
+
+    [Theory]
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(8)]
