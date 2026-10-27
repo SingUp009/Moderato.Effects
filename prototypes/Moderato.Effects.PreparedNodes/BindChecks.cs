@@ -12,7 +12,7 @@ static class BindChecks
         Check(constants.TryAdd(Result<int, string>.Err("earlier"), out var failedSource) == Status.Ok, "Error setup failed.");
         var calls = 0;
         Computation<int, string, int> latest = default;
-        Func<int, BuildResult<int, string, int>> next = value =>
+        Func<int, BuildContext?, BuildResult<int, string, int>> next = (value, _) =>
         {
             calls++;
             var status = nextConstants.TryAdd(Result<int, string>.Ok(value * 2), out latest);
@@ -32,7 +32,7 @@ static class BindChecks
         Check(binds.TryAdd(failedSource, next, out var shortCircuit) == Status.Ok, "Error bind setup failed.");
         Check(shortCircuit.Run(0).Error == "earlier" && calls == previousCalls, "Source Err did not short circuit.");
         Check(scratch.TryReset() == Status.Ok, "Scratch reset failed.");
-        Check(binds.TryAdd(source, _ =>
+        Check(binds.TryAdd(source, (_, _) =>
         {
             var status = nextConstants.TryAdd(Result<int, string>.Err("next"), out var failed);
             return new(status, failed);
@@ -41,9 +41,9 @@ static class BindChecks
         Check(scratch.TryReset() == Status.Ok, "Scratch reset failed.");
         Check(nextConstants.TryAdd(Result<int, string>.Ok(9), out var old) == Status.Ok, "Old handle setup failed.");
         Check(scratch.TryReset() == Status.Ok, "Scratch reset failed.");
-        Check(binds.TryAdd(source, _ => new(Status.Ok, old), out var staleNext) == Status.Ok, "Stale bind setup failed.");
+        Check(binds.TryAdd(source, (_, _) => new(Status.Ok, old), out var staleNext) == Status.Ok, "Stale bind setup failed.");
         Check(staleNext.Run(0).Status == Status.Invalid, "Stale continuation executed.");
-        Check(binds.TryAdd(source, value =>
+        Check(binds.TryAdd(source, (value, _) =>
         {
             var status = constants.TryAdd(Result<int, string>.Ok(value), out var sameArena);
             return new(status, sameArena);

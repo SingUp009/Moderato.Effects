@@ -3,14 +3,14 @@ readonly record struct BuildResult<T, E, R>(Status Status, Computation<T, E, R> 
 sealed class BindNode<T, U, E, R>(Arena owner) : Node<U, E, R>(owner)
 {
     public Computation<T, E, R> Source;
-    public Func<T, BuildResult<U, E, R>>? Bind;
+    public Func<T, BuildContext?, BuildResult<U, E, R>>? Bind;
 
-    public override Result<U, E> Run(R environment)
+    public override Result<U, E> Run(R environment, BuildContext? construction)
     {
-        var source = Source.Read(environment);
+        var source = Source.Read(environment, construction);
         if (source.Status != Status.Ok) return new(source.Status, default!, source.Error, source.Exception);
-        var next = Bind!(source.Value);
-        return next.Status == Status.Ok ? next.Computation.Run(environment) : Result<U, E>.Stop(next.Status);
+        var next = Bind!(source.Value, construction);
+        return next.Status == Status.Ok ? next.Computation.Run(environment, construction) : Result<U, E>.Stop(next.Status);
     }
 }
 
@@ -28,7 +28,7 @@ sealed class BindPool<T, U, E, R> : IPool
         owner.Register(this);
     }
 
-    public Status TryAdd(Computation<T, E, R> source, Func<T, BuildResult<U, E, R>> bind, out Computation<U, E, R> effect)
+    public Status TryAdd(Computation<T, E, R> source, Func<T, BuildContext?, BuildResult<U, E, R>> bind, out Computation<U, E, R> effect)
     {
         effect = default;
         if (!owner.TryWrite()) return Status.Busy;

@@ -2,13 +2,14 @@ sealed class PendingExecution<T, U, V, E, R>(Func<T, R, ValueTask<Result<U, E>>>
 {
     private Computation<T, E, R> source;
     private R environment = default!;
+    private BuildContext? construction;
     private ValueTask<Result<U, E>> pending;
     private Result<V, E> result;
     private long epoch;
     private int gate;
     private Phase phase;
 
-    public Status TryStart(Computation<T, E, R> computation, R env, out long token)
+    public Status TryStart(Computation<T, E, R> computation, R env, out long token, BuildContext? buildContext = null)
     {
         token = 0;
         if (Interlocked.CompareExchange(ref gate, 1, 0) != 0) return Status.Busy;
@@ -25,6 +26,7 @@ sealed class PendingExecution<T, U, V, E, R>(Func<T, R, ValueTask<Result<U, E>>>
             }
             source = computation;
             environment = env;
+            construction = buildContext;
             token = ++epoch;
             phase = Phase.Start;
             return Status.Ok;
@@ -43,7 +45,7 @@ sealed class PendingExecution<T, U, V, E, R>(Func<T, R, ValueTask<Result<U, E>>>
             {
                 if (phase == Phase.Start)
                 {
-                    var first = source.Read(environment);
+                    var first = source.Read(environment, construction);
                     if (first.Status != Status.Ok)
                     {
                         result = new(first.Status, default!, first.Error, first.Exception);
@@ -81,6 +83,7 @@ sealed class PendingExecution<T, U, V, E, R>(Func<T, R, ValueTask<Result<U, E>>>
             var owner = source.Node!.Owner;
             source = default;
             environment = default!;
+            construction = null;
             pending = default;
             result = default;
             phase = Phase.Idle;

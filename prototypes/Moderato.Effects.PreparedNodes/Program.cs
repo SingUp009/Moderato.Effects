@@ -29,6 +29,8 @@ Console.WriteLine("Capacity rejection, unchanged existing nodes, stale/default/f
 
 PendingChecks.Run();
 BindChecks.Run();
+AwaitChecks.Run();
+ConcurrentBuildChecks.Run();
 
 void Exercise()
 {
@@ -99,33 +101,33 @@ sealed class Arena(int poolCapacity)
 readonly record struct Computation<T, E, R>(Node<T, E, R>? Node, long Epoch)
 {
     public bool BelongsTo(Arena owner) => Node is not null && ReferenceEquals(Node.Owner, owner) && Epoch == owner.Epoch;
-    public Result<T, E> Run(R environment)
+    public Result<T, E> Run(R environment, BuildContext? construction = null)
     {
         if (Node is null) return Result<T, E>.Stop(Status.Invalid);
         if (!Node.Owner.TryRead()) return Result<T, E>.Stop(Status.Busy);
-        try { return Read(environment); }
+        try { return Read(environment, construction); }
         finally { Node.Owner.EndRead(); }
     }
-    public Result<T, E> Read(R environment) => Node is null || Epoch != Node.Owner.Epoch
-        ? Result<T, E>.Stop(Status.Invalid) : Node.Run(environment);
+    public Result<T, E> Read(R environment, BuildContext? construction = null) => Node is null || Epoch != Node.Owner.Epoch
+        ? Result<T, E>.Stop(Status.Invalid) : Node.Run(environment, construction);
 }
 abstract class Node<T, E, R>(Arena owner)
 {
     public Arena Owner { get; } = owner;
-    public abstract Result<T, E> Run(R environment);
+    public abstract Result<T, E> Run(R environment, BuildContext? construction);
 }
 sealed class ConstantNode<T, E, R>(Arena owner) : Node<T, E, R>(owner)
 {
     public Result<T, E> Value;
-    public override Result<T, E> Run(R environment) => Value;
+    public override Result<T, E> Run(R environment, BuildContext? construction) => Value;
 }
 sealed class MapNode<T, U, E, R>(Arena owner) : Node<U, E, R>(owner)
 {
     public Computation<T, E, R> Source;
     public Func<T, U>? Map;
-    public override Result<U, E> Run(R environment)
+    public override Result<U, E> Run(R environment, BuildContext? construction)
     {
-        var source = Source.Read(environment);
+        var source = Source.Read(environment, construction);
         return source.Status == Status.Ok ? Result<U, E>.Ok(Map!(source.Value))
             : source.Status == Status.Error ? Result<U, E>.Err(source.Error)
             : Result<U, E>.Stop(source.Status);
