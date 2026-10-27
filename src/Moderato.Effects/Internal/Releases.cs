@@ -36,7 +36,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     /// <summary>Releases everything, then decides the final outcome.</summary>
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
-        Func<ExitCase, Effect<Unit, Never, R>>[] actions;
+        List<Func<ExitCase, Effect<Unit, Never, R>>> actions;
         lock (gate)
         {
             bodyEnded = true;
@@ -44,8 +44,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             // Any cancellation of the body may have left a callback failure.
             body = bodyCancellation.WithCallbackFailure(body);
             if (this.actions is not { Count: > 0 }) return body;
-            actions = [.. this.actions];
-            this.actions.Clear();
+            actions = this.actions;
+            this.actions = null;
         }
 
         // Fixed before any release runs, so a failing release cannot change what later ones see.
@@ -62,7 +62,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
         ImmutableArray<Suppressed>.Builder? carried = null;
         var carriedOmitted = 0;
-        for (var i = actions.Length - 1; i >= 0; i--)
+        for (var i = actions.Count - 1; i >= 0; i--)
         {
             Outcome<Unit, Never> released;
             try
