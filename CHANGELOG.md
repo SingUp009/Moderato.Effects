@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Pass resource acquisition continuation state explicitly instead of capturing it on every run.
+
 - Skip unobserved-step tracking lists when a Gen block has no steps left to settle.
 
 - Use one async wrapper for Sleep so suspended waits avoid an intermediate result state.
