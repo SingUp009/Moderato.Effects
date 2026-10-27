@@ -50,6 +50,9 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
 
         // Fixed before any release runs, so a failing release cannot change what later ones see.
         var exit = ExitCases.From(body);
+        // An error that cannot be read is a defect, and the block ends with what its releases were told.
+        if (body.Kind == OutcomeKind.Err && exit.Value is Die unreadable)
+            body = Outcome<T, E>.Die(ExceptionDispatchInfo.Capture(unreadable.Exception), [.. unreadable.Suppressed, .. body.Suppressed], omitted: body.Omitted);
         // Releases ignore the run's token, which would otherwise stop a rollback.
         var context = new RunContext(CancellationToken.None);
 
@@ -162,9 +165,19 @@ internal static class ExitCases
     internal static ExitCase Die(ExceptionDispatchInfo defect) => new Die(defect.SourceException, []);
 
     /// <summary>A failure holding the error, a union unwrapped to its case so <c>Failed(NotFound n)</c> matches.</summary>
+    /// <returns>The failure, or a <see cref="Die"/> with the error as context when a union's value throws.</returns>
     internal static ExitCase Failed(object? error)
     {
-        while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;
+        try
+        {
+            while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;
+        }
+        catch (Exception exception)
+        {
+            // The union whose value threw is kept as it is, so nothing reads that value again.
+            return new Die(exception, [new Suppressed(new Failed(error), Relation.Sequential)]);
+        }
+
         return new Failed(error);
     }
 
