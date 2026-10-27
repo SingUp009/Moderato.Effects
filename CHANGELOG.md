@@ -71,6 +71,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Bound child-defect context while preserving body-error projection and duplicate suppression.
 
+- Reuse single-child defect context when the body adds no separate failure.
+
 - Bound context collected from failed releases and count entries beyond the retained prefix.
 
 - Bound carried context from successful releases before merging it with the final failure.

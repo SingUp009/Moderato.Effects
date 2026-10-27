@@ -118,6 +118,15 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
         var first = defects[0];
+        if (defects.Count == 1
+            && (body.Kind is OutcomeKind.Ok or OutcomeKind.Interrupted
+                || body.Kind == OutcomeKind.Die && ReferenceEquals(first.Defect!.SourceException, body.Defect!.SourceException)))
+        {
+            return body.Suppressed.IsEmpty
+                ? Outcome<T, E>.Die(first.Defect!, first.Suppressed, omitted: first.Omitted + body.Omitted)
+                : Outcome<T, E>.Die(first.Defect!, body.Suppressed, omitted: body.Omitted).After(first);
+        }
+
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
         var discarded = AddContext(suppressed, first.Suppressed);
         for (var i = 1; i < defects.Count; i++)
