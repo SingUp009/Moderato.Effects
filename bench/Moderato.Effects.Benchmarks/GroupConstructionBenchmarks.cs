@@ -8,13 +8,17 @@ public class GroupConstructionBenchmarks
     [Params(0, 8)]
     public int Count;
 
-    private Effect<int, string, EmptyEnvironment>[] effects = [];
+    [Params(false, true)]
+    public bool UseList;
+
+    private IEnumerable<Effect<int, string, EmptyEnvironment>> effects = [];
 
     [GlobalSetup]
     public void Setup()
     {
-        effects = new Effect<int, string, EmptyEnvironment>[Count];
-        for (var i = 0; i < effects.Length; i++) effects[i] = Effect<EmptyEnvironment>.Succeed(i);
+        var values = new Effect<int, string, EmptyEnvironment>[Count];
+        for (var i = 0; i < values.Length; i++) values[i] = Effect<EmptyEnvironment>.Succeed(i);
+        effects = UseList ? values.ToList() : values;
     }
 
     [Benchmark] public Effect<int[], string, EmptyEnvironment> All() => Effect.All(effects);

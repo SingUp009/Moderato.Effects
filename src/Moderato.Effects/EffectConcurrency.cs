@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Moderato.Effects.Internal;
 using Moderato.Results;
 
@@ -227,10 +228,16 @@ public static partial class Effect
     private static Effect<T, E, R>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
-        if (effects is not Effect<T, E, R>[] array) return [.. effects.Select(static effect => effect.Validate())];
-        Effect<T, E, R>[] runs = array.Length == 0 ? [] : new Effect<T, E, R>[array.Length];
-        for (var i = 0; i < array.Length; i++) runs[i] = array[i].Validate();
-        return runs;
+        if (effects is Effect<T, E, R>[] array) return Copy(array);
+        if (effects is List<Effect<T, E, R>> list) return Copy(CollectionsMarshal.AsSpan(list));
+        return [.. effects.Select(static effect => effect.Validate())];
+
+        static Effect<T, E, R>[] Copy(ReadOnlySpan<Effect<T, E, R>> source)
+        {
+            Effect<T, E, R>[] runs = source.IsEmpty ? [] : new Effect<T, E, R>[source.Length];
+            for (var i = 0; i < source.Length; i++) runs[i] = source[i].Validate();
+            return runs;
+        }
     }
 
     private static Effect<object?, E, R> Box<T, E, R>(Effect<T, E, R> effect) => effect.Map(static value => (object?)value);
