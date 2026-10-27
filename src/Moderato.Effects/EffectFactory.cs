@@ -69,7 +69,7 @@ public static class Effect<R>
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(map);
-        return new((_, context) => new(Catching.Map(Steps.Run<T, E>(body, context).Result, map, context)));
+        return new((_, context) => new(Catching.Run(body, map, context)));
     }
 
     /// <summary>A try/catch that turns any exception into the error, like <c>Result.Try</c>.</summary>
@@ -121,7 +121,21 @@ public static class Effect<R>
 
 file static class Catching
 {
-    /// <summary>Awaits user code and maps its outcome in one continuation.</summary>
+    /// <summary>Runs user code and maps a caught exception directly to an error.</summary>
+    internal static Outcome<T, E> Run<TException, T, E>(Func<T> body, Func<TException, E> map, RunContext context)
+        where TException : Exception
+    {
+        try
+        {
+            return Outcome<T, E>.Ok(body());
+        }
+        catch (Exception exception)
+        {
+            return FromException<TException, T, E>(exception, map, context);
+        }
+    }
+
+    /// <summary>Awaits user code and maps a caught exception in one continuation.</summary>
     internal static ValueTask<Outcome<T, E>> RunAsync<TException, T, E>(
         Func<CancellationToken, ValueTask<T>> body, Func<TException, E> map, RunContext context) where TException : Exception
     {
@@ -132,44 +146,43 @@ file static class Catching
         }
         catch (Exception exception)
         {
-            return new(Map(Defects.From<T, E>(exception, context), map, context));
+            return new(FromException<TException, T, E>(exception, map, context));
         }
 
         return task.IsCompletedSuccessfully ? new(Outcome<T, E>.Ok(task.Result)) : Await(task, map, context);
 
         static async ValueTask<Outcome<T, E>> Await(ValueTask<T> task, Func<TException, E> map, RunContext context)
         {
-            Outcome<T, E> outcome;
             try
             {
-                outcome = Outcome<T, E>.Ok(await task.ConfigureAwait(false));
+                return Outcome<T, E>.Ok(await task.ConfigureAwait(false));
             }
             catch (Exception exception)
             {
-                outcome = Defects.From<T, E>(exception, context);
+                return FromException<TException, T, E>(exception, map, context);
             }
-
-            return Map(outcome, map, context);
         }
     }
 
-    /// <summary>Turns a defect of the caught type into the error; the run's own cancellation is never caught.</summary>
-    internal static Outcome<T, E> Map<TException, T, E>(Outcome<T, E> outcome, Func<TException, E> map, RunContext context)
+    private static Outcome<T, E> FromException<TException, T, E>(Exception exception, Func<TException, E> map, RunContext context)
         where TException : Exception
     {
-        if (outcome.Kind != OutcomeKind.Die || outcome.Defect!.SourceException is not TException caught) return outcome;
         // ScopeFailure is a Gen block's control flow, so catching it would replace the block's Err.
-        if (caught is ScopeFailure) return outcome;
+        if (exception is not TException caught || caught is ScopeFailure
+            || caught is OperationCanceledException && context.CancellationToken.IsCancellationRequested)
+        {
+            return Defects.From<T, E>(exception, context);
+        }
 
         try
         {
             return Outcome<T, E>.Err(map(caught));
         }
-        catch (Exception exception)
+        catch (Exception mappingFailure)
         {
             // The mapper threw while handling the defect, which stays as earlier context.
-            return Defects.From<T, E>(exception, context)
-                .After([new Suppressed(ExitCases.Die(outcome.Defect!), Relation.Sequential), .. outcome.Suppressed], outcome.Omitted);
+            return Defects.From<T, E>(mappingFailure, context)
+                .After([new Suppressed(new Die(caught, []), Relation.Sequential)]);
         }
     }
 }
