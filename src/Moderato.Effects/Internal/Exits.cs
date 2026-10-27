@@ -19,7 +19,7 @@ internal static class Exits
                 return new(ExitCases.ToDie(outcome));
             default:
                 UnobservedFailures.ReportDefects(outcome.Suppressed);
-                return new(new Interrupted());
+                return new(ExitCases.Interrupted);
         }
     }
 }

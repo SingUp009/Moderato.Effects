@@ -56,7 +56,7 @@ public readonly partial struct Effect<T, E, R>
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
     {
         var run = Run;
-        if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(new Interrupted()));
+        if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
 
         var task = Start(run, environment, cancellationToken);
         return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task);
