@@ -188,7 +188,7 @@ public static class ResourceLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return source.AndThen(t => selector(t).Map(u => resultSelector(t, u)));
+        return SelectManyCore(source, selector, resultSelector, static outcome => outcome);
     }
 
     /// <summary><c>from … from … select</c> where the second resource cannot fail.</summary>
@@ -197,7 +197,7 @@ public static class ResourceLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return source.AndThen<V>(t => selector(t).Map(u => resultSelector(t, u)));
+        return SelectManyCore(source, selector, resultSelector, static outcome => outcome.WithErrorType<E>());
     }
 
     /// <summary><c>from … from … select</c> where the first resource cannot fail.</summary>
@@ -207,7 +207,7 @@ public static class ResourceLinq
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
         Resource<T, E, R> widened = source;
-        return widened.AndThen(t => selector(t).Map(u => resultSelector(t, u)));
+        return SelectManyCore(widened, selector, resultSelector, static outcome => outcome);
     }
 
     /// <summary><c>from … from … select</c> where neither resource can fail.</summary>
@@ -216,6 +216,43 @@ public static class ResourceLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return source.AndThen(t => selector(t).Map(u => resultSelector(t, u)));
+        return SelectManyCore(source, selector, resultSelector, static outcome => outcome);
+    }
+
+    private static Resource<V, E, R> SelectManyCore<T, E, R, U, F, V>(
+        Resource<T, E, R> source, Func<T, Resource<U, F, R>> selector, Func<T, U, V> resultSelector,
+        Func<Outcome<U, F>, Outcome<U, E>> widen)
+    {
+        var acquire = source.Acquire;
+        return new((env, context, releases) => AcquireAsync(acquire, selector, resultSelector, widen, env, context, releases));
+
+        static async ValueTask<Outcome<V, E>> AcquireAsync(
+            Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire,
+            Func<T, Resource<U, F, R>> selector, Func<T, U, V> resultSelector,
+            Func<Outcome<U, F>, Outcome<U, E>> widen, R env, RunContext context, Releases<R> releases)
+        {
+            var first = await acquire(env, context, releases).ConfigureAwait(false);
+            if (first.Kind != OutcomeKind.Ok) return first.WithValueType<V>();
+
+            Outcome<U, E> second;
+            try
+            {
+                second = widen(await selector(first.Value).Acquire(env, context, releases).ConfigureAwait(false));
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<V, E>(exception, context).After(first);
+            }
+
+            if (second.Kind != OutcomeKind.Ok) return second.WithValueType<V>().After(first);
+            try
+            {
+                return Outcome<V, E>.Ok(resultSelector(first.Value, second.Value)).After(second).After(first);
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<V, E>(exception, context).After(second).After(first);
+            }
+        }
     }
 }
