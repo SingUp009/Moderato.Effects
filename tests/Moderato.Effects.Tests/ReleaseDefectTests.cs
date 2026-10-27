@@ -131,6 +131,39 @@ public class ReleaseDefectTests
         Assert.All(die.Suppressed, failure => Assert.Equal(Relation.Sequential, failure.Relation));
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(0, 100)]
+    [InlineData(50, 0)]
+    [InlineData(50, 100)]
+    [InlineData(100, 0)]
+    [InlineData(100, 100)]
+    public async Task Use_SingleReleaseFailsAfterSuccessfulBody_KeepsBodyContextBeforeReleaseContext(int bodyCount, int releaseCount)
+    {
+        // Given
+        var failure = new IOException("release");
+        var bodyContext = Enumerable.Range(0, bodyCount).Select(i => new Suppressed(new Failed($"body {i}"), Relation.Parallel)).ToArray();
+        var releaseContext = Enumerable.Range(0, releaseCount).Select(i => new Suppressed(new Failed($"release {i}"), Relation.Sequential)).ToArray();
+        var bodyOutcome = Outcome<int, Never>.Ok(42).WithSuppressed([.. bodyContext], 2);
+        var releaseOutcome = Outcome<Unit, Never>.Die(ExceptionDispatchInfo.Capture(failure), [.. releaseContext], omitted: 3);
+        var body = new Effect<int, Never, EmptyEnvironment>((_, _) => new(bodyOutcome));
+        var release = new Effect<Unit, Never, EmptyEnvironment>((_, _) => new(releaseOutcome));
+        var exits = new List<ExitCase>();
+        var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(1), (_, exit) => { exits.Add(exit); return release; });
+        Suppressed[] expected = [.. bodyContext, .. releaseContext];
+
+        // When
+        var exit = await resource.Use(_ => body).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(Assert.Single(exits).Value is Succeeded);
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Equal(expected.Take(100), die.Suppressed);
+        Assert.Equal(5 + Math.Max(0, expected.Length - 100), die.OmittedSuppressed);
+        for (var i = 0; i < Math.Min(100, expected.Length); i++) Assert.Same(expected[i], die.Suppressed[i]);
+    }
+
     [Fact]
     public async Task Defer_FailedReleaseCountsOverflow_ReportsOverflow()
     {

@@ -131,6 +131,12 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     // Each failed release keeps its own suppressed failures.
     private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
+        if (body.Kind == OutcomeKind.Ok && defects.Count == 1)
+        {
+            var only = defects[0];
+            return Outcome<T, E>.Die(only.Defect!, only.Suppressed, omitted: only.Omitted).After(body);
+        }
+
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);

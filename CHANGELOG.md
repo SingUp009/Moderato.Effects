@@ -50,6 +50,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Reuse bounded context merging when a Retry or Repeat policy fails.
 
+- Reuse existing context when a successful body has a single failed release.
+
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
 
 ## [0.1.0-preview.1] - 2026-10-27

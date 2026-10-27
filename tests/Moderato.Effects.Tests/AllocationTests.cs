@@ -15,6 +15,55 @@ public class AllocationTests
 
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
+    [Fact]
+    public async Task RunExitAsync_SingleReleaseFailureHasContext_AllocatesLikeEmptyContext()
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var failure = new IOException("release");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure);
+        var effects = new[] { 0, 100 }.Select(count =>
+        {
+            var outcome = Outcome<Unit, Never>.Die(captured, [.. context.Take(count)], omitted: 3);
+            var release = new Effect<Unit, Never, EmptyEnvironment>((_, _) => new(outcome));
+            return Resource.Make(Effect<EmptyEnvironment>.Succeed(42), (_, _) => release)
+                .Use(Effect<EmptyEnvironment>.Succeed);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, Never>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(failure, die.Exception);
+            Assert.Equal(context.Take(scenario * 100), die.Suppressed);
+            Assert.Equal(3, die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Empty context: {allocated[0]}; full context: {allocated[1]}");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
