@@ -203,10 +203,17 @@ internal static class Concurrent
             if (i != primary && (end.Outcome.Kind == OutcomeKind.Die || (includeErrs && end.Outcome.Kind == OutcomeKind.Err)))
             {
                 var relation = end.IsIndependentFailure ? Relation.Parallel : Relation.Consequence;
-                // Project discarded errors too: union getters may run user code.
-                var failure = end.Outcome.Kind == OutcomeKind.Die ? ExitCases.Die(end.Outcome.Defect!) : ExitCases.Failed(end.Outcome.Error);
-                if (builder.Count < SuppressedLimit.MAX) builder.Add(new Suppressed(failure, relation));
-                else omitted++;
+                if (builder.Count < SuppressedLimit.MAX)
+                {
+                    var failure = end.Outcome.Kind == OutcomeKind.Die ? ExitCases.Die(end.Outcome.Defect!) : ExitCases.Failed(end.Outcome.Error);
+                    builder.Add(new Suppressed(failure, relation));
+                }
+                else
+                {
+                    // Project discarded errors too: union getters may run user code.
+                    if (end.Outcome.Kind == OutcomeKind.Err) _ = ExitCases.Failed(end.Outcome.Error);
+                    omitted++;
+                }
             }
 
             if (i != primary)

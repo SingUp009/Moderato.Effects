@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Skip creating discarded defect cases after grouped failure context reaches its limit.
+
 - Reuse private async state for scheduled Retry and Repeat waits.
 
 - Initialize fresh outcomes with empty failure context directly.
