@@ -227,7 +227,10 @@ public static partial class Effect
     private static Effect<T, E, R>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
-        return [.. effects.Select(static effect => effect.Validate())];
+        if (effects is not Effect<T, E, R>[] array) return [.. effects.Select(static effect => effect.Validate())];
+        Effect<T, E, R>[] runs = array.Length == 0 ? [] : new Effect<T, E, R>[array.Length];
+        for (var i = 0; i < array.Length; i++) runs[i] = array[i].Validate();
+        return runs;
     }
 
     private static Effect<object?, E, R> Box<T, E, R>(Effect<T, E, R> effect) => effect.Map(static value => (object?)value);

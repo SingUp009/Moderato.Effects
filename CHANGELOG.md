@@ -58,6 +58,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Fill group result arrays directly and avoid per-run wrapper closures in group and race execution.
 
+- Snapshot input effect arrays without an intermediate validation iterator.
+
 - Skip failure aggregation buffers when a group has no stored secondary failures, retaining omitted counts.
 - Allocate release action lists only when needed and read remaining release defects without copying their array.
 
