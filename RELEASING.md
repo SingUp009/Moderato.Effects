@@ -14,6 +14,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] **Analyzer releases**: move the rules in `src/Moderato.Effects.SourceGenerator/AnalyzerReleases.Unshipped.md` into `AnalyzerReleases.Shipped.md` under a `## Release <Version>` heading.
   - The heading takes a `System.Version`, so a preview uses a fourth number: `0.1.0-preview.1` is `## Release 0.1.0.1`, and `0.1.0` is `## Release 0.1.0`. Do not suppress RS2007: a heading it cannot read leaves that release's rules unchecked.
 - [ ] **Changelog**: in `CHANGELOG.md`, rename `[Unreleased]` to the new version with today's date, add an empty `[Unreleased]` above it, and update the compare links at the bottom. Breaking changes come first, and a source-compatible but binary-breaking change is still a breaking change.
+  - `Tests` is an Unreleased-only section for verification changes with no package-observable effect; remove it before renaming `[Unreleased]`. API, behavior, and allocation changes belong under the normal change types.
 - [ ] `dotnet test -c Release` passes.
 
 Merge the PR once CI is green.
