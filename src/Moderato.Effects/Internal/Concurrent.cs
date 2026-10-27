@@ -191,6 +191,8 @@ internal static class Concurrent
             count++;
         }
 
+        System.Diagnostics.Debug.Assert(count == ends.Max(static end => end.Order));
+
         for (var order = 0; order < count; order++)
         {
             var i = indices[order];

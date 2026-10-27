@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Collect group failure context by completion rank instead of sorting intermediate sequences.
+- Assert the completion-rank bound before collecting group failure context in Debug builds.
 
 - Aggregate child and release defects directly from their owned builders without intermediate array copies.
 
