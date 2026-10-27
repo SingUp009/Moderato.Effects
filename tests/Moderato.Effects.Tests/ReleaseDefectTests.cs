@@ -7,6 +7,45 @@ namespace Moderato.Effects.Tests;
 public class ReleaseDefectTests
 {
     [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(8)]
+    [InlineData(9)]
+    [InlineData(17)]
+    public async Task Defer_ManyFailedReleases_PreservesEveryFailureInReverseOrder(int count)
+    {
+        // Given
+        var failures = Enumerable.Range(0, count).Select(index => new IOException($"release {index}")).ToArray();
+        var releases = failures.Select(failure => Effect<EmptyEnvironment>.Sync<Unit>(() => throw failure)).ToArray();
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            foreach (var release in releases)
+            {
+#pragma warning disable MEFF305
+                scope.Defer(_ => release);
+#pragma warning restore MEFF305
+            }
+
+            return new(42);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failures[^1], die.Exception);
+        Assert.Equal(count - 1, die.Suppressed.Count);
+        for (var i = 0; i < die.Suppressed.Count; i++)
+        {
+            Assert.Same(failures[count - 2 - i], Assert.IsType<Die>(die.Suppressed[i].Case.Value).Exception);
+            Assert.Equal(Relation.Sequential, die.Suppressed[i].Relation);
+        }
+
+        Assert.Equal(0, die.OmittedSuppressed);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Defer_FailedReleasesHaveOmittedFailures_PreservesOrderIdentityAndCounts(bool bodyFails)

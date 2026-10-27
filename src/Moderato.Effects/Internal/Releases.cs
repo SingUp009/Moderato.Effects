@@ -40,7 +40,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         lock (gate)
         {
             bodyEnded = true;
-            if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects.ToImmutable());
+            if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects);
             // Any cancellation of the body may have left a callback failure.
             body = bodyCancellation.WithCallbackFailure(body);
             if (this.actions is not { Count: > 0 }) return body;
@@ -87,20 +87,21 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             }
         }
 
-        var outcome = defects is null ? body : Combine(body, defects.ToImmutable());
+        var outcome = defects is null ? body : Combine(body, defects);
         return carried is null && carriedOmitted == 0
             ? outcome
             : outcome.WithSuppressed(carried is null ? outcome.Suppressed : outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
     }
 
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
-    private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
+    private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
         var first = defects[0];
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
         suppressed.AddRange(first.Suppressed);
-        foreach (var other in defects.AsSpan()[1..])
+        for (var i = 1; i < defects.Count; i++)
         {
+            var other = defects[i];
             suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
             suppressed.AddRange(other.Suppressed);
         }
@@ -109,8 +110,9 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var sameDefect = false;
         if (body.Kind == OutcomeKind.Die)
         {
-            foreach (var defect in defects.AsSpan())
+            for (var i = 0; i < defects.Count; i++)
             {
+                var defect = defects[i];
                 if (!ReferenceEquals(defect.Defect!.SourceException, body.Defect!.SourceException)) continue;
                 sameDefect = true;
                 break;
@@ -121,21 +123,21 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
         suppressed.AddRange(body.Suppressed);
         var omitted = 0;
-        foreach (var defect in defects.AsSpan()) omitted = checked(omitted + defect.Omitted);
+        for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
         return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + omitted);
     }
 
     // Each failed release keeps its own suppressed failures.
-    private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
+    private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
-        foreach (var defect in defects.AsSpan()) omitted = checked(omitted + defect.Omitted);
+        for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
         omitted += body.Omitted;
         if (body.Kind == OutcomeKind.Die && !body.Consequential)
         {
             suppressed.AddRange(body.Suppressed);
-            AddReleaseFailures(suppressed, defects.AsSpan());
+            AddReleaseFailures(suppressed, defects, 0);
             return Outcome<T, E>.Die(body.Defect!, suppressed.ToImmutable(), omitted: omitted);
         }
 
@@ -145,14 +147,15 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));
         suppressed.AddRange(body.Suppressed);
         suppressed.AddRange(primary.Suppressed);
-        AddReleaseFailures(suppressed, defects.AsSpan()[1..]);
+        AddReleaseFailures(suppressed, defects, 1);
         return Outcome<T, E>.Die(primary.Defect!, suppressed.ToImmutable(), omitted: omitted);
     }
 
-    private static void AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ReadOnlySpan<Outcome<Unit, Never>> defects)
+    private static void AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int start)
     {
-        foreach (var defect in defects)
+        for (var i = start; i < defects.Count; i++)
         {
+            var defect = defects[i];
             suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
             suppressed.AddRange(defect.Suppressed);
         }

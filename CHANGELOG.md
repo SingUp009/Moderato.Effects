@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Aggregate child and release defects directly from their owned builders without intermediate array copies.
+
 - Traverse child and release defects without allocating LINQ enumeration state or a captured predicate.
 
 - Unwrap single callback failures without building flattened aggregate exceptions.
