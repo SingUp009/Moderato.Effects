@@ -169,6 +169,8 @@ internal readonly struct ScheduleClock<R> where R : IHas<TimeProvider>
         if (spec.Next(recurrence, time.GetElapsedTime(started), random) is not { } delay) return new(Outcome<bool, Never>.Ok(false));
         return WaitAsync(delay, env, context);
 
+        // The schedule policy returns this only to DecideAsync, which awaits it once.
+        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
         static async ValueTask<Outcome<bool, Never>> WaitAsync(TimeSpan delay, R env, RunContext context)
         {
             await Task.Delay(delay, Services.Resolve<TimeProvider, R>(env), context.CancellationToken).ConfigureAwait(false);
