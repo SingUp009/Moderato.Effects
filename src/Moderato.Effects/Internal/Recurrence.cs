@@ -145,7 +145,7 @@ internal readonly struct ScheduleClock<R> where R : IHas<TimeProvider>
     internal ScheduleClock(ScheduleSpec spec, R env)
     {
         this.spec = spec;
-        time = env.Resolve<TimeProvider>();
+        time = Services.Resolve<TimeProvider, R>(env);
         started = time.GetTimestamp();
         if (spec.Jittered) random = Derive(((IHas<Random>)env).Resolve());
     }
@@ -159,7 +159,7 @@ internal readonly struct ScheduleClock<R> where R : IHas<TimeProvider>
 
         static async ValueTask<Outcome<bool, Never>> WaitAsync(TimeSpan delay, R env, RunContext context)
         {
-            await Task.Delay(delay, env.Resolve<TimeProvider>(), context.CancellationToken).ConfigureAwait(false);
+            await Task.Delay(delay, Services.Resolve<TimeProvider, R>(env), context.CancellationToken).ConfigureAwait(false);
             return Outcome<bool, Never>.Ok(true);
         }
     }

@@ -17,6 +17,7 @@
     <Using Include="Moderato.Results" />
     <Compile Include="..\Shared\AllocationScenarios.cs" Link="AllocationScenarios.cs" />
     <Compile Include="..\Shared\SchedulingAllocationScenarios.cs" Link="SchedulingAllocationScenarios.cs" />
+    <Compile Include="..\Shared\ValueClockAllocationScenarios.cs" Link="ValueClockAllocationScenarios.cs" />
   </ItemGroup>
 
   <ItemGroup>

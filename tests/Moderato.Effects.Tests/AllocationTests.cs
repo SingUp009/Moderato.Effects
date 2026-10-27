@@ -81,6 +81,27 @@ public class AllocationTests
         }
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public async Task BuiltInScheduling_WithValueTypeClock_DoesNotBox(int operation, bool exit)
+    {
+        var (effect, expected) = ValueClockAllocationScenarios.Create(operation);
+        if (exit)
+        {
+            Exit<int, string> expectedExit = operation == 1 ? new(new Err<string>("failed")) : new(new Ok<int>(20));
+            await AssertZeroAllocation(() => effect.RunExitAsync(default, CancellationToken.None), expectedExit);
+        }
+        else
+        {
+            await AssertZeroAllocation(() => effect.RunAsync(default, CancellationToken.None), expected);
+        }
+    }
+
     private static async Task AssertZeroAllocation<T>(Func<ValueTask<T>> run, T expected)
     {
         // Warm up generic statics, cached delegates and tiered compilation before

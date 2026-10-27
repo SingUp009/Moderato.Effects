@@ -11,6 +11,14 @@ var retried = await Profiles<AppEnv>.Find(2).Retry(Schedule.Immediately.UpTo(1))
 var repeated = await Profiles<AppEnv>.Find(1).Repeat(Schedule.Immediately.UpTo(1)).RunAsync(env);
 var slept = await Effect.Sleep<AppEnv>(TimeSpan.Zero).RunAsync(env);
 
+// Exercise constrained service access with a struct under both JIT and Native AOT.
+var valueClock = default(ValueClock);
+var valueSuccess = Effect<ValueClock>.FromResult<int, string>(Result.Ok(20));
+var valueFailure = Effect<ValueClock>.FromResult<int, string>(Result.Err("failed"));
+AssertZeroAllocation(valueFailure.Retry(Schedule.Immediately.UpTo(7)), valueClock, Result.Err("failed"));
+AssertZeroAllocation(valueSuccess.Repeat(Schedule.Immediately.UpTo(7)), valueClock, Result.Ok(20));
+AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result.Ok(Unit.Value));
+
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
 [
@@ -31,6 +39,30 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static void AssertZeroAllocation<T, E, R>(Effect<T, E, R> effect, R environment, Result<T, E> expected)
+{
+    for (var i = 0; i < 1024; i++) effect.RunAsync(environment).GetAwaiter().GetResult();
+    Result<T, E> last = default;
+    var before = GC.GetAllocatedBytesForCurrentThread();
+    for (var i = 0; i < 4096; i++)
+    {
+        var task = effect.RunAsync(environment);
+        if (!task.IsCompletedSuccessfully) throw new InvalidOperationException("Expected synchronous completion.");
+        last = task.GetAwaiter().GetResult();
+    }
+
+    var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+    if (last != expected || allocated != 0)
+    {
+        throw new InvalidOperationException($"Expected {expected} and 0 B, got {last} and {allocated} B.");
+    }
+}
+
+public readonly struct ValueClock : IHas<TimeProvider>
+{
+    TimeProvider IHas<TimeProvider>.Service => TimeProvider.System;
+}
 
 public record NotFound(int Id);
 

@@ -3,6 +3,25 @@ namespace Moderato.Effects.Tests;
 public class SchedulingContinuationTests
 {
     [Fact]
+    public async Task Scheduling_NullReferenceEnvironment_KeepsTheArgumentNullDefect()
+    {
+        // Given
+        Effect<int, string, CountingClock> source = Effect<CountingClock>.Fail("failed");
+        var scheduled = source.Retry(Schedule.Immediately.UpTo(1));
+        var sleep = Effect.Sleep<CountingClock>(TimeSpan.Zero);
+
+        // When
+        var scheduledExit = await scheduled.RunExitAsync(null!, TestContext.Current.CancellationToken);
+        var sleepExit = await sleep.RunExitAsync(null!, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(scheduledExit.TryGetValue(out Die? scheduledDie));
+        Assert.True(sleepExit.TryGetValue(out Die? sleepDie));
+        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(scheduledDie.Exception).ParamName);
+        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(sleepDie.Exception).ParamName);
+    }
+
+    [Fact]
     public async Task Retry_ImmediateSchedule_ResolvesTheClockForEachWait()
     {
         // Given

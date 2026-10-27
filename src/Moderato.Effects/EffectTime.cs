@@ -18,7 +18,7 @@ public static partial class Effect
         return new((env, context) => Steps.RunAsync<Unit, Never, (R Env, TimeSpan Duration)>(
             static async (state, cancellationToken) =>
             {
-                await Task.Delay(state.Duration, state.Env.Resolve<TimeProvider>(), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(state.Duration, Services.Resolve<TimeProvider, R>(state.Env), cancellationToken).ConfigureAwait(false);
                 return Unit.Value;
             },
             (env, duration), context));
