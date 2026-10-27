@@ -136,6 +136,24 @@ internal static class Concurrent
     /// <summary>Every failure but the primary's, in order of ending, then what each child suppressed.</summary>
     internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Others<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
     {
+        var omitted = 0;
+        for (var i = 0; i < ends.Length; i++)
+        {
+            var end = ends[i];
+            if (!end.Ran || i == primary) continue;
+            if (end.Outcome.Kind == OutcomeKind.Die
+                || (includeErrs && end.Outcome.Kind == OutcomeKind.Err)
+                || !end.Outcome.Suppressed.IsEmpty)
+            {
+                return CollectOthers(ends, primary, includeErrs);
+            }
+            omitted += end.Outcome.Omitted;
+        }
+        return ([], omitted);
+    }
+
+    private static (ImmutableArray<Suppressed> Suppressed, int Omitted) CollectOthers<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs)
+    {
         var builder = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
         foreach (var i in Enumerable.Range(0, ends.Length).Where(i => ends[i].Ran).OrderBy(i => ends[i].Order))
