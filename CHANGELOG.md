@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Skip creating discarded defect cases after grouped failure context reaches its limit.
+
 - Initialize fresh outcomes with empty failure context directly.
 
 - Avoid capturing dispatch information for exceptions successfully handled by Try and TryAsync.

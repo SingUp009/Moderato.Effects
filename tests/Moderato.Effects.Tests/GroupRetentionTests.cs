@@ -61,6 +61,44 @@ public class GroupRetentionTests
         for (var i = 0; i < die.Suppressed.Count; i++) Assert.Equal(i, Assert.IsType<Failed>(die.Suppressed[i].Case.Value).Error);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(99)]
+    [InlineData(100)]
+    public async Task All_DefectsFollowRetainedContext_PreservesPrefixAndOmissions(int contextCount)
+    {
+        // Given
+        var context = Enumerable.Range(0, contextCount).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var failures = new[] { new IOException("first"), new IOException("second") };
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = 0;
+        Effect<int, string, EmptyEnvironment> prefix = new((_, _) => new(Outcome<int, string>.Ok(42).WithSuppressed([.. context], 4)));
+        var children = new[] { prefix }.Concat(failures.Select(failure => new Effect<int, string, EmptyEnvironment>(async (_, _) =>
+        {
+            if (Interlocked.Increment(ref started) == 2) ready.SetResult();
+            await ready.Task.ConfigureAwait(false);
+            return Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(failure), omitted: 2);
+        }))).ToArray();
+
+        // When
+        var exit = await Effect.All(children, Concurrency.Parallel.WithMaxDegree(2)).RunExitAsync(CancellationToken.None)
+            .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Contains(die.Exception, failures);
+        Assert.Equal(context, die.Suppressed.Take(contextCount));
+        Assert.Equal(Math.Min(100, contextCount + 1), die.Suppressed.Count);
+        Assert.Equal(8 + Math.Max(0, contextCount + 1 - 100), die.OmittedSuppressed);
+        if (contextCount < 100)
+        {
+            var other = Assert.IsType<Die>(die.Suppressed[^1].Case.Value);
+            Assert.Contains(other.Exception, failures);
+            Assert.NotSame(die.Exception, other.Exception);
+            Assert.Equal(Relation.Parallel, die.Suppressed[^1].Relation);
+        }
+    }
+
     private sealed class ObservedError(int index, List<int> reads, bool throws) : System.Runtime.CompilerServices.IUnion
     {
         public object? Value
