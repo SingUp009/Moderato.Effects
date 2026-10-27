@@ -46,6 +46,26 @@ Results are [Moderato.Results](https://github.com/SingUp009/Moderato.Results) `R
 
 **Warning:** .NET 11 is in preview, and so is this library.
 
+## Zero allocation
+
+Running an effect that is already built should cost nothing on the managed heap. An effect is built once and run many times, so the library keeps its per-run work free of closures, context objects and boxing, and regression tests hold each covered operator to 0 bytes per run.
+
+A run allocates nothing when:
+
+- the effect, its callbacks and the environment were built beforehand and have run once;
+- it runs with no `CancellationToken` (or `CancellationToken.None`);
+- every step completes synchronously, and callbacks and the effects they return allocate nothing themselves;
+- it ends with Ok or Err, with no exception, interruption or suppressed failure.
+
+| Covered | Not yet covered |
+|---|---|
+| `Sync`, `Access`, `Try`, and `Async` / `AccessAsync` / `TryAsync` / `FromResultAsync` that complete at once | building effects |
+| `Map`, `MapErr`, `Tap`, `TapErr`, `Match`, `UnwrapOr`, `UnwrapOrElse`, `Attempt`, `Provide` | a cancelable token, `Timeout` |
+| `AndThen`, `AndThrough`, `OrElse` returning a reused effect, and `CatchCase` with a handler that cannot fail | Gen blocks, resources, fibers, `Race`, `OnThreadPool` |
+| LINQ query syntax over effects | `All`, `AllSettled`, `AllErrors` |
+| `Retry` / `Repeat` with a policy, or with a schedule whose waits are zero and not jittered | jitter, waits longer than zero, work that completes asynchronously |
+| `Effect.Sleep(TimeSpan.Zero)`, also with a value-type environment | exceptions and suppressed failures |
+
 ## Requirements
 
 - .NET 11 SDK (`11.0.100-rc.2` or later), `net11.0`
@@ -85,11 +105,7 @@ dotnet run --project samples/Moderato.Effects.Samples
 dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*' --inProcess
 ```
 
-See the [performance measurements](docs/performance/README.md) for execution time, allocations, measurement conditions and reproduction commands. BenchmarkDotNet 0.15.8 requires `--inProcess` with the current .NET 11 preview.
-
-The [zero-allocation contract](docs/performance/zero-allocation/README.md) defines the supported execution paths and their regression tests, including LINQ and custom Retry/Repeat policies.
-
-See [allocation coverage by feature](docs/performance/coverage.md) for the current guarantees, built-in scheduling support and remaining API constraints.
+BenchmarkDotNet 0.15.8 needs `--inProcess` on the .NET 11 preview.
 
 ## Changelog
 
