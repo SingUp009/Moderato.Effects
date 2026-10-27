@@ -67,6 +67,67 @@ public class AllocationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task RunExitAsync_IndependentTimeoutContextExceedsLimit_AllocatesLikeRetainedPrefix(bool interruptedLast)
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        if (interruptedLast) context[99] = new Suppressed(new Interrupted(), Relation.Consequence);
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var environment = new TimeEnvironment(time);
+        var failure = new IOException("independent body");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure);
+        var handlerCalled = false;
+        var effects = new[] { 99, 100 }.Select(count =>
+        {
+            var last = Outcome<int, string>.Die(captured, [.. context.Take(count)], omitted: 7);
+            var source = new Effect<int, string, TimeEnvironment>((_, _) =>
+            {
+                time.Advance(TimeSpan.FromSeconds(1));
+                return new(last);
+            });
+            return source.Timeout(TimeSpan.FromSeconds(1), _ => { handlerCalled = true; return "timeout"; });
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(environment, CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(environment, CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.False(handlerCalled);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(failure, die.Exception);
+            Assert.Equal(100, die.Suppressed.Count);
+            Assert.Equal(new Suppressed(new Failed(new TimeoutError(TimeSpan.FromSeconds(1))), Relation.Sequential), die.Suppressed[0]);
+            Assert.Equal(context.Take(99), die.Suppressed.Skip(1));
+            Assert.Equal(7 + (scenario == 1 && !interruptedLast ? 1 : 0), die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Retained attempt: {allocated[0]}; full attempt: {allocated[1]}");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task RunExitAsync_TimedOutContextExceedsLimit_AllocatesLikeRetainedPrefix(bool defect)
     {
         // Given

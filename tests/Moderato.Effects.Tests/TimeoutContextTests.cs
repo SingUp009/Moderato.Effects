@@ -11,11 +11,15 @@ public class TimeoutContextTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
     public async Task Timeout_IndependentDefectHasContext_RemovesOnlyInterruptionsAndKeepsOrder(int shape)
     {
         // Given
         var time = new FakeTimeProvider();
         var failure = new IOException("independent defect");
+        var omitted = shape == 6 ? int.MaxValue : 7;
         Suppressed[] context = shape switch
         {
             0 => [],
@@ -23,13 +27,15 @@ public class TimeoutContextTests
             2 => [new(new Failed("first"), Relation.Parallel), new(new Interrupted(), Relation.Sequential),
                 new(new Die(new IOException("second"), []), Relation.Consequence),
                 new(new Interrupted(), Relation.Parallel), new(new Failed("third"), Relation.Sequential)],
+            4 => [.. Enumerable.Range(0, 100).Select(i => new Suppressed(i % 2 == 0 ? new Interrupted() : new Failed(i), Relation.Parallel))],
+            5 => [.. Enumerable.Range(0, 100).Select(_ => new Suppressed(new Interrupted(), Relation.Consequence))],
             _ => [.. Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel))],
         };
         var expected = context.Where(s => s.Case is not Interrupted).ToArray();
         var work = new Effect<int, string, TimeEnvironment>((_, _) =>
         {
             time.Advance(TimeSpan.FromSeconds(1));
-            return new(Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(failure), [.. context], omitted: 7));
+            return new(Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(failure), [.. context], omitted: omitted));
         });
         var handlerCalled = false;
 
@@ -44,7 +50,7 @@ public class TimeoutContextTests
         Assert.Equal(new Suppressed(new Failed(new TimeoutError(TimeSpan.FromSeconds(1))), Relation.Sequential), die.Suppressed[0]);
         Assert.Equal(1 + Math.Min(99, expected.Length), die.Suppressed.Count);
         for (var i = 1; i < die.Suppressed.Count; i++) Assert.Same(expected[i - 1], die.Suppressed[i]);
-        Assert.Equal(7 + Math.Max(0, expected.Length - 99), die.OmittedSuppressed);
+        Assert.Equal(unchecked(omitted + Math.Max(0, expected.Length - 99)), die.OmittedSuppressed);
     }
 
     [Theory]
