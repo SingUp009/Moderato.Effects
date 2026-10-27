@@ -127,8 +127,12 @@ internal static class Recurrence
             return failure;
         }
 
-        ImmutableArray<Suppressed> context = ExitCases.FailureOf(last) is { } lastFailure
-            ? [new Suppressed(lastFailure, Relation.Sequential), .. last.Suppressed]
+        var lastFailure = ExitCases.FailureOf(last);
+        if (failure.Suppressed.Length == SuppressedLimit.MAX)
+            return failure.WithSuppressed(failure.Suppressed, failure.Omitted + last.Omitted + last.Suppressed.Length + (lastFailure is null ? 0 : 1));
+
+        ImmutableArray<Suppressed> context = lastFailure is { } retainedFailure
+            ? [new Suppressed(retainedFailure, Relation.Sequential), .. last.Suppressed]
             : last.Suppressed;
         return failure.WithSuppressed(context, last.Omitted).After(failure);
     }
