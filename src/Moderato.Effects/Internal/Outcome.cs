@@ -79,6 +79,12 @@ internal readonly struct Outcome<T, E>
         if (earlier.IsDefaultOrEmpty && earlierOmitted == 0) return this;
         if (!earlier.IsDefault && earlier.Length >= SuppressedLimit.MAX)
             return new(Kind, Value, Error, Defect, Consequential, earlier, Omitted + earlierOmitted + Suppressed.Length);
+        if (!earlier.IsDefault && earlier.Length + Suppressed.Length > SuppressedLimit.MAX)
+        {
+            var retained = SuppressedLimit.MAX - earlier.Length;
+            return new(Kind, Value, Error, Defect, Consequential, earlier.AddRange(Suppressed.AsSpan()[..retained]),
+                Omitted + earlierOmitted + Suppressed.Length - retained);
+        }
 
         return new(Kind, Value, Error, Defect, Consequential, earlier.IsDefault ? Suppressed : earlier.AddRange(Suppressed), Omitted + earlierOmitted);
     }
