@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Copy only retained canceled-body context after a timeout, counting discarded entries as omitted.
+
 - Resolve timeout clocks without boxing value-type environments.
 
 - Build retained retry failure context directly without copying discarded entries or intermediate arrays.

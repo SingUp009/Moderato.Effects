@@ -89,10 +89,13 @@ internal static class Timeouts
     }
 
     // The canceled effect's outcome follows from the timeout, so it stays as context.
-    private static Outcome<U, F> AfterCanceled<T, E, U, F>(Outcome<U, F> timeout, Outcome<T, E> inner) => inner.Kind switch
+    private static Outcome<U, F> AfterCanceled<T, E, U, F>(Outcome<U, F> timeout, Outcome<T, E> inner)
     {
-        OutcomeKind.Die => timeout.After([new Suppressed(ExitCases.Die(inner.Defect!), Relation.Consequence), .. inner.Suppressed], inner.Omitted),
-        OutcomeKind.Err => timeout.After([new Suppressed(ExitCases.Failed(inner.Error), Relation.Consequence), .. inner.Suppressed], inner.Omitted),
-        _ => timeout.After(inner),
-    };
+        if (inner.Kind is not (OutcomeKind.Die or OutcomeKind.Err)) return timeout.After(inner);
+
+        var failure = inner.Kind == OutcomeKind.Die ? ExitCases.Die(inner.Defect!) : ExitCases.Failed(inner.Error);
+        var retained = Math.Min(inner.Suppressed.Length, SuppressedLimit.MAX - 1);
+        return timeout.After([new Suppressed(failure, Relation.Consequence), .. inner.Suppressed.AsSpan()[..retained]],
+            inner.Omitted + inner.Suppressed.Length - retained);
+    }
 }

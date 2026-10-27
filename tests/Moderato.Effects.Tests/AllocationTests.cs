@@ -65,6 +65,69 @@ public class AllocationTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunExitAsync_TimedOutContextExceedsLimit_AllocatesLikeRetainedPrefix(bool defect)
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var environment = new TimeEnvironment(time);
+        var failure = new IOException("canceled body");
+        var timeoutFailure = new IOException("timeout handler");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure);
+        var effects = new[] { 99, 100 }.Select(count =>
+        {
+            var last = (defect ? Outcome<int, string>.Die(captured, consequential: true) : Outcome<int, string>.Err("last"))
+                .WithSuppressed([.. context.Take(count)], 2);
+            var source = new Effect<int, string, TimeEnvironment>((_, _) =>
+            {
+                time.Advance(TimeSpan.FromSeconds(1));
+                return new(last);
+            });
+            return source.Timeout(TimeSpan.FromSeconds(1), _ => throw timeoutFailure);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(environment, CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(environment, CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(timeoutFailure, die.Exception);
+            var retained = die.Suppressed;
+            Assert.Equal(100, retained.Count);
+            Assert.Equal(Relation.Consequence, retained[0].Relation);
+            if (defect) Assert.Same(failure, Assert.IsType<Die>(retained[0].Case.Value).Exception);
+            else Assert.Equal("last", Assert.IsType<Failed>(retained[0].Case.Value).Error);
+            Assert.Equal(context.Take(99), retained.Skip(1));
+            Assert.Equal(2 + scenario, die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Retained attempt: {allocated[0]}; full attempt: {allocated[1]}");
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(50)]
     [InlineData(99)]
