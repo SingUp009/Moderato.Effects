@@ -4,121 +4,217 @@ namespace Moderato.Effects.Tests;
 
 public class AllocationTests
 {
-    public static TheoryData<AllocationCase, bool> Cases
+    private const int WARM_UP_RUNS = 1024;
+    private const int RUNS = 4096;
+
+    public static TheoryData<AllocationCase> Cases => new(Enum.GetValues<AllocationCase>());
+
+    public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task RunAsync_PrebuiltSynchronousEffect_AllocatesNothing(AllocationCase scenario)
     {
-        get
+        // Given
+        var (effect, expected) = AllocationScenarios.Create(scenario);
+        await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
         {
-            var cases = new TheoryData<AllocationCase, bool>();
-            foreach (var scenario in Enum.GetValues<AllocationCase>())
-            {
-                cases.Add(scenario, false);
-                cases.Add(scenario, true);
-            }
-
-            return cases;
+            var run = effect.RunAsync(CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            result = await run;
         }
-    }
 
-    public static TheoryData<SchedulingAllocationCase, bool> SchedulingCases
-    {
-        get
-        {
-            var cases = new TheoryData<SchedulingAllocationCase, bool>();
-            foreach (var scenario in Enum.GetValues<SchedulingAllocationCase>())
-            {
-                cases.Add(scenario, false);
-                cases.Add(scenario, true);
-            }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-            return cases;
-        }
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(expected, result);
+        Assert.Equal(0L, allocated);
     }
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public async Task PrebuiltSynchronousEffect_WithNoCancellation_AllocatesZeroBytes(AllocationCase scenario, bool exit)
+    public async Task RunExitAsync_PrebuiltSynchronousEffect_AllocatesNothing(AllocationCase scenario)
     {
+        // Given
         var (effect, expected) = AllocationScenarios.Create(scenario);
-        if (exit)
+        await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Exit<int, string> exit = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
         {
-            Exit<int, string> expectedExit = expected.TryGetOk(out var value) ? new(new Ok<int>(value))
-                : expected.TryGetErr(out var error) ? new(new Err<string>(error))
-                : throw new InvalidOperationException("The scenario must have an initialized expected result.");
-            await AssertZeroAllocation(() => effect.RunExitAsync(CancellationToken.None), expectedExit);
+            var run = effect.RunExitAsync(CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            exit = await run;
         }
-        else
-        {
-            await AssertZeroAllocation(() => effect.RunAsync(CancellationToken.None), expected);
-        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(ToExit(expected), exit);
+        Assert.Equal(0L, allocated);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ValueTypeEnvironmentAndError_DoNotBoxOnEachRun(bool fail)
+    public async Task RunAsync_ValueTypeEnvironmentAndError_AllocatesNothing(bool fail)
     {
+        // Given
         Result<int, int> input = fail ? Result.Err(7) : Result.Ok(42);
         Result<int, int> expected = fail ? Result.Err(8) : Result.Ok(43);
         var effect = Effect<int>.FromResult(input).Map(static x => x + 1).MapErr(static error => error + 1);
-        await AssertZeroAllocation(() => effect.RunAsync(0, CancellationToken.None), expected);
+        await WarmUpAsync(() => effect.RunAsync(0, CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Result<int, int> result = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
+        {
+            var run = effect.RunAsync(0, CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            result = await run;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(expected, result);
+        Assert.Equal(0L, allocated);
     }
 
     [Theory]
     [MemberData(nameof(SchedulingCases))]
-    public async Task BuiltInScheduling_WithNoCancellation_AllocatesZeroBytes(SchedulingAllocationCase scenario, bool exit)
+    public async Task RunAsync_BuiltInScheduleWithoutWaiting_AllocatesNothing(SchedulingAllocationCase scenario)
     {
+        // Given
         var (effect, expected) = SchedulingAllocationScenarios.Create(scenario);
-        if (exit)
-        {
-            Exit<int, string> expectedExit = expected.TryGetOk(out var value) ? new(new Ok<int>(value))
-                : expected.TryGetErr(out var error) ? new(new Err<string>(error))
-                : throw new InvalidOperationException("The scenario must have an initialized expected result.");
-            await AssertZeroAllocation(() => effect.RunExitAsync(CancellationToken.None), expectedExit);
-        }
-        else
-        {
-            await AssertZeroAllocation(() => effect.RunAsync(CancellationToken.None), expected);
-        }
-    }
+        await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
 
-    [Theory]
-    [InlineData(0, false)]
-    [InlineData(0, true)]
-    [InlineData(1, false)]
-    [InlineData(1, true)]
-    [InlineData(2, false)]
-    [InlineData(2, true)]
-    public async Task BuiltInScheduling_WithValueTypeClock_DoesNotBox(int operation, bool exit)
-    {
-        var (effect, expected) = ValueClockAllocationScenarios.Create(operation);
-        if (exit)
-        {
-            Exit<int, string> expectedExit = operation == 1 ? new(new Err<string>("failed")) : new(new Ok<int>(20));
-            await AssertZeroAllocation(() => effect.RunExitAsync(default, CancellationToken.None), expectedExit);
-        }
-        else
-        {
-            await AssertZeroAllocation(() => effect.RunAsync(default, CancellationToken.None), expected);
-        }
-    }
-
-    private static async Task AssertZeroAllocation<T>(Func<ValueTask<T>> run, T expected)
-    {
-        // Warm up generic statics, cached delegates and tiered compilation before
-        // measuring. Assertions and the test runner stay outside this region.
-        for (var i = 0; i < 1024; i++) await run();
-
-        T result = default!;
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 4096; i++)
+        for (var i = 0; i < RUNS; i++)
         {
-            var task = run();
-            if (!task.IsCompletedSuccessfully) throw new InvalidOperationException("The allocation contract requires synchronous completion.");
-            result = await task;
+            var run = effect.RunAsync(CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            result = await run;
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
         Assert.Equal(expected, result);
         Assert.Equal(0L, allocated);
     }
+
+    [Theory]
+    [MemberData(nameof(SchedulingCases))]
+    public async Task RunExitAsync_BuiltInScheduleWithoutWaiting_AllocatesNothing(SchedulingAllocationCase scenario)
+    {
+        // Given
+        var (effect, expected) = SchedulingAllocationScenarios.Create(scenario);
+        await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Exit<int, string> exit = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
+        {
+            var run = effect.RunExitAsync(CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            exit = await run;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(ToExit(expected), exit);
+        Assert.Equal(0L, allocated);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunAsync_ValueTypeClock_AllocatesNothing(int operation)
+    {
+        // Given
+        var (effect, expected) = ValueClockAllocationScenarios.Create(operation);
+        await WarmUpAsync(() => effect.RunAsync(default, CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
+        {
+            var run = effect.RunAsync(default, CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            result = await run;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(expected, result);
+        Assert.Equal(0L, allocated);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunExitAsync_ValueTypeClock_AllocatesNothing(int operation)
+    {
+        // Given
+        var (effect, expected) = ValueClockAllocationScenarios.Create(operation);
+        await WarmUpAsync(() => effect.RunExitAsync(default, CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Exit<int, string> exit = default;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < RUNS; i++)
+        {
+            var run = effect.RunExitAsync(default, CancellationToken.None);
+            completedAtOnce &= run.IsCompletedSuccessfully;
+            exit = await run;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(ToExit(expected), exit);
+        Assert.Equal(0L, allocated);
+    }
+
+    // Warm-up first, so one-time static, delegate and JIT allocations stay out of the measurement.
+    private static async Task WarmUpAsync<T>(Func<ValueTask<T>> run)
+    {
+        for (var i = 0; i < WARM_UP_RUNS; i++) await run();
+    }
+
+    private static Exit<int, string> ToExit(Result<int, string> expected)
+        => expected.TryGetOk(out var value) ? new(new Ok<int>(value))
+            : expected.TryGetErr(out var error) ? new(new Err<string>(error))
+            : throw new InvalidOperationException("The scenario must have an initialized expected result.");
 }

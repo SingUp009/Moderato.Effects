@@ -3,8 +3,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Benchmarks;
 
-// Construction is measured separately; zero bytes when rerunning an effect
-// does not imply that building its delegate graph is allocation-free.
+// Measured apart from runs, since a run that allocates nothing says nothing about construction.
 [MemoryDiagnoser]
 public class ConstructionBenchmarks
 {

@@ -3,8 +3,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Benchmarks;
 
-// Construct once to isolate per-run costs. Return the ValueTask directly so the
-// benchmark does not add an async state machine or turn it into a Task.
+// Built once and returned as a ValueTask, so only the run itself is measured.
 [MemoryDiagnoser]
 public class ExecutionBenchmarks
 {

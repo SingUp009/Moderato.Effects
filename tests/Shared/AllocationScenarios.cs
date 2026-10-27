@@ -2,8 +2,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects.Testing;
 
-// Shared by allocation regression tests and benchmarks. Build outside the measured
-// region; every callback either computes a scalar or returns a prebuilt effect.
+// Built outside the measured region, with callbacks that allocate nothing themselves.
 public enum AllocationCase
 {
     Sync, CompletedAsync, Access, AccessAsync, Try, TryAsync, FromResultAsync,

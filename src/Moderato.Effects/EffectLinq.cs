@@ -57,8 +57,7 @@ public static class EffectLinq
         return Bind(source, (value, env, context) => selector(value).Run(env, context), resultSelector);
     }
 
-    // Project directly from the next outcome instead of constructing a Map on
-    // every run. The source value and projection travel as value-type state.
+    // Projects the next outcome directly, since building a Map per run would allocate.
     private static Effect<V, E, R> Bind<T, E, R, U, V>(Effect<T, E, R> source,
         Func<T, R, RunContext, ValueTask<Outcome<U, E>>> next, Func<T, U, V> project)
         => source.Then<V, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
