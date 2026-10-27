@@ -9,6 +9,9 @@ public class ResourceReleaseBenchmarks
     private Effect<int, Never, EmptyEnvironment> use;
     private Effect<int, Never, EmptyEnvironment> gen;
 
+    private Effect<int, Never, EmptyEnvironment> empty;
+    private Effect<int, Never, EmptyEnvironment> defects;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -21,10 +24,30 @@ public class ResourceReleaseBenchmarks
             return new ValueTask<int>(42);
         });
 
+        empty = Scope<Never, EmptyEnvironment>.Gen<int>(static _ => new(42));
+        var exception = new IOException("release failed");
+        var fail = Effect<EmptyEnvironment>.Sync<Unit>(() => throw exception);
+        Func<ExitCase, Effect<Unit, Never, EmptyEnvironment>> cleanup = _ => fail;
+        defects = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            scope.Defer(cleanup);
+            scope.Defer(cleanup);
+            scope.Defer(cleanup);
+            return new(42);
+        });
+
+        if (EmptyGen().Result.UnwrapOr(-1) != 42
+            || !FailingReleases().Result.TryGetValue(out Die? die) || die.Suppressed.Count != 2)
+        {
+            throw new InvalidOperationException("Unexpected release context.");
+        }
+
         if (Use().Result.UnwrapOr(-1) != 42 || Gen().Result.UnwrapOr(-1) != 42)
             throw new InvalidOperationException("Unexpected benchmark result.");
     }
 
+    [Benchmark] public ValueTask<Result<int, Never>> EmptyGen() => empty.RunAsync();
+    [Benchmark] public ValueTask<Exit<int, Never>> FailingReleases() => defects.RunExitAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Use() => use.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Gen() => gen.RunAsync();
 }
