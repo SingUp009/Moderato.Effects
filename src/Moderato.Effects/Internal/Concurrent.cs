@@ -33,26 +33,43 @@ internal readonly record struct ChildEnd<T, E>(Outcome<T, E> Outcome, bool After
 internal static class Concurrent
 {
     /// <summary>Runs every child and waits for all that started, releases included.</summary>
-    internal static async ValueTask<ChildEnd<T, E>[]> RunAsync<T, E, R>(
+    internal static ValueTask<ChildEnd<T, E>[]> RunAsync<T, E, R>(
+        Effect<T, E, R>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
+        => children.Length == 0 ? new([])
+            : concurrency.IsParallel ? RunParallelAsync(children, env, context, concurrency, stopOn)
+            : RunSequentialAsync(children, env, context, stopOn);
+
+    private static async ValueTask<ChildEnd<T, E>[]> RunSequentialAsync<T, E, R>(
+        Effect<T, E, R>[] children, R env, RunContext context, StopOn stopOn)
+    {
+        var ends = new ChildEnd<T, E>[children.Length];
+        using var group = new Cancellation(context.CancellationToken);
+        var groupContext = new RunContext(group.Token);
+        for (var i = 0; i < children.Length && !group.Token.IsCancellationRequested; i++)
+        {
+            Outcome<T, E> outcome;
+            try
+            {
+                outcome = await children[i].Run(env, groupContext).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                outcome = Defects.From<T, E>(exception, groupContext);
+            }
+
+            var afterCancel = CompleteChild(ref outcome, group, stopOn);
+            ends[i] = new(outcome, afterCancel, i + 1);
+        }
+        return ends;
+    }
+
+    private static async ValueTask<ChildEnd<T, E>[]> RunParallelAsync<T, E, R>(
         Effect<T, E, R>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
     {
         var ends = new ChildEnd<T, E>[children.Length];
-        if (children.Length == 0) return ends;
-
         using var group = new Cancellation(context.CancellationToken);
         var groupContext = new RunContext(group.Token);
         var order = 0;
-
-        if (!concurrency.IsParallel)
-        {
-            for (var i = 0; i < children.Length && !group.Token.IsCancellationRequested; i++)
-            {
-                await RunChildAsync(i).ConfigureAwait(false);
-            }
-
-            return ends;
-        }
-
         var next = -1;
         var workers = new Task[Math.Min(concurrency.MaxDegree ?? children.Length, children.Length)];
         for (var w = 0; w < workers.Length; w++)
@@ -83,12 +100,18 @@ internal static class Concurrent
                 outcome = Defects.From<T, E>(exception, groupContext);
             }
 
-            var afterCancel = group.Token.IsCancellationRequested;
-            var reason = stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure;
-            // The child that cancels the group carries any callback defect.
-            if (Stops(outcome.Kind, stopOn) && group.TryCancel(reason)) outcome = group.WithCallbackFailure(outcome);
+            var afterCancel = CompleteChild(ref outcome, group, stopOn);
             ends[i] = new(outcome, afterCancel, Interlocked.Increment(ref order));
         }
+    }
+
+    private static bool CompleteChild<T, E>(ref Outcome<T, E> outcome, Cancellation group, StopOn stopOn)
+    {
+        var afterCancel = group.Token.IsCancellationRequested;
+        var reason = stopOn is StopOn.SuccessOrDefect or StopOn.Anything ? CancellationReason.RaceLoser : CancellationReason.SiblingFailure;
+        // The child that cancels the group carries any callback defect.
+        if (Stops(outcome.Kind, stopOn) && group.TryCancel(reason)) outcome = group.WithCallbackFailure(outcome);
+        return afterCancel;
     }
 
     private static bool Stops(OutcomeKind kind, StopOn stopOn) => stopOn switch

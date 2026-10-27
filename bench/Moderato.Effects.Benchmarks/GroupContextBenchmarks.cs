@@ -16,6 +16,9 @@ public class GroupContextBenchmarks
     private Effect<int, string, EmptyEnvironment> race;
     private Effect<int, string, EmptyEnvironment> raceFirst;
 
+    private Effect<int[], string, EmptyEnvironment> empty;
+    private Effect<int[], string, EmptyEnvironment> pending;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -24,6 +27,13 @@ public class GroupContextBenchmarks
         var withDefect = errors.ToArray();
         var failure = new IOException("defect");
         withDefect[^1] = Effect<EmptyEnvironment>.Sync<int>(() => throw failure);
+        empty = Effect.All<int, string, EmptyEnvironment>([]);
+        Effect<int, string, EmptyEnvironment> delayed = Effect<EmptyEnvironment>.Async<int>(static async ct =>
+        {
+            await Task.Delay(1, ct).ConfigureAwait(false);
+            return 42;
+        });
+        pending = Effect.All([delayed, successes[1]]);
         race = Effect.Race(successes[0], successes[1]);
         raceFirst = Effect.RaceFirst(successes[0], successes[1]);
         settled = Effect.AllSettled(successes);
@@ -31,7 +41,9 @@ public class GroupContextBenchmarks
         all = Effect.All(successes);
         allErrors = Effect.AllErrors(errors);
         defect = Effect.AllErrors(withDefect);
-        if (!Race().AsTask().GetAwaiter().GetResult().TryGetOk(out var winner) || winner is < 0 or > 1
+        if (!Empty().Result.TryGetOk(out var noValues) || noValues.Length != 0
+            || !Pending().AsTask().GetAwaiter().GetResult().TryGetOk(out var pendingValues) || pendingValues.Length != 2 || pendingValues[0] != 42 || pendingValues[1] != 1
+            || !Race().AsTask().GetAwaiter().GetResult().TryGetOk(out var winner) || winner is < 0 or > 1
             || !RaceFirst().AsTask().GetAwaiter().GetResult().TryGetOk(out var first) || first is < 0 or > 1
             || !Settled().Result.TryGetOk(out var exits) || exits.Length != 8
             || !MixedErrors().Result.TryGetErr(out var mixedFailures) || mixedFailures.Length != 4
@@ -43,6 +55,8 @@ public class GroupContextBenchmarks
         }
     }
 
+    [Benchmark] public ValueTask<Result<int[], string>> Empty() => empty.RunAsync();
+    [Benchmark] public ValueTask<Result<int[], string>> Pending() => pending.RunAsync();
     [Benchmark] public ValueTask<Result<int, string>> Race() => race.RunAsync();
     [Benchmark] public ValueTask<Result<int, string>> RaceFirst() => raceFirst.RunAsync();
     [Benchmark] public ValueTask<Result<Exit<int, string>[], Never>> Settled() => settled.RunAsync();

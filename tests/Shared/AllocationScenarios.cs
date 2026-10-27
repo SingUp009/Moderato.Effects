@@ -11,6 +11,7 @@ public enum AllocationCase
     LinqSameError, LinqSourceError, LinqNextError, LinqSecondNever,
     LinqFirstNever, LinqBothNever, LinqChain, CatchCaseNever,
     RetrySuccess, RetryStop, RetryEightAttempts, RepeatStop, RepeatEightRuns,
+    EmptyAll, EmptyAllParallel, EmptyAllErrors, EmptyAllErrorsParallel, EmptyAllSettled, EmptyAllSettledParallel,
 }
 
 public static class AllocationScenarios
@@ -98,6 +99,18 @@ public static class AllocationScenarios
                 return (source.Repeat(_ => no), Result.Ok(20));
             case AllocationCase.RepeatEightRuns:
                 return (source.Repeat(context => context.Repetition < 8 ? yes : no), Result.Ok(20));
+            case AllocationCase.EmptyAll:
+            case AllocationCase.EmptyAllParallel:
+                return (Effect.All<int, string, EmptyEnvironment>([], scenario == AllocationCase.EmptyAllParallel ? Concurrency.Parallel : Concurrency.Sequential)
+                    .Map(static values => values.Length), Result.Ok(0));
+            case AllocationCase.EmptyAllErrors:
+            case AllocationCase.EmptyAllErrorsParallel:
+                return (Effect.AllErrors<int, string, EmptyEnvironment>([], scenario == AllocationCase.EmptyAllErrorsParallel ? Concurrency.Parallel : Concurrency.Sequential)
+                    .Map(static values => values.Length).MapErr(static _ => "unexpected"), Result.Ok(0));
+            case AllocationCase.EmptyAllSettled:
+            case AllocationCase.EmptyAllSettledParallel:
+                return (Effect.AllSettled<int, string, EmptyEnvironment>([], scenario == AllocationCase.EmptyAllSettledParallel ? Concurrency.Parallel : Concurrency.Sequential)
+                    .Map(static values => values.Length), Result.Ok(0));
             default:
                 throw new ArgumentOutOfRangeException(nameof(scenario));
         }
