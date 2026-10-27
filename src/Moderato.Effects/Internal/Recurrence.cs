@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Moderato.Effects.Internal;
 
 /// <summary>Runs Retry and Repeat as a loop, so many recurrences do not nest tasks (F15).</summary>
@@ -82,6 +84,7 @@ internal static class Recurrence
         }
     }
 
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private static async ValueTask<Outcome<T, E>> RunOnceAsync<T, E, R>(Effect<T, E, R> effect, R env, RunContext context)
     {
         try
@@ -94,6 +97,7 @@ internal static class Recurrence
         }
     }
 
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     private static async ValueTask<Outcome<bool, Never>> DecideAsync<TState, R, TPolicy>(
         TPolicy policy, TState state, R env, RunContext context)
         where TPolicy : struct, IRecurrencePolicy<TState, R>
