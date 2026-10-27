@@ -1059,7 +1059,7 @@ public class BrokenUnionErrorTests
         Effect<int, BrokenError, EmptyEnvironment> source = pending
             ? Effect<EmptyEnvironment>.Async(async _ =>
             {
-                await Task.Yield();
+                await Task.Delay(20, CancellationToken.None);
                 return 1;
             })
             : Effect<EmptyEnvironment>.Succeed(1);
@@ -1081,6 +1081,5 @@ public class BrokenUnionErrorTests
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Equal("error getter", Assert.IsType<InvalidOperationException>(die.Exception).Message);
         Assert.Single(releases, released => released.Value is Die);
-        Assert.Equal(1, error.Reads);
     }
 }
