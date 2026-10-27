@@ -17,9 +17,8 @@ public static partial class Effect
     public static Effect<T[], E, R> All<T, E, R>(IEnumerable<Effect<T, E, R>> effects, Concurrency concurrency = default)
     {
         var runs = Runs(effects);
-        return new((env, context) => Guard(context, async () =>
+        return new((env, context) => RunGroup<T, E, R, T[], E>(runs, env, context, concurrency, StopOn.Failure, static (ends, context) =>
         {
-            var ends = await Concurrent.RunAsync(runs, env, context, concurrency, StopOn.Failure).ConfigureAwait(false);
             if (Concurrent.PrimaryFailure(ends, context.CancellationToken.IsCancellationRequested) is { } primary)
                 return Concurrent.Fail<T, E, T[], E>(ends, primary, static error => error);
             return Succeeded<T, E, T[], E>(ends, static values => values);
@@ -124,9 +123,8 @@ public static partial class Effect
     public static Effect<Exit<T, E>[], Never, R> AllSettled<T, E, R>(IEnumerable<Effect<T, E, R>> effects, Concurrency concurrency = default)
     {
         var runs = Runs(effects);
-        return new((env, context) => Guard<Exit<T, E>[], Never>(context, async () =>
+        return new((env, context) => RunGroup<T, E, R, Exit<T, E>[], Never>(runs, env, context, concurrency, StopOn.Nothing, static (ends, context) =>
         {
-            var ends = await Concurrent.RunAsync(runs, env, context, concurrency, StopOn.Nothing).ConfigureAwait(false);
             if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, Exit<T, E>[], Never>(ends);
             Exit<T, E>[] exits = ends.Length == 0 ? [] : new Exit<T, E>[ends.Length];
             for (var i = 0; i < ends.Length; i++) exits[i] = Exits.From(ends[i].Outcome);
@@ -141,9 +139,8 @@ public static partial class Effect
     public static Effect<T[], E[], R> AllErrors<T, E, R>(IEnumerable<Effect<T, E, R>> effects, Concurrency concurrency = default)
     {
         var runs = Runs(effects);
-        return new((env, context) => Guard<T[], E[]>(context, async () =>
+        return new((env, context) => RunGroup<T, E, R, T[], E[]>(runs, env, context, concurrency, StopOn.Defect, static (ends, context) =>
         {
-            var ends = await Concurrent.RunAsync(runs, env, context, concurrency, StopOn.Defect).ConfigureAwait(false);
             if (Concurrent.PrimaryFailure(ends, context.CancellationToken.IsCancellationRequested) is { } primary
                 && ends[primary].Outcome.Kind != OutcomeKind.Err)
             {
@@ -177,9 +174,8 @@ public static partial class Effect
     public static Effect<T, E, R> Race<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
         Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];
-        return new((env, context) => Guard(context, async () =>
+        return new((env, context) => RunGroup<T, E, R, T, E>(runs, env, context, Concurrency.Parallel, StopOn.SuccessOrDefect, static (ends, context) =>
         {
-            var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.SuccessOrDefect).ConfigureAwait(false);
             var winner = Earliest(ends, static end => end.Outcome.Kind == OutcomeKind.Ok && !end.AfterCancel);
             return Settle(ends, winner, context);
         }));
@@ -192,9 +188,8 @@ public static partial class Effect
     public static Effect<T, E, R> RaceFirst<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
         Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];
-        return new((env, context) => Guard(context, async () =>
+        return new((env, context) => RunGroup<T, E, R, T, E>(runs, env, context, Concurrency.Parallel, StopOn.Anything, static (ends, context) =>
         {
-            var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.Anything).ConfigureAwait(false);
             var winner = Earliest(ends, static end => end.Outcome.Kind is OutcomeKind.Ok or OutcomeKind.Err && !end.AfterCancel);
             return Settle(ends, winner, context);
         }));
@@ -260,15 +255,18 @@ public static partial class Effect
         return Outcome<U, F>.Ok(build(values)).WithSuppressed(others, omitted);
     }
 
-    private static async ValueTask<Outcome<T, E>> Guard<T, E>(RunContext context, Func<ValueTask<Outcome<T, E>>> body)
+    private static async ValueTask<Outcome<U, F>> RunGroup<T, E, R, U, F>(
+        Effect<T, E, R>[] runs, R env, RunContext context, Concurrency concurrency, StopOn stopOn,
+        Func<ChildEnd<T, E>[], RunContext, Outcome<U, F>> settle)
     {
         try
         {
-            return await body().ConfigureAwait(false);
+            var ends = await Concurrent.RunAsync(runs, env, context, concurrency, stopOn).ConfigureAwait(false);
+            return settle(ends, context);
         }
         catch (Exception exception)
         {
-            return Defects.From<T, E>(exception, context);
+            return Defects.From<U, F>(exception, context);
         }
     }
 }

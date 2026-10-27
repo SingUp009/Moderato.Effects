@@ -13,6 +13,9 @@ public class GroupContextBenchmarks
     private Effect<Exit<int, string>[], Never, EmptyEnvironment> settled;
     private Effect<int[], string[], EmptyEnvironment> mixed;
 
+    private Effect<int, string, EmptyEnvironment> race;
+    private Effect<int, string, EmptyEnvironment> raceFirst;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -21,12 +24,16 @@ public class GroupContextBenchmarks
         var withDefect = errors.ToArray();
         var failure = new IOException("defect");
         withDefect[^1] = Effect<EmptyEnvironment>.Sync<int>(() => throw failure);
+        race = Effect.Race(successes[0], successes[1]);
+        raceFirst = Effect.RaceFirst(successes[0], successes[1]);
         settled = Effect.AllSettled(successes);
         mixed = Effect.AllErrors([successes[0], errors[0], successes[1], errors[1], successes[2], errors[2], successes[3], errors[3]]);
         all = Effect.All(successes);
         allErrors = Effect.AllErrors(errors);
         defect = Effect.AllErrors(withDefect);
-        if (!Settled().Result.TryGetOk(out var exits) || exits.Length != 8
+        if (!Race().AsTask().GetAwaiter().GetResult().TryGetOk(out var winner) || winner is < 0 or > 1
+            || !RaceFirst().AsTask().GetAwaiter().GetResult().TryGetOk(out var first) || first is < 0 or > 1
+            || !Settled().Result.TryGetOk(out var exits) || exits.Length != 8
             || !MixedErrors().Result.TryGetErr(out var mixedFailures) || mixedFailures.Length != 4
             || !All().Result.TryGetOk(out var values) || values.Length != 8
             || !AllErrors().Result.TryGetErr(out var failures) || failures.Length != 8
@@ -36,6 +43,8 @@ public class GroupContextBenchmarks
         }
     }
 
+    [Benchmark] public ValueTask<Result<int, string>> Race() => race.RunAsync();
+    [Benchmark] public ValueTask<Result<int, string>> RaceFirst() => raceFirst.RunAsync();
     [Benchmark] public ValueTask<Result<Exit<int, string>[], Never>> Settled() => settled.RunAsync();
     [Benchmark] public ValueTask<Result<int[], string[]>> MixedErrors() => mixed.RunAsync();
     [Benchmark] public ValueTask<Result<int[], string>> All() => all.RunAsync();
