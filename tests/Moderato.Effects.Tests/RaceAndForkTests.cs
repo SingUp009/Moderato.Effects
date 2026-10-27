@@ -31,7 +31,7 @@ public class RaceTests
         var fast = Effect<EmptyEnvironment>.Succeed("primary");
 
         // When
-        var result = await Effect.Race<string, AppError, EmptyEnvironment>(slow, fast).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Effect.Race<string, AppError, EmptyEnvironment>(slow, fast).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Ok("primary"), result);
@@ -56,7 +56,7 @@ public class RaceTests
         });
 
         // When
-        var result = await Effect.Race(failing, later).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Effect.Race(failing, later).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Ok("replica"), result);
@@ -70,7 +70,7 @@ public class RaceTests
         var second = Steps.Fail(new Forbidden("down"));
 
         // When
-        var result = await Effect.Race(first, second).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Effect.Race(first, second).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(result.TryGetErr(out var error));
@@ -86,7 +86,7 @@ public class RaceTests
         var broken = Effect<EmptyEnvironment>.Sync<string>(() => throw new InvalidOperationException("bug"));
 
         // When
-        var exit = await Effect.Race<string, AppError, EmptyEnvironment>(slow, broken).RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await Effect.Race<string, AppError, EmptyEnvironment>(slow, broken).RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -107,7 +107,7 @@ public class RaceTests
         var winner = Effect<EmptyEnvironment>.Succeed("primary");
 
         // When
-        var exit = await Effect.Race<string, AppError, EmptyEnvironment>(loser, winner).RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await Effect.Race<string, AppError, EmptyEnvironment>(loser, winner).RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -123,7 +123,7 @@ public class RaceTests
         var failing = Steps.Fail(new Forbidden("down"));
 
         // When
-        var result = await Effect.RaceFirst(slow, failing).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Effect.RaceFirst(slow, failing).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Err<AppError>(new Forbidden("down")), result);
@@ -139,7 +139,7 @@ public class RaceTests
         var fast = Effect<EmptyEnvironment>.Succeed("primary");
 
         // When
-        var result = await Effect.RaceFirst<string, AppError, EmptyEnvironment>(slow, fast).RunAsync(TestContext.Current.CancellationToken);
+        var result = await Effect.RaceFirst<string, AppError, EmptyEnvironment>(slow, fast).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Ok("primary"), result);
@@ -155,8 +155,8 @@ public class RaceTests
 
         // When
         var running = race.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
-        await cts.CancelAsync();
-        var exit = await running;
+        await cts.CancelAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
@@ -177,7 +177,7 @@ public class ForkTests
         });
 
         // When
-        var result = await work.RunAsync(TestContext.Current.CancellationToken);
+        var result = await work.RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<int, AppError>>(Result.Ok(42), result);
@@ -200,7 +200,7 @@ public class ForkTests
         });
 
         // When
-        var result = await work.RunAsync(TestContext.Current.CancellationToken);
+        var result = await work.RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, Never>>(Result.Ok("fiber done"), result);
@@ -218,7 +218,7 @@ public class ForkTests
         });
 
         // When
-        var result = await work.RunAsync(TestContext.Current.CancellationToken);
+        var result = await work.RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Ok("done"), result);
@@ -244,7 +244,7 @@ public class ForkTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -264,7 +264,7 @@ public class ForkTests
         });
 
         // When
-        var result = await work.RunAsync(TestContext.Current.CancellationToken);
+        var result = await work.RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<string, AppError>>(Result.Err<AppError>(new NotFound(7)), result);
@@ -284,10 +284,10 @@ public class ForkTests
         {
             kept = fiber;
             return Effect<EmptyEnvironment>.Succeed(0);
-        }).RunAsync(TestContext.Current.CancellationToken);
+        }).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // When
-        async Task Act() => await kept!.Join().RunAsync(TestContext.Current.CancellationToken);
+        async Task Act() => await kept!.Join().RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         await Assert.ThrowsAnyAsync<OperationCanceledException>(Act);
@@ -307,10 +307,10 @@ public class ForkTests
         {
             kept = fiber;
             return Effect<EmptyEnvironment>.Succeed(0);
-        }).RunAsync(TestContext.Current.CancellationToken);
+        }).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // When
-        var exit = await kept!.Join().RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await kept!.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
@@ -330,11 +330,11 @@ public class ForkTests
         {
             kept = fiber;
             return Effect<EmptyEnvironment>.Succeed(0);
-        }).RunAsync(TestContext.Current.CancellationToken);
+        }).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var join = Scope<Never, EmptyEnvironment>.Gen(async scope => await scope.Run(kept!.Join()));
 
         // When
-        var exit = await join.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await join.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
@@ -351,7 +351,7 @@ public class ForkTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -365,7 +365,7 @@ public class ForkTests
         var compute = Effect<EmptyEnvironment>.Succeed(42);
 
         // When
-        var result = await compute.Fork().Use(fiber => fiber.Join()).RunAsync(TestContext.Current.CancellationToken);
+        var result = await compute.Fork().Use(fiber => fiber.Join()).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.Equal<Result<int, Never>>(Result.Ok(42), result);
@@ -390,7 +390,7 @@ public class UnjoinedFiberTests
         try
         {
             // When
-            var result = await work.RunAsync(TestContext.Current.CancellationToken);
+            var result = await work.RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             // Then
             Assert.Equal<Result<string, Never>>(Result.Ok("done"), result);
@@ -467,7 +467,7 @@ public class ForkCleanupTests
         });
 
         // When
-        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var loggedWhenTheBlockEnded = log.ToArray();
 
         // Then
@@ -498,10 +498,10 @@ public class ForkCleanupTests
 
         // When
         var running = work.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
-        await started.Task;
-        await cts.CancelAsync();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await cts.CancelAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         gate.SetResult();
-        var exit = await running;
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -571,9 +571,9 @@ public class RaceCanceledIntoErrTests
         {
             // When
             var running = race.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
-            await Task.WhenAll(first.Task, second.Task);
-            await cts.CancelAsync();
-            var exit = await running;
+            await Task.WhenAll(first.Task, second.Task).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await cts.CancelAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             // Then
             Assert.True(exit.TryGetValue(out Interrupted? _));
@@ -599,9 +599,9 @@ public class RaceCanceledIntoErrTests
         {
             // When
             var running = race.RunExitAsync(EmptyEnvironment.Value, cts.Token).AsTask();
-            await Task.WhenAll(first.Task, second.Task);
-            await cts.CancelAsync();
-            var exit = await running;
+            await Task.WhenAll(first.Task, second.Task).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await cts.CancelAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             // Then
             Assert.True(exit.TryGetValue(out Interrupted? _));
@@ -678,12 +678,12 @@ public class JoinSuppressedTests
         var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
         {
             var fiber = await scope.Fork(child);
-            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             return await scope.Run(fiber.Join());
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -702,13 +702,13 @@ public class JoinSuppressedTests
         var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
         {
             var fiber = await scope.Fork(child);
-            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
-            joined = await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            joined = await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             return 0;
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(joined!.Value.TryGetValue(out Die? joinedDie));
@@ -731,12 +731,12 @@ public class JoinSuppressedTests
             for (var i = 0; i < parentFailures; i++)
                 await scope.Run(RaceWhoseLoserFails(new IOException("parent")));
             var fiber = await scope.Fork(child);
-            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             return await scope.Run(fiber.Join());
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -767,14 +767,14 @@ public class JoinSuppressedTests
             Effect<int, string, EmptyEnvironment> childEnded = Effect<EmptyEnvironment>.Async(async _ =>
             {
                 startChild.SetResult();
-                await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+                await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 return 0;
             });
             return await scope.Run(earlier.AndThen(_ => childEnded).AndThen(_ => fiber.Join()));
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -791,7 +791,7 @@ public class JoinSuppressedTests
         var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
         {
             var fiber = await scope.Fork(child);
-            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             for (var i = 0; i < 2; i++)
             {
                 try
@@ -807,7 +807,7 @@ public class JoinSuppressedTests
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
@@ -826,12 +826,12 @@ public class JoinSuppressedTests
         {
             await scope.Run(RaceWhoseLoserFails(cleanup));
             var fiber = await scope.Fork(child);
-            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             return await scope.Run(fiber.Join());
         });
 
         // When
-        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
