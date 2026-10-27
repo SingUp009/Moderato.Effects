@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Resolve timeout clocks without boxing value-type environments.
 
 - Build retained retry failure context directly without copying discarded entries or intermediate arrays.
+- Reuse private recurrence await state across repeated waits while retaining execution-context boundaries.
 
 - Avoid a per-acquisition bound delegate when registering resource releases.
 - Skip discarded retry context arrays when the policy failure already fills the context limit.
