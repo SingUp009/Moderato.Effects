@@ -10,9 +10,9 @@ internal static class Timeouts
         where R : IHas<TimeProvider>
     {
         ThrowIfInvalid(after);
-        var run = effect.Run;
+        effect = effect.Validate();
         var error = new TimeoutError(after);
-        return new((env, context) => RunAsync(run, env, context, after, error, passthrough, timedOut));
+        return new((env, context) => RunAsync(effect, env, context, after, error, passthrough, timedOut));
     }
 
     /// <summary>The longest wait <c>Task.Delay</c> and the system timer accept.</summary>
@@ -27,7 +27,7 @@ internal static class Timeouts
     }
 
     private static async ValueTask<Outcome<U, F>> RunAsync<T, E, U, F, R>(
-        Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R env, RunContext context, TimeSpan after, TimeoutError error,
+        Effect<T, E, R> effect, R env, RunContext context, TimeSpan after, TimeoutError error,
         Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, Outcome<U, F>> timedOut)
         where R : IHas<TimeProvider>
     {
@@ -44,7 +44,7 @@ internal static class Timeouts
             {
                 try
                 {
-                    inner = await run(env, innerContext).ConfigureAwait(false);
+                    inner = await effect.Run(env, innerContext).ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {

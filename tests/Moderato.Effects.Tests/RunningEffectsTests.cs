@@ -54,6 +54,19 @@ public class RunAsyncTests
 public class RunExitAsyncTests
 {
     [Fact]
+    public void RunExitAsync_DefaultEffectWithCanceledToken_ThrowsBeforeReturningInterrupted()
+    {
+        // Given
+        var effect = default(Effect<int, string, EmptyEnvironment>);
+
+        // When
+        Action act = () => _ = effect.RunExitAsync(new CancellationToken(canceled: true));
+
+        // Then
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
     public async Task RunExitAsync_Succeeds_ReturnsOk()
     {
         // Given
@@ -154,6 +167,49 @@ public class RunExitAsyncTests
 
 public class ImplicitConversionTests
 {
+    [Fact]
+    public async Task ImplicitConversion_NullConstantValue_PreservesSuccess()
+    {
+        // Given
+        var source = Effect<EmptyEnvironment>.Succeed<string?>(null);
+
+        // When
+        Effect<string?, int, EmptyEnvironment> effect = source;
+        var result = await effect.RunAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(result.TryGetOk(out var value));
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public async Task ImplicitConversion_NullConstantError_PreservesFailure()
+    {
+        // Given
+        var source = Effect<EmptyEnvironment>.Fail<string?>(null);
+
+        // When
+        Effect<int, string?, EmptyEnvironment> effect = source;
+        var result = await effect.RunAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(result.TryGetErr(out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void ImplicitConversion_DefaultEffect_ThrowsBeforeExecution()
+    {
+        // Given
+        var source = default(Effect<int, Never, EmptyEnvironment>);
+
+        // When
+        Action act = () => _ = (Effect<int, string, EmptyEnvironment>)source;
+
+        // Then
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
     [Fact]
     public async Task ImplicitConversion_EffectThatCannotFail_IsUsableWithAnyErrorType()
     {

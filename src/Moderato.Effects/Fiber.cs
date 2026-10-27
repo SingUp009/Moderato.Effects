@@ -14,7 +14,7 @@ public sealed class Fiber<T, E, R>
     private bool reportedToOwner;
     private int joined;
 
-    private Fiber(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R env, Releases<R> owner, Cancellation cancellation)
+    private Fiber(Effect<T, E, R> effect, R env, Releases<R> owner, Cancellation cancellation)
     {
         this.cancellation = cancellation;
         var context = new RunContext(cancellation.Token);
@@ -23,7 +23,7 @@ public sealed class Fiber<T, E, R>
             Outcome<T, E> outcome;
             try
             {
-                outcome = await run(env, context).ConfigureAwait(false);
+                outcome = await effect.Run(env, context).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -42,10 +42,10 @@ public sealed class Fiber<T, E, R>
 
     internal static Resource<Fiber<T, E, R>, Never, R> Fork(Effect<T, E, R> effect)
     {
-        var run = effect.Run;
+        effect = effect.Validate();
         return new((env, context, releases) =>
         {
-            var fiber = new Fiber<T, E, R>(run, env, releases, new Cancellation(context.CancellationToken));
+            var fiber = new Fiber<T, E, R>(effect, env, releases, new Cancellation(context.CancellationToken));
             releases.Add(_ => new((_, _) => fiber.ReleaseAsync()));
             return new(Outcome<Fiber<T, E, R>, Never>.Ok(fiber));
         });

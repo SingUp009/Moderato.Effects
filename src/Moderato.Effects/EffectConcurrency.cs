@@ -168,7 +168,7 @@ public static partial class Effect
     /// <returns>An effect with the winner's value.</returns>
     public static Effect<T, E, R> Race<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
-        Func<R, RunContext, ValueTask<Outcome<T, E>>>[] runs = [first.Run, second.Run];
+        Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];
         return new((env, context) => Guard(context, async () =>
         {
             var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.SuccessOrDefect).ConfigureAwait(false);
@@ -183,7 +183,7 @@ public static partial class Effect
     /// <returns>An effect with the outcome of the first to finish.</returns>
     public static Effect<T, E, R> RaceFirst<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
-        Func<R, RunContext, ValueTask<Outcome<T, E>>>[] runs = [first.Run, second.Run];
+        Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];
         return new((env, context) => Guard(context, async () =>
         {
             var ends = await Concurrent.RunAsync(runs, env, context, Concurrency.Parallel, StopOn.Anything).ConfigureAwait(false);
@@ -221,10 +221,10 @@ public static partial class Effect
         return chosen.WithSuppressed(chosen.Suppressed.AddRange(others), chosen.Omitted + omitted);
     }
 
-    private static Func<R, RunContext, ValueTask<Outcome<T, E>>>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
+    private static Effect<T, E, R>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
     {
         ArgumentNullException.ThrowIfNull(effects);
-        return [.. effects.Select(static effect => effect.Run)];
+        return [.. effects.Select(static effect => effect.Validate())];
     }
 
     private static Effect<object?, E, R> Box<T, E, R>(Effect<T, E, R> effect) => effect.Map(static value => (object?)value);

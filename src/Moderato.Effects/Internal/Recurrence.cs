@@ -9,20 +9,20 @@ internal static class Recurrence
         Effect<T, E, R> effect, Func<R, RunContext, TPolicy> start)
         where TPolicy : struct, IRecurrencePolicy<RetryContext<E>, R>
     {
-        var run = effect.Run;
-        return new((env, context) => RetryAsync(run, start, env, context));
+        effect = effect.Validate();
+        return new((env, context) => RetryAsync(effect, start, env, context));
     }
 
     internal static Effect<T, E, R> Repeat<T, E, R, TPolicy>(
         Effect<T, E, R> effect, Func<R, RunContext, TPolicy> start)
         where TPolicy : struct, IRecurrencePolicy<RepeatContext<T>, R>
     {
-        var run = effect.Run;
-        return new((env, context) => RepeatAsync(run, start, env, context));
+        effect = effect.Validate();
+        return new((env, context) => RepeatAsync(effect, start, env, context));
     }
 
     private static async ValueTask<Outcome<T, E>> RetryAsync<T, E, R, TPolicy>(
-        Func<R, RunContext, ValueTask<Outcome<T, E>>> run, Func<R, RunContext, TPolicy> start,
+        Effect<T, E, R> effect, Func<R, RunContext, TPolicy> start,
         R env, RunContext context)
         where TPolicy : struct, IRecurrencePolicy<RetryContext<E>, R>
     {
@@ -38,7 +38,7 @@ internal static class Recurrence
 
         for (var attempt = 1; ; attempt++)
         {
-            var outcome = await RunOnceAsync(run, env, context).ConfigureAwait(false);
+            var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Err) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
@@ -54,7 +54,7 @@ internal static class Recurrence
     }
 
     private static async ValueTask<Outcome<T, E>> RepeatAsync<T, E, R, TPolicy>(
-        Func<R, RunContext, ValueTask<Outcome<T, E>>> run, Func<R, RunContext, TPolicy> start,
+        Effect<T, E, R> effect, Func<R, RunContext, TPolicy> start,
         R env, RunContext context)
         where TPolicy : struct, IRecurrencePolicy<RepeatContext<T>, R>
     {
@@ -70,7 +70,7 @@ internal static class Recurrence
 
         for (var repetition = 1; ; repetition++)
         {
-            var outcome = await RunOnceAsync(run, env, context).ConfigureAwait(false);
+            var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
@@ -84,11 +84,11 @@ internal static class Recurrence
         }
     }
 
-    private static async ValueTask<Outcome<T, E>> RunOnceAsync<T, E, R>(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, R env, RunContext context)
+    private static async ValueTask<Outcome<T, E>> RunOnceAsync<T, E, R>(Effect<T, E, R> effect, R env, RunContext context)
     {
         try
         {
-            return await run(env, context).ConfigureAwait(false);
+            return await effect.Run(env, context).ConfigureAwait(false);
         }
         catch (Exception exception)
         {

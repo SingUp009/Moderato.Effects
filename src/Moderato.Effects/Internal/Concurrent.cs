@@ -34,7 +34,7 @@ internal static class Concurrent
 {
     /// <summary>Runs every child and waits for all that started, releases included.</summary>
     internal static async ValueTask<ChildEnd<T, E>[]> RunAsync<T, E, R>(
-        Func<R, RunContext, ValueTask<Outcome<T, E>>>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
+        Effect<T, E, R>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
     {
         var ends = new ChildEnd<T, E>[children.Length];
         if (children.Length == 0) return ends;
@@ -76,7 +76,7 @@ internal static class Concurrent
             Outcome<T, E> outcome;
             try
             {
-                outcome = await children[i](env, groupContext).ConfigureAwait(false);
+                outcome = await children[i].Run(env, groupContext).ConfigureAwait(false);
             }
             catch (Exception exception)
             {

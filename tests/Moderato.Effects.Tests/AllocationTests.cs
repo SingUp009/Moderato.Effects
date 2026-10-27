@@ -14,6 +14,61 @@ public class AllocationTests
 
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    public async Task RunAsync_NewConstantEffect_AllocatesNothing(int factory, bool cancelable)
+    {
+        // Given
+        using var cancellation = new CancellationTokenSource();
+        var cancellationToken = cancelable ? cancellation.Token : CancellationToken.None;
+        Result<int, string> expected = factory is 1 or 3 ? Result.Err("failed") : Result.Ok(42);
+        await WarmUpAsync(() =>
+        {
+            Effect<int, string, EmptyEnvironment> effect = factory switch
+            {
+                0 => Effect<EmptyEnvironment>.Succeed(42),
+                1 => Effect<EmptyEnvironment>.Fail("failed"),
+                _ => Effect<EmptyEnvironment>.FromResult(expected),
+            };
+            return effect.RunAsync(cancellationToken);
+        });
+
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                Effect<int, string, EmptyEnvironment> effect = factory switch
+                {
+                    0 => Effect<EmptyEnvironment>.Succeed(42),
+                    1 => Effect<EmptyEnvironment>.Fail("failed"),
+                    _ => Effect<EmptyEnvironment>.FromResult(expected),
+                };
+                var run = effect.RunAsync(cancellationToken);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
+
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(expected, result);
+        Assert.Equal(0L, allocated);
+    }
+
     [Fact]
     public async Task RunExitAsync_TokenAlreadyCanceled_AllocatesNothing()
     {

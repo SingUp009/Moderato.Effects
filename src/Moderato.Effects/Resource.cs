@@ -154,8 +154,8 @@ public static class Resource
     public static Resource<T, E, R> Make<T, E, R>(Effect<T, E, R> acquire, Func<T, ExitCase, Effect<Unit, Never, R>> release)
     {
         ArgumentNullException.ThrowIfNull(release);
-        var run = acquire.Run;
-        return new((env, context, releases) => Steps.Then(run(env, context), outcome =>
+        acquire = acquire.Validate();
+        return new((env, context, releases) => Steps.Then(acquire.Run(env, context), outcome =>
         {
             // Registered before any token check, so a cancellation right after cannot leak the value.
             if (outcome.Kind == OutcomeKind.Ok)

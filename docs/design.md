@@ -39,7 +39,8 @@
 
 - `Effect<T, E, R>`。型パラメータの並びは Effect-TS / Results と同じ。
 - 遅延実行される不変の記述で、何度でも実行し直せる。
-- 中身は `Func<R, RunContext, ValueTask<Outcome<T, E>>>`（どちらも内部の型。D18）。概念上は「R と CancellationToken を受け取り、Result を返す非同期の関数」。
+- `Succeed`・`Fail`・`FromResult` は、確定した `Result<T, E>` を構造体に直接保持する。それ以外は `Func<R, RunContext, ValueTask<Outcome<T, E>>>`（内部の型。D18）で遅延実行する。定数の `Never` 変換も値を直接移し、クロージャを作らない。
+- 内部の実行メソッドは定数と遅延処理を判別する。合成や並行処理は Effect 自体を保持し、インスタンスメソッドのデリゲート化によるボックス化を避ける。定数用フィールドは遅延処理にも含まれるため、大きな値型では Effect のコピーコストも考慮する。
 - `default` は不正な状態（Results と同じ方針）。
 - **Never を使った2つの暗黙変換**を持つ。どちらも型パラメータの数が同じなので、型推論も変換も通る（RC2 で確認済み）。
   - `Effect<T, Never, R>` → `Effect<T, E, R>`：失敗しない Effect は、どのエラー型の Effect としても使える。
