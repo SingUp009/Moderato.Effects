@@ -111,6 +111,27 @@ public class RunExitAsyncTests
     }
 
     [Fact]
+    public async Task RunExitAsync_CanceledDuringExecution_ReusesTheInterruptedCase()
+    {
+        // Given
+        using var cancellation = new CancellationTokenSource();
+        var effect = Effect<EmptyEnvironment>.Sync<int>(() =>
+        {
+            cancellation.Cancel();
+            throw new OperationCanceledException(cancellation.Token);
+        });
+
+        // When
+        var beforeExecution = await effect.RunExitAsync(new CancellationToken(canceled: true));
+        var duringExecution = await effect.RunExitAsync(cancellation.Token);
+
+        // Then
+        Assert.True(beforeExecution.TryGetValue(out Interrupted? before));
+        Assert.True(duringExecution.TryGetValue(out Interrupted? during));
+        Assert.Same(before, during);
+    }
+
+    [Fact]
     public async Task RunExitAsync_AnyEnding_CanBeMatchedExhaustively()
     {
         // Given
