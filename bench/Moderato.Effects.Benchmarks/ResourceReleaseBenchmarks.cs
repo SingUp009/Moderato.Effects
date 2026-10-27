@@ -9,6 +9,7 @@ public class ResourceReleaseBenchmarks
     private Effect<int, Never, EmptyEnvironment> use;
     private Effect<int, Never, EmptyEnvironment> gen;
     private Effect<int, Never, EmptyEnvironment> suspendedUse;
+    private Effect<int, Never, EmptyEnvironment> suspendedGen;
 
     private Effect<int, Never, EmptyEnvironment> empty;
     private Effect<int, Never, EmptyEnvironment> defects;
@@ -35,6 +36,11 @@ public class ResourceReleaseBenchmarks
             return Unit.Value;
         });
         suspendedUse = Resource.Make(value, (_, _) => delayedRelease).Use(_ => value);
+        suspendedGen = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            scope.Defer(_ => delayedRelease);
+            return new(42);
+        });
         gen = Scope<Never, EmptyEnvironment>.Gen(scope =>
         {
             scope.Defer(_ => release);
@@ -61,7 +67,8 @@ public class ResourceReleaseBenchmarks
         }
 
         if (Use().Result.UnwrapOr(-1) != 42 || Gen().Result.UnwrapOr(-1) != 42
-            || SuspendedUse().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42)
+            || SuspendedUse().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42
+            || SuspendedGen().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42)
         {
             throw new InvalidOperationException("Unexpected benchmark result.");
         }
@@ -73,5 +80,22 @@ public class ResourceReleaseBenchmarks
     [Benchmark] public ValueTask<Exit<int, Never>> FailingReleases() => defects.RunExitAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Use() => use.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> SuspendedUse() => suspendedUse.RunAsync();
+    [Benchmark] public ValueTask<Result<int, Never>> SuspendedGen() => suspendedGen.RunAsync();
+    [Benchmark]
+    public async ValueTask<Result<int, Never>> RepeatedSuspendedUse()
+    {
+        Result<int, Never> result = default;
+        for (var i = 0; i < 8; i++) result = await suspendedUse.RunAsync().ConfigureAwait(false);
+        return result;
+    }
+
+    [Benchmark]
+    public async ValueTask<Result<int, Never>> RepeatedSuspendedGen()
+    {
+        Result<int, Never> result = default;
+        for (var i = 0; i < 8; i++) result = await suspendedGen.RunAsync().ConfigureAwait(false);
+        return result;
+    }
+
     [Benchmark] public ValueTask<Result<int, Never>> Gen() => gen.RunAsync();
 }
