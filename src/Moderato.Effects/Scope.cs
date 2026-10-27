@@ -197,14 +197,17 @@ public sealed class Scope<E, R>
     /// <summary>A step that did not finish at once, tracking whether the body read it.</summary>
     private abstract class PendingStep
     {
-        private readonly TaskCompletionSource<ExitCase?> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<ExitCase?>? done;
+        private ExitCase? failure;
         private int observed;
 
         /// <summary>Whether the body read the step's result (or its failure).</summary>
         internal bool Observed => Volatile.Read(ref observed) == 1;
 
         /// <summary>Completes with the step's failure, if any, once recorded on the scope.</summary>
-        internal Task<ExitCase?> Done => done.Task;
+        internal ValueTask<ExitCase?> Done => Completed ? new(failure) : new((done ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task);
+
+        internal bool Completed { get; private set; }
 
         internal ExceptionDispatchInfo? Defect { get; private set; }
 
@@ -220,7 +223,9 @@ public sealed class Scope<E, R>
             Defect = defect;
             Consequential = consequential;
             RecordedError = recordedError;
-            done.SetResult(failure);
+            this.failure = failure;
+            Completed = true;
+            done?.SetResult(failure);
         }
     }
 
@@ -272,7 +277,7 @@ public sealed class Scope<E, R>
             steps = unobserved;
             if (Volatile.Read(ref running) is { Observed: false } last) (steps ??= []).Add(last);
             // A step ended by now has its Err on the outcome already.
-            endedWithBody = steps?.ConvertAll(static step => step.Done.IsCompleted);
+            endedWithBody = steps?.ConvertAll(static step => step.Completed);
         }
 
         if (steps is not null) outcome = await SettleUnobservedAsync(outcome, steps, endedWithBody!).ConfigureAwait(false);
@@ -315,7 +320,9 @@ public sealed class Scope<E, R>
         for (var i = 0; i < steps.Count; i++)
         {
             var step = steps[i];
-            if (await step.Done.ConfigureAwait(false) is not { Value: not Interrupted } failure || step.Observed) continue;
+            ValueTask<ExitCase?> done;
+            lock (gate) done = step.Done;
+            if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure || step.Observed) continue;
 
             lock (gate)
             {

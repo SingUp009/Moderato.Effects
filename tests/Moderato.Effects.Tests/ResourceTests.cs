@@ -675,6 +675,42 @@ public class AcquireTests
     }
 
     [Fact]
+    public async Task Run_UnobservedStepDiesDuringScopeCancellation_PreservesItsDefect()
+    {
+        // Given
+        var finish = new TaskCompletionSource();
+        var exception = new IOException("step failed during cancellation");
+        var released = false;
+        var step = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            using var registration = ct.Register(() => finish.SetResult());
+            await finish.Task.ConfigureAwait(false);
+            throw exception;
+        });
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            scope.Defer(_ => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                released = true;
+                return Unit.Value;
+            }));
+            // Inline completion exercises recording between the end snapshot and settlement.
+#pragma warning disable MEFF310
+            _ = scope.Run(step);
+#pragma warning restore MEFF310
+            return new(42);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(exception, die.Exception);
+        Assert.True(released);
+    }
+
+    [Fact]
     public async Task Acquire_NotAwaitedAndFinishingAfterTheBlock_IsStillReleased()
     {
         // Given
