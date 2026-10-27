@@ -43,7 +43,7 @@ public static class EffectScheduleExtensions
         where R : IHas<TimeProvider>
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        return Recurrence.Retry(effect, ScheduledRetry<E, R>(schedule.Spec, when));
+        return Recurrence.Retry(effect, (env, _) => new ScheduledRetry<E, R>(schedule.Spec, env, when));
     }
 
     /// <summary>Tries again on Err as the schedule says, with what it needs from the environment.</summary>
@@ -57,7 +57,7 @@ public static class EffectScheduleExtensions
         where R : IHas<TimeProvider>, TNeed
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        return Recurrence.Retry(effect, ScheduledRetry<E, R>(schedule.Spec, when));
+        return Recurrence.Retry(effect, (env, _) => new ScheduledRetry<E, R>(schedule.Spec, env, when));
     }
 
     /// <summary>Tries again on Err while the policy, which does its own waiting, returns <see langword="true"/>.</summary>
@@ -67,7 +67,7 @@ public static class EffectScheduleExtensions
     public static Effect<T, E, R> Retry<T, E, R>(this Effect<T, E, R> effect, Func<RetryContext<E>, Effect<bool, Never, R>> policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
-        return Recurrence.Retry(effect, (_, _) => policy);
+        return Recurrence.Retry(effect, (_, _) => new EffectPolicy<RetryContext<E>, R>(policy));
     }
 
     /// <summary>Runs again on Ok as the schedule says, ending with the last value or the first Err.</summary>
@@ -81,7 +81,7 @@ public static class EffectScheduleExtensions
         where R : IHas<TimeProvider>
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        return Recurrence.Repeat(effect, ScheduledRepeat<T, R>(schedule.Spec, when));
+        return Recurrence.Repeat(effect, (env, _) => new ScheduledRepeat<T, R>(schedule.Spec, env, when));
     }
 
     /// <summary>Runs again on Ok as the schedule says, with what it needs from the environment.</summary>
@@ -95,7 +95,7 @@ public static class EffectScheduleExtensions
         where R : IHas<TimeProvider>, TNeed
     {
         ArgumentNullException.ThrowIfNull(schedule);
-        return Recurrence.Repeat(effect, ScheduledRepeat<T, R>(schedule.Spec, when));
+        return Recurrence.Repeat(effect, (env, _) => new ScheduledRepeat<T, R>(schedule.Spec, env, when));
     }
 
     /// <summary>Runs again on Ok while the policy, which does its own waiting, returns <see langword="true"/>.</summary>
@@ -105,25 +105,6 @@ public static class EffectScheduleExtensions
     public static Effect<T, E, R> Repeat<T, E, R>(this Effect<T, E, R> effect, Func<RepeatContext<T>, Effect<bool, Never, R>> policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
-        return Recurrence.Repeat(effect, (_, _) => policy);
+        return Recurrence.Repeat(effect, (_, _) => new EffectPolicy<RepeatContext<T>, R>(policy));
     }
-
-    // Both forms share one policy executor, whose state is per run.
-    private static Func<R, RunContext, Func<RetryContext<E>, Effect<bool, Never, R>>> ScheduledRetry<E, R>(ScheduleSpec spec, Func<E, bool>? when)
-        where R : IHas<TimeProvider>
-        => (env, _) =>
-        {
-            var clock = new ScheduleClock<R>(spec, env);
-            return context => when is not null && !when(context.Error) ? Stop<R>() : clock.WaitBefore(context.Attempt);
-        };
-
-    private static Func<R, RunContext, Func<RepeatContext<T>, Effect<bool, Never, R>>> ScheduledRepeat<T, R>(ScheduleSpec spec, Func<T, bool>? when)
-        where R : IHas<TimeProvider>
-        => (env, _) =>
-        {
-            var clock = new ScheduleClock<R>(spec, env);
-            return context => when is not null && !when(context.Value) ? Stop<R>() : clock.WaitBefore(context.Repetition);
-        };
-
-    private static Effect<bool, Never, R> Stop<R>() => Effect<R>.Succeed(false);
 }

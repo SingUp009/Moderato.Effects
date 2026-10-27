@@ -94,7 +94,8 @@ public static class Effect<R>
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(map);
-        return new((_, context) => Steps.Then(Steps.RunAsync<T, E>(body, context), outcome => Catching.Map(outcome, map, context)));
+        return new((_, context) => Steps.Then(Steps.RunAsync<T, E>(body, context), (map, context),
+            static (outcome, state) => Catching.Map(outcome, state.map, state.context)));
     }
 
     /// <summary>The asynchronous form of <see cref="Try{T, E}(Func{T}, Func{Exception, E})"/>.</summary>
@@ -110,7 +111,7 @@ public static class Effect<R>
     public static Effect<T, Never, R> Access<T>(Func<R, T> read)
     {
         ArgumentNullException.ThrowIfNull(read);
-        return new((env, context) => Steps.Run<T, Never>(() => read(env), context));
+        return new((env, context) => Steps.Run<T, Never, R>(read, env, context));
     }
 
     /// <summary>An effect that runs asynchronous code against the environment on each run; exceptions are defects.</summary>
@@ -119,7 +120,7 @@ public static class Effect<R>
     public static Effect<T, Never, R> AccessAsync<T>(Func<R, CancellationToken, ValueTask<T>> read)
     {
         ArgumentNullException.ThrowIfNull(read);
-        return new((env, context) => Steps.RunAsync<T, Never>(ct => read(env, ct), context));
+        return new((env, context) => Steps.RunAsync<T, Never, R>(read, env, context));
     }
 
     /// <summary>The environment itself.</summary>

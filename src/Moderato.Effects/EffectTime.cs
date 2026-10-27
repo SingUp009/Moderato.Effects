@@ -15,13 +15,13 @@ public static partial class Effect
     public static Effect<Unit, Never, R> Sleep<R>(TimeSpan duration) where R : IHas<TimeProvider>
     {
         Timeouts.ThrowIfInvalid(duration);
-        return new((env, context) => Steps.RunAsync<Unit, Never>(
-            async cancellationToken =>
+        return new((env, context) => Steps.RunAsync<Unit, Never, (R Env, TimeSpan Duration)>(
+            static async (state, cancellationToken) =>
             {
-                await Task.Delay(duration, env.Resolve<TimeProvider>(), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(state.Duration, Services.Resolve<TimeProvider, R>(state.Env), cancellationToken).ConfigureAwait(false);
                 return Unit.Value;
             },
-            context));
+            (env, duration), context));
     }
 }
 

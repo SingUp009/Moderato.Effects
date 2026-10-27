@@ -34,7 +34,7 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(binder);
         return Then<U, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(binder(outcome.Value).Run(env, context), next => next.After(outcome))
+            ? Steps.Then(binder(outcome.Value).Run(env, context), outcome, static (next, previous) => next.After(previous))
             : new(outcome.WithValueType<U>()));
     }
 
@@ -45,9 +45,9 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(check);
         return Then<T, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(check(outcome.Value).Run(env, context), next => (next.Kind == OutcomeKind.Ok
-                ? Outcome<T, E>.Ok(outcome.Value).After(next)
-                : next.WithValueType<T>()).After(outcome))
+            ? Steps.Then(check(outcome.Value).Run(env, context), outcome, static (next, previous) => (next.Kind == OutcomeKind.Ok
+                ? Outcome<T, E>.Ok(previous.Value).After(next)
+                : next.WithValueType<T>()).After(previous))
             : new(outcome));
     }
 

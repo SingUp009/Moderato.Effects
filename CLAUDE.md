@@ -32,7 +32,7 @@ dotnet test -c Release
 dotnet format whitespace --verify-no-changes
 dotnet format style --verify-no-changes --severity warn
 dotnet run --project samples/Moderato.Effects.Samples
-dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*'
+dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*' --inProcess
 ```
 
 `tests/Moderato.Effects.PackageTests` is not in the solution: CI runs it against the packed `.nupkg` (see the `package` job in `.github/workflows/ci.yml`). To run it locally, `dotnet pack src/Moderato.Effects -c Release -o artifacts` first and pass `-p:ModeratoEffectsVersion=<Version>`.

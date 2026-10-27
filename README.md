@@ -1,6 +1,6 @@
 # Moderato.Effects
 
-[Effect](https://effect.website) for C#
+Zero Allocation Effect System for C#
 
 ```csharp
 // async / await
@@ -82,8 +82,10 @@ The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderat
 dotnet build
 dotnet test -c Release
 dotnet run --project samples/Moderato.Effects.Samples
-dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*'
+dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*' --inProcess
 ```
+
+BenchmarkDotNet 0.15.8 needs `--inProcess` on the .NET 11 preview.
 
 ## Changelog
 
