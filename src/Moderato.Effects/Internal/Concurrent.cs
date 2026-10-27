@@ -32,6 +32,8 @@ internal readonly record struct ChildEnd<T, E>(Outcome<T, E> Outcome, bool After
 /// <summary>Runs groups of effects under one cancellation unit and decides the group's outcome (D10, D18).</summary>
 internal static class Concurrent
 {
+    private const int MAX_STACK_CHILDREN = 256;
+
     /// <summary>Runs every child and waits for all that started, releases included.</summary>
     internal static ValueTask<ChildEnd<T, E>[]> RunAsync<T, E, R>(
         Effect<T, E, R>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
@@ -179,8 +181,19 @@ internal static class Concurrent
     {
         var builder = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
-        foreach (var i in Enumerable.Range(0, ends.Length).Where(i => ends[i].Ran).OrderBy(i => ends[i].Order))
+        Span<int> indices = ends.Length <= MAX_STACK_CHILDREN ? stackalloc int[ends.Length] : new int[ends.Length];
+        var count = 0;
+        // Completed children have unique, contiguous ranks; unstarted children have no rank.
+        for (var i = 0; i < ends.Length; i++)
         {
+            if (!ends[i].Ran) continue;
+            indices[ends[i].Order - 1] = i;
+            count++;
+        }
+
+        for (var order = 0; order < count; order++)
+        {
+            var i = indices[order];
             var end = ends[i];
             if (i != primary && (end.Outcome.Kind == OutcomeKind.Die || (includeErrs && end.Outcome.Kind == OutcomeKind.Err)))
             {
