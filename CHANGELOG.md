@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Verify asynchronous Result failure classification without caller isolation.
+
 - Pass Effect composition state directly to continuations without separate callback closures.
 - Convert asynchronous Results directly into outcomes without an intermediate outcome continuation.
 
