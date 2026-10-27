@@ -14,6 +14,39 @@ public class AllocationTests
 
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
+    [Fact]
+    public async Task RunExitAsync_TokenAlreadyCanceled_AllocatesNothing()
+    {
+        // Given
+        var calls = 0;
+        var effect = Effect<EmptyEnvironment>.Sync(() => ++calls);
+        var cancellationToken = new CancellationToken(canceled: true);
+        await WarmUpAsync(() => effect.RunExitAsync(cancellationToken));
+
+        // When
+        var completedAtOnce = true;
+        Exit<int, Never> exit = default;
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunExitAsync(cancellationToken);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                exit = await run;
+            }
+
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.Equal(0, calls);
+        Assert.Equal(0L, allocated);
+    }
+
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task RunAsync_PrebuiltSynchronousEffect_AllocatesNothing(AllocationCase scenario)

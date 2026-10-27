@@ -184,5 +184,5 @@ internal static class ExitCases
         return new Failed(error);
     }
 
-    internal static ExitCase Interrupted => interrupted;
+    internal static Interrupted Interrupted => interrupted;
 }
