@@ -652,6 +652,32 @@ public class JoinSuppressedTests
         Assert.Equal(omitted, die.OmittedSuppressed);
     }
 
+    [Fact]
+    public async Task Join_ChildDefectAlreadyReportedToTheParent_GivesTheDefectWhileTheParentKeepsItsSuppressedFailures()
+    {
+        // Given
+        var child = DiesAfterFailedReleases(1, static () => new IOException("cleanup"));
+        Exit<int, string>? joined = null;
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            var fiber = await scope.Fork(child);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            joined = await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            return 0;
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(joined!.Value.TryGetValue(out Die? joinedDie));
+        Assert.Equal("child", joinedDie.Exception.Message);
+        Assert.Empty(joinedDie.Suppressed);
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(joinedDie.Exception, die.Exception);
+        Assert.Equal("cleanup", Assert.IsType<Die>(Assert.Single(die.Suppressed).Case.Value).Exception.Message);
+    }
+
     [Theory]
     [InlineData(99, 119)]
     [InlineData(100, 120)]
@@ -666,6 +692,44 @@ public class JoinSuppressedTests
             var fiber = await scope.Fork(child);
             await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
             return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("child", die.Exception.Message);
+        Assert.Equal(100, die.Suppressed.Count);
+        Assert.Equal(omitted, die.OmittedSuppressed);
+    }
+
+    [Theory]
+    [InlineData(99, 119)]
+    [InlineData(100, 120)]
+    public async Task Join_ComposedAfterAnEffectWithItsOwnSuppressedFailures_CountsTheChildsOmittedFailuresOnce(int earlierFailures, int omitted)
+    {
+        // Given
+        var startChild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> waitToStart = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await startChild.Task;
+            return 0;
+        });
+        var child = waitToStart.AndThen(_ => DiesAfterFailedReleases(120, static () => new IOException("cleanup")));
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            var fiber = await scope.Fork(child);
+            Effect<int, string, EmptyEnvironment> earlier = Effect<EmptyEnvironment>.Succeed(0);
+            for (var i = 0; i < earlierFailures; i++)
+                earlier = earlier.AndThen(_ => RaceWhoseLoserFails(new IOException("parent")));
+            Effect<int, string, EmptyEnvironment> childEnded = Effect<EmptyEnvironment>.Async(async _ =>
+            {
+                startChild.SetResult();
+                await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+                return 0;
+            });
+            return await scope.Run(earlier.AndThen(_ => childEnded).AndThen(_ => fiber.Join()));
         });
 
         // When

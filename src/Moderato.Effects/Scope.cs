@@ -339,10 +339,8 @@ public sealed class Scope<E, R>
     {
         lock (gate)
         {
-            // Dropped before the limit cuts them off, so a child defect counts once however often or late it is joined.
-            var (kept, keptOmitted) = releases.WithoutJoined(outcome.Suppressed, outcome.Omitted);
-            AddSuppressed(kept);
-            omitted += keptOmitted;
+            AddSuppressed(outcome.Suppressed);
+            omitted += outcome.Omitted;
 
             switch (outcome.Kind)
             {
