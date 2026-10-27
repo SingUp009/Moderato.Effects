@@ -8,7 +8,7 @@ namespace Moderato.Effects.Internal;
 internal sealed class Releases<R>(Cancellation bodyCancellation)
 {
     // The owner never escapes to user code, so it can be its own gate.
-    private List<Func<ExitCase, Effect<Unit, Never, R>>>? actions;
+    private List<object>? actions;
     private ImmutableArray<Outcome<Unit, Never>>.Builder? childDefects;
     private bool bodyEnded;
 
@@ -33,10 +33,26 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         lock (this) (actions ??= []).Add(release);
     }
 
+    internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release)
+    {
+        var acquired = new AcquiredRelease<T>(value, release);
+        lock (this) (actions ??= []).Add(acquired);
+    }
+
+    private interface IAcquiredRelease
+    {
+        Effect<Unit, Never, R> Invoke(ExitCase exit);
+    }
+
+    private sealed class AcquiredRelease<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release) : IAcquiredRelease
+    {
+        public Effect<Unit, Never, R> Invoke(ExitCase exit) => release(value, exit);
+    }
+
     /// <summary>Releases everything, then decides the final outcome.</summary>
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
-        List<Func<ExitCase, Effect<Unit, Never, R>>> actions;
+        List<object> actions;
         lock (this)
         {
             bodyEnded = true;
@@ -67,7 +83,11 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             Outcome<Unit, Never> released;
             try
             {
-                released = await actions[i](exit).Run(env, context).ConfigureAwait(false);
+                var action = actions[i];
+                var release = action is Func<ExitCase, Effect<Unit, Never, R>> callback
+                    ? callback(exit)
+                    : ((IAcquiredRelease)action).Invoke(exit);
+                released = await release.Run(env, context).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
