@@ -11,8 +11,8 @@ public readonly partial struct Effect<T, E, R>
     public Effect<U, E, R> Map<U>(Func<T, U> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
-        return Then<U, E>((outcome, _, _) => new(outcome.Kind == OutcomeKind.Ok
-            ? Outcome<U, E>.Ok(mapper(outcome.Value)).After(outcome)
+        return Then<U, E, Func<T, U>>(mapper, static (outcome, _, _, map) => new(outcome.Kind == OutcomeKind.Ok
+            ? Outcome<U, E>.Ok(map(outcome.Value)).After(outcome)
             : outcome.WithValueType<U>()));
     }
 
@@ -22,8 +22,8 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, F, R> MapErr<F>(Func<E, F> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
-        return Then<T, F>((outcome, _, _) => new(outcome.Kind == OutcomeKind.Err
-            ? Outcome<T, F>.Err(mapper(outcome.Error)).After(outcome)
+        return Then<T, F, Func<E, F>>(mapper, static (outcome, _, _, map) => new(outcome.Kind == OutcomeKind.Err
+            ? Outcome<T, F>.Err(map(outcome.Error)).After(outcome)
             : outcome.WithErrorType<F>()));
     }
 
@@ -33,8 +33,8 @@ public readonly partial struct Effect<T, E, R>
     public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return Then<U, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(binder(outcome.Value).Run(env, context), outcome, static (next, previous) => next.After(previous))
+        return Then<U, E, Func<T, Effect<U, E, R>>>(binder, static (outcome, env, context, bind) => outcome.Kind == OutcomeKind.Ok
+            ? Steps.Then(bind(outcome.Value).Run(env, context), outcome, static (next, previous) => next.After(previous))
             : new(outcome.WithValueType<U>()));
     }
 
@@ -44,8 +44,8 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R> AndThrough<U>(Func<T, Effect<U, E, R>> check)
     {
         ArgumentNullException.ThrowIfNull(check);
-        return Then<T, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(check(outcome.Value).Run(env, context), outcome, static (next, previous) => (next.Kind == OutcomeKind.Ok
+        return Then<T, E, Func<T, Effect<U, E, R>>>(check, static (outcome, env, context, checkStep) => outcome.Kind == OutcomeKind.Ok
+            ? Steps.Then(checkStep(outcome.Value).Run(env, context), outcome, static (next, previous) => (next.Kind == OutcomeKind.Ok
                 ? Outcome<T, E>.Ok(previous.Value).After(next)
                 : next.WithValueType<T>()).After(previous))
             : new(outcome));
@@ -57,11 +57,11 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, F, R> OrElse<F>(Func<E, Effect<T, F, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return Then<T, F>((outcome, env, context) =>
+        return Then<T, F, Func<E, Effect<T, F, R>>>(binder, static (outcome, env, context, recover) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return binder(outcome.Error).Run(env, context);
+            return recover(outcome.Error).Run(env, context);
         });
     }
 
@@ -71,9 +71,9 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R> Tap(Action<T> action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        return Then<T, E>((outcome, _, _) =>
+        return Then<T, E, Action<T>>(action, static (outcome, _, _, tap) =>
         {
-            if (outcome.Kind == OutcomeKind.Ok) action(outcome.Value);
+            if (outcome.Kind == OutcomeKind.Ok) tap(outcome.Value);
             return new(outcome);
         });
     }
@@ -84,9 +84,9 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R> TapErr(Action<E> action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        return Then<T, E>((outcome, _, _) =>
+        return Then<T, E, Action<E>>(action, static (outcome, _, _, tap) =>
         {
-            if (outcome.Kind == OutcomeKind.Err) action(outcome.Error);
+            if (outcome.Kind == OutcomeKind.Err) tap(outcome.Error);
             return new(outcome);
         });
     }
@@ -99,10 +99,10 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(ok);
         ArgumentNullException.ThrowIfNull(err);
-        return Then<U, Never>((outcome, _, _) => new(outcome.Kind switch
+        return Then<U, Never, (Func<T, U> ok, Func<E, U> err)>((ok, err), static (outcome, _, _, handlers) => new(outcome.Kind switch
         {
-            OutcomeKind.Ok => Outcome<U, Never>.Ok(ok(outcome.Value)).After(outcome),
-            OutcomeKind.Err => Handled(outcome, err(outcome.Error)),
+            OutcomeKind.Ok => Outcome<U, Never>.Ok(handlers.ok(outcome.Value)).After(outcome),
+            OutcomeKind.Err => Handled(outcome, handlers.err(outcome.Error)),
             _ => outcome.WithTypes<U, Never>(),
         }));
     }
@@ -111,7 +111,7 @@ public readonly partial struct Effect<T, E, R>
     /// <param name="fallback">The value to use on an Err.</param>
     /// <returns>An effect that cannot fail.</returns>
     public Effect<T, Never, R> UnwrapOr(T fallback)
-        => Then<T, Never>((outcome, _, _) => new(Recover(outcome, static (fallback, _) => fallback, fallback)));
+        => Then<T, Never, T>(fallback, static (outcome, _, _, value) => new(Recover(outcome, static (fallback, _) => fallback, value)));
 
     /// <summary>Replaces the error with a value built from it.</summary>
     /// <param name="fallback">Builds the value from the error.</param>
@@ -119,7 +119,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, Never, R> UnwrapOrElse(Func<E, T> fallback)
     {
         ArgumentNullException.ThrowIfNull(fallback);
-        return Then<T, Never>((outcome, _, _) => new(Recover(outcome, static (fallback, error) => fallback(error), fallback)));
+        return Then<T, Never, Func<E, T>>(fallback, static (outcome, _, _, getValue) => new(Recover(outcome, static (fallback, error) => fallback(error), getValue)));
     }
 
     /// <summary>Makes the error a value to match on instead of short-circuiting.</summary>
@@ -137,12 +137,12 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) where F : IUnionRest<F, E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return Then<T, F>((outcome, env, context) =>
+        return Then<T, F, Func<TCase, Effect<T, F, R>>>(handler, static (outcome, env, context, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(Outcome<T, F>.Err(rest).After(outcome));
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return handler(caught).Run(env, context);
+            return handle(caught).Run(env, context);
         });
     }
 
@@ -223,6 +223,34 @@ public readonly partial struct Effect<T, E, R>
             try
             {
                 return next(outcome, env, context);
+            }
+            catch (Exception exception)
+            {
+                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
+            }
+        }
+    }
+
+    /// <summary>Continues with query-owned state.</summary>
+    internal Effect<U, F, R> Then<U, F, TState>(TState state,
+        Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next)
+    {
+        var effect = Validate();
+        return new((env, context) =>
+        {
+            var task = effect.Run(env, context);
+            return task.IsCompletedSuccessfully ? Continue(task.Result, env, context) : Await(task, env, context);
+        });
+
+        // The query owns state, so a suspended run needs only a reference to it.
+        async ValueTask<Outcome<U, F>> Await(ValueTask<Outcome<T, E>> task, R env, RunContext context)
+            => await Continue(await task.ConfigureAwait(false), env, context).ConfigureAwait(false);
+
+        ValueTask<Outcome<U, F>> Continue(Outcome<T, E> outcome, R env, RunContext context)
+        {
+            try
+            {
+                return next(outcome, env, context, state);
             }
             catch (Exception exception)
             {

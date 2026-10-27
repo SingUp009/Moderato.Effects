@@ -78,8 +78,8 @@ public static class EffectLinq
 
             return projected.After(state.outcome);
         };
-        return source.Then<V, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(next(outcome.Value).Run(env, context), (outcome, context), complete)
-            : new(outcome.WithValueType<V>()));
+        return source.Then((next, complete), static (outcome, env, context, state) => outcome.Kind == OutcomeKind.Ok
+            ? Steps.Then(state.next(outcome.Value).Run(env, context), (outcome, context), state.complete)
+            : new ValueTask<Outcome<V, E>>(outcome.WithValueType<V>()));
     }
 }
