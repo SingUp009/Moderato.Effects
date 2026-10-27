@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Pass Effect composition state directly to continuations without separate callback closures.
+- Convert asynchronous Results directly into outcomes without an intermediate outcome continuation.
 
 - Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
 

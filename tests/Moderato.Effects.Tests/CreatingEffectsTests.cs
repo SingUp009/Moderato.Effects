@@ -273,35 +273,97 @@ public class AsyncTests
 
 public class FromResultAsyncTests
 {
-    [Fact]
-    public async Task FromResultAsync_BodyReturnsErr_RunsToErr()
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public async Task FromResultAsync_BodyCompletes_PreservesResultOrRejectsDefault(int kind, bool pending)
     {
         // Given
-        var effect = Effect<EmptyEnvironment>.FromResultAsync(async ct =>
+        Result<int, string> result = kind switch { 0 => Result.Ok(42), 1 => Result.Err("failed"), _ => default };
+        var completion = new TaskCompletionSource<Result<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var effect = Effect<EmptyEnvironment>.FromResultAsync(_ =>
         {
-            await Task.Yield();
-            return (Result<int, string>)Result.Err("not found");
+            calls++;
+            return pending ? new(completion.Task) : new ValueTask<Result<int, string>>(result);
+        });
+        Assert.Equal(0, calls);
+
+        // When
+        var running = effect.RunExitAsync(TestContext.Current.CancellationToken);
+        if (pending) Assert.False(running.IsCompleted);
+        completion.SetResult(result);
+        var first = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var second = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(2, calls);
+        foreach (var exit in new[] { first, second })
+        {
+            if (kind == 0)
+            {
+                Assert.True(exit.TryGetValue(out Ok<int> ok));
+                Assert.Equal(42, ok.Value);
+            }
+            else if (kind == 1)
+            {
+                Assert.True(exit.TryGetValue(out Err<string> err));
+                Assert.Equal("failed", err.Error);
+            }
+            else
+            {
+                Assert.True(exit.TryGetValue(out Die? die));
+                Assert.IsType<InvalidOperationException>(die.Exception);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task FromResultAsync_BodyThrows_PreservesExceptionAndCancellationClassification(bool pending, bool cancel, bool cancellationException)
+    {
+        // Given
+        using var caller = new CancellationTokenSource();
+        var completion = new TaskCompletionSource<Result<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Exception failure = cancellationException ? new OperationCanceledException() : new IOException("failed");
+        var effect = Effect<EmptyEnvironment>.FromResultAsync<int, string>(_ =>
+        {
+            if (pending) return new(completion.Task);
+            if (cancel) caller.Cancel();
+            throw failure;
         });
 
         // When
-        var result = await effect.RunAsync(TestContext.Current.CancellationToken);
+        var running = effect.RunExitAsync(caller.Token);
+        if (pending)
+        {
+            Assert.False(running.IsCompleted);
+            if (cancel) caller.Cancel();
+            completion.SetException(failure);
+        }
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
-        Assert.Equal<Result<int, string>>(Result.Err("not found"), result);
-    }
-
-    [Fact]
-    public async Task FromResultAsync_BodyReturnsDefault_RunExitAsyncReturnsDie()
-    {
-        // Given
-        var effect = Effect<EmptyEnvironment>.FromResultAsync(_ => ValueTask.FromResult(default(Result<int, string>)));
-
-        // When
-        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
-
-        // Then
-        Assert.True(exit.TryGetValue(out Die? die));
-        Assert.IsType<InvalidOperationException>(die.Exception);
+        if (cancel && cancellationException)
+        {
+            Assert.True(exit.TryGetValue(out Interrupted? _));
+        }
+        else
+        {
+            Assert.True(exit.TryGetValue(out Die? die));
+            Assert.Same(failure, die.Exception);
+        }
     }
 }
 

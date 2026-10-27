@@ -57,11 +57,7 @@ public static class Effect<R>
     public static Effect<T, E, R> FromResultAsync<T, E>(Func<CancellationToken, ValueTask<Result<T, E>>> body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        return new((_, context) =>
-        {
-            var task = Steps.RunAsync<Result<T, E>, E>(body, context);
-            return Steps.Then(task, static outcome => outcome.Kind == OutcomeKind.Ok ? Steps.FromResult(outcome.Value) : outcome.WithValueType<T>());
-        });
+        return new((_, context) => Steps.RunResultAsync(body, context));
     }
 
     /// <summary>A typed try/catch: <typeparamref name="TException"/> becomes the error, anything else is a defect.</summary>
