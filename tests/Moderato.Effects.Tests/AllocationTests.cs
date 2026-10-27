@@ -501,6 +501,58 @@ public class AllocationTests
     }
 
     // Warm-up first, so one-time static, delegate and JIT allocations stay out of the measurement.
+    [Fact]
+    public async Task RunExitAsync_FullPrimaryContext_DoesNotAllocateMoreThanPartialPrefix()
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var other = new Suppressed(new Failed("other"), Relation.Parallel);
+        var earlier = Outcome<int, string>.Ok(1).WithSuppressed([other], 3);
+        var first = new Effect<int, string, EmptyEnvironment>((_, _) => new(earlier));
+        var defect = new IOException("primary");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(defect);
+        var effects = new[] { 99, 100 }.Select(count =>
+        {
+            var outcome = Outcome<int, string>.Die(captured, [.. context.Take(count)], omitted: 2);
+            var primary = new Effect<int, string, EmptyEnvironment>((_, _) => new(outcome));
+            return Effect.All([first, primary]);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int[], string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(defect, die.Exception);
+            Assert.Equal(100, die.Suppressed.Count);
+            Assert.Equal(5 + scenario, die.OmittedSuppressed);
+            Assert.Same(scenario == 0 ? other : context[99], die.Suppressed[^1]);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Partial prefix: {allocated[0]}; full prefix: {allocated[1]}");
+    }
+
     private static async Task WarmUpAsync<T>(Func<ValueTask<T>> run)
     {
         for (var i = 0; i < WARM_UP_RUNS; i++) await run();

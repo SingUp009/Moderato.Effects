@@ -221,7 +221,7 @@ public static partial class Effect
 
         var chosen = ends[winner!.Value].Outcome;
         var (others, omitted) = Concurrent.Others(ends, winner);
-        return chosen.WithSuppressed(chosen.Suppressed.AddRange(others), chosen.Omitted + omitted);
+        return chosen.WithSuppressed(others, omitted).After(chosen);
     }
 
     private static Effect<T, E, R>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)

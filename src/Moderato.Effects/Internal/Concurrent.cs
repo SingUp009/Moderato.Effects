@@ -223,6 +223,6 @@ internal static class Concurrent
         var (others, omitted) = Others(ends, primary);
         var chosen = ends[primary].Outcome;
         var failure = chosen.Kind == OutcomeKind.Err ? Outcome<U, F>.Err(error(chosen.Error)) : chosen.WithTypes<U, F>();
-        return failure.WithSuppressed(chosen.Suppressed.AddRange(others), chosen.Omitted + omitted);
+        return failure.WithSuppressed(others, omitted).After(chosen);
     }
 }
