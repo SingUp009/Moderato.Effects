@@ -283,7 +283,7 @@ public sealed class Scope<E, R>
         if (steps is not null) outcome = await SettleUnobservedAsync(outcome, steps, endedWithBody!).ConfigureAwait(false);
 
         closed = true;
-        if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.ToImmutable() ?? [], omitted);
+        if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.DrainToImmutable() ?? [], omitted);
         try
         {
             return await releases.ReleaseAsync(outcome, Env).ConfigureAwait(false);

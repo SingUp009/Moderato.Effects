@@ -72,7 +72,7 @@ internal static class Timeouts
             suppressed.Add(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
             foreach (var failure in inner.Suppressed.AsSpan())
                 if (failure.Case is not Interrupted) suppressed.Add(failure);
-            return inner.WithSuppressed(suppressed.ToImmutable(), inner.Omitted).WithTypes<U, F>();
+            return inner.WithSuppressed(suppressed.DrainToImmutable(), inner.Omitted).WithTypes<U, F>();
         }
 
         Outcome<U, F> timeout;

@@ -766,6 +766,83 @@ public class AllocationTests
         Assert.True(allocated[1] <= allocated[0], $"Empty release context: {allocated[0]}; full release context: {allocated[1]}");
     }
 
+    [Theory]
+    [InlineData("Group")]
+    [InlineData("Gen")]
+    [InlineData("CarriedRelease")]
+    [InlineData("FailedRelease")]
+    public async Task RunExitAsync_ContextFillsBuffer_DoesNotAllocateMoreThanPartialBuffer(string scenario)
+    {
+        // Given
+        var context = Enumerable.Range(0, 8).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var failure = new IOException("primary");
+        var releaseFailure = new IOException("release");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure);
+        var bodyOutcome = Outcome<int, Never>.Die(captured, omitted: 3);
+        var body = new Effect<int, Never, EmptyEnvironment>((_, _) => new(bodyOutcome));
+        var effects = new[] { 7, 8 }.Select(count =>
+        {
+            var stepOutcome = Outcome<int, Never>.Ok(42).WithSuppressed([.. context.Take(count)], 2);
+            var step = new Effect<int, Never, EmptyEnvironment>((_, _) => new(stepOutcome));
+            var releaseOutcome = scenario == "FailedRelease"
+                ? Outcome<Unit, Never>.Die(System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(releaseFailure), [.. context.Take(count - 1)], omitted: 2)
+                : Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([.. context.Take(count)], 2);
+            var release = new Effect<Unit, Never, EmptyEnvironment>((_, _) => new(releaseOutcome));
+            return scenario switch
+            {
+                "Group" => Effect.All([step, body]).Map(static _ => 42),
+                "Gen" => Scope<Never, EmptyEnvironment>.Gen(async scope =>
+                {
+                    await scope.Run(step);
+                    return await scope.Run(body);
+                }),
+                _ => Resource.Make(Effect<EmptyEnvironment>.Succeed(1), (_, _) => release).Use(_ => body),
+            };
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, Never>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var shape = 0; shape < effects.Length; shape++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[shape].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[shape] = await run;
+                }
+
+                allocated[shape] = Math.Min(allocated[shape], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var shape = 0; shape < results.Length; shape++)
+        {
+            Assert.True(results[shape].TryGetValue(out Die? die));
+            Assert.Same(failure, die.Exception);
+            Assert.Equal(7 + shape, die.Suppressed.Count);
+            Assert.Equal(5, die.OmittedSuppressed);
+            if (scenario == "FailedRelease")
+            {
+                Assert.Same(releaseFailure, Assert.IsType<Die>(die.Suppressed[0].Case.Value).Exception);
+                Assert.Equal(context.Take(6 + shape), die.Suppressed.Skip(1));
+            }
+            else
+            {
+                Assert.Equal(context.Take(7 + shape), die.Suppressed);
+            }
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Partial buffer: {allocated[0]}; full buffer: {allocated[1]}");
+    }
+
     private static async Task WarmUpAsync<T>(Func<ValueTask<T>> run)
     {
         for (var i = 0; i < WARM_UP_RUNS; i++) await run();

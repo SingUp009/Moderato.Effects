@@ -214,7 +214,7 @@ internal static class Concurrent
             }
         }
 
-        return (builder.ToImmutable(), omitted);
+        return (builder.DrainToImmutable(), omitted);
     }
 
     /// <summary>The primary child's failure, with the others' failures suppressed.</summary>
