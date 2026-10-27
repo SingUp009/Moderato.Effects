@@ -406,6 +406,47 @@ public class UnjoinedFiberTests
 public class ForkCleanupTests
 {
     [Fact]
+    public async Task Fork_TwoUnjoinedFibers_CancelsAndAwaitsEachInReverseOrder()
+    {
+        // Given
+        TaskCompletionSource[] started =
+        [
+            new(TaskCreationOptions.RunContinuationsAsynchronously),
+            new(TaskCreationOptions.RunContinuationsAsynchronously),
+        ];
+        var stopped = new List<int>();
+        var children = Enumerable.Range(0, 2).Select(index => Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            started[index].SetResult();
+            try
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            finally
+            {
+                lock (stopped) stopped.Add(index);
+            }
+
+            return index;
+        })).ToArray();
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            await scope.Fork(children[0]);
+            await scope.Fork(children[1]);
+            await Task.WhenAll(started.Select(signal => signal.Task));
+            return 42;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Exit<int, Never>>(new Ok<int>(42), exit);
+        Assert.Equal([1, 0], stopped);
+    }
+
+    [Fact]
     public async Task Fork_FibersCancellationCallbackThrows_WaitsForTheFiberAndDiesWithTheCallbackDefect()
     {
         // Given
