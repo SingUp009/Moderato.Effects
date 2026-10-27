@@ -122,3 +122,20 @@ public partial union Either(string?, int?);
 
 [Error]
 public partial union WrappedEither(Either, bool);
+
+/// <summary>An error whose union value cannot be read, as a broken hand-written union would behave.</summary>
+public sealed class BrokenError : System.Runtime.CompilerServices.IUnion
+{
+    private int reads;
+
+    public int Reads => Volatile.Read(ref reads);
+
+    public object? Value
+    {
+        get
+        {
+            Interlocked.Increment(ref reads);
+            throw new InvalidOperationException("error getter");
+        }
+    }
+}

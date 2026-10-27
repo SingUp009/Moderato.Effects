@@ -998,3 +998,133 @@ public class ReleaseSuppressedTests
         lock (reported) return [.. reported.Select(static failure => failure.Value).OfType<Die>().Where(static die => die.Exception.Message == MESSAGE)];
     }
 }
+
+public class BrokenUnionErrorTests
+{
+    [Fact]
+    public async Task Use_ErrorWhoseUnionValueThrows_RunsTheReleaseOnceAndDies()
+    {
+        // Given
+        var error = new BrokenError();
+        var releases = new List<ExitCase>();
+        var resource = Resource.Make<int, BrokenError, EmptyEnvironment>(
+            acquire: Effect<EmptyEnvironment>.Succeed(1),
+            release: (_, exit) => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                releases.Add(exit);
+                return Unit.Value;
+            }));
+        var use = resource.Use(_ => Effect<EmptyEnvironment>.Fail(error));
+
+        // When
+        var exit = await use.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("error getter", Assert.IsType<InvalidOperationException>(die.Exception).Message);
+        Assert.Contains(die.Suppressed, s => s.Case.Value is Failed { Error: BrokenError });
+        Assert.Single(releases, released => released.Value is Die);
+        Assert.Equal(1, error.Reads);
+    }
+
+    [Fact]
+    public async Task Use_ErrorWhoseUnionValueThrowsAfterEarlierFailures_GivesTheReleaseThemToo()
+    {
+        // Given
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, BrokenError, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, BrokenError, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async token =>
+        {
+            loserStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            throw new IOException("earlier");
+        });
+        Die? released = null;
+        var resource = Resource.Make<int, BrokenError, EmptyEnvironment>(
+            acquire: Effect<EmptyEnvironment>.Succeed(1),
+            release: (_, exit) => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                released = exit.Value as Die;
+                return Unit.Value;
+            }));
+        var use = resource.Use(_ => Effect.Race(winner, loser).AndThen<int>(_ => Effect<EmptyEnvironment>.Fail(new BrokenError())));
+
+        // When
+        var exit = await use.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.NotNull(released);
+        Assert.Same(die.Exception, released.Exception);
+        Assert.Equal(die.Suppressed, released.Suppressed);
+        Assert.Equal(die.OmittedSuppressed, released.OmittedSuppressed);
+        Assert.Contains(released.Suppressed, s => s.Case.Value is Die { Exception.Message: "earlier" });
+    }
+
+    [Fact]
+    public async Task Run_PendingStepFailsWithErrorWhoseUnionValueThrows_Completes()
+    {
+        // Given
+        var error = new BrokenError();
+        Effect<int, BrokenError, EmptyEnvironment> slow = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await Task.Delay(20, CancellationToken.None);
+            return 1;
+        });
+        var fails = slow.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail(error));
+        var work = Scope<BrokenError, EmptyEnvironment>.Gen(async scope => await scope.Run(fails));
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Err<BrokenError> err));
+        Assert.Same(error, err.Error);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Run_StepFailsWithErrorWhoseUnionValueThrowsBeforeADefer_RunsTheReleaseOnceAndDies(bool pending)
+    {
+        // Given
+        var error = new BrokenError();
+        var releases = new List<ExitCase>();
+        Effect<int, BrokenError, EmptyEnvironment> source = pending
+            ? Effect<EmptyEnvironment>.Async(async _ =>
+            {
+                await Task.Delay(20, CancellationToken.None);
+                return 1;
+            })
+            : Effect<EmptyEnvironment>.Succeed(1);
+        var fails = source.AndThen<int>(_ => Effect<EmptyEnvironment>.Fail(error));
+        var work = Scope<BrokenError, EmptyEnvironment>.Gen(async scope =>
+        {
+            scope.Defer(exit => Effect<EmptyEnvironment>.Sync(() =>
+            {
+                releases.Add(exit);
+                return Unit.Value;
+            }));
+            return await scope.Run(fails);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("error getter", Assert.IsType<InvalidOperationException>(die.Exception).Message);
+        Assert.Single(releases, released => released.Value is Die);
+    }
+}
