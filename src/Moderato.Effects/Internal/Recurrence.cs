@@ -130,7 +130,7 @@ internal static class Recurrence
         ImmutableArray<Suppressed> context = ExitCases.FailureOf(last) is { } lastFailure
             ? [new Suppressed(lastFailure, Relation.Sequential), .. last.Suppressed]
             : last.Suppressed;
-        return failure.WithSuppressed(failure.Suppressed.AddRange(context), failure.Omitted + last.Omitted);
+        return failure.WithSuppressed(context, last.Omitted).After(failure);
     }
 }
 
