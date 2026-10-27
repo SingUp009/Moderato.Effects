@@ -28,6 +28,7 @@ Console.WriteLine($"Prepared arena construction, reassignment, mixed-node array,
 Console.WriteLine("Capacity rejection, unchanged existing nodes, stale/default/foreign handles and reset during execution verified.");
 
 PendingChecks.Run();
+BindChecks.Run();
 
 void Exercise()
 {
