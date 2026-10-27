@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
+
 - Remove Effect LINQ selector adapters and widen second-step outcomes in the projection continuation.
 
 - Project Resource LINQ results directly without constructing mapped resources on each run.
