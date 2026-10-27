@@ -189,6 +189,52 @@ public class LinqContinuationTests
         Assert.Equal(first, second);
     }
 
+    [Theory]
+    [InlineData(0, false, 1)]
+    [InlineData(0, false, 99)]
+    [InlineData(0, true, 1)]
+    [InlineData(0, true, 99)]
+    [InlineData(1, false, 1)]
+    [InlineData(1, false, 99)]
+    [InlineData(1, true, 1)]
+    [InlineData(1, true, 99)]
+    [InlineData(2, false, 1)]
+    [InlineData(2, false, 99)]
+    [InlineData(2, true, 1)]
+    [InlineData(2, true, 99)]
+    [InlineData(3, false, 1)]
+    [InlineData(3, false, 99)]
+    [InlineData(3, true, 1)]
+    [InlineData(3, true, 99)]
+    public async Task SelectMany_SuccessThenDefect_PreservesBothStepsContext(int overload, bool pending, int firstCount)
+    {
+        // Given
+        var earlier = Enumerable.Range(0, firstCount).Select(i => new Suppressed(new Failed($"earlier {i}"), Relation.Sequential)).ToArray();
+        var later = Enumerable.Range(0, 2).Select(i => new Suppressed(new Failed($"later {i}"), Relation.Parallel)).ToArray();
+        var first = Outcome<int, Never>.Ok(20).WithSuppressed([.. earlier], 2);
+        var last = Outcome<int, Never>.Ok(22).WithSuppressed([.. later], 3);
+        var completion = new TaskCompletionSource<Outcome<int, Never>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, Never, EmptyEnvironment>((_, _) => new(first));
+        var next = new Effect<int, Never, EmptyEnvironment>((_, _) => pending ? new(completion.Task) : new(last));
+        var query = Query(overload, source, next, static (a, b) => a + b);
+        var failure = new IOException("after projection");
+        var seen = 0;
+
+        // When
+        var running = query.AndThen(value => Effect<EmptyEnvironment>.Sync<int>(() => { seen = value; throw failure; }))
+            .RunExitAsync(TestContext.Current.CancellationToken);
+        if (pending) Assert.False(running.IsCompleted);
+        completion.SetResult(last);
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Equal(42, seen);
+        Assert.Equal(earlier.Concat(later).Take(100), die.Suppressed);
+        Assert.Equal(5 + Math.Max(0, firstCount + 2 - 100), die.OmittedSuppressed);
+    }
+
     private static Effect<int, string, EmptyEnvironment> Query(int overload,
         Effect<int, Never, EmptyEnvironment> source, Effect<int, Never, EmptyEnvironment> next, Func<int, int, int> project)
     {
