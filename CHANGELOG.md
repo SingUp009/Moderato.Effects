@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Transfer the registered release list to cleanup without copying it to an array.
+
 - Skip unobserved-step tracking lists when a Gen block has no steps left to settle.
 - Create step-completion notifications only when a Gen block must wait for an unobserved step.
 
