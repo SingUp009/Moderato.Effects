@@ -16,6 +16,54 @@ public class AllocationTests
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
     [Fact]
+    public async Task RunAsync_GroupContextExceedsLimit_AllocatesLikeRetainedPrefix()
+    {
+        // Given
+        var earlier = Outcome<int, string>.Ok(1).WithSuppressed(
+            [.. Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential))], 2);
+        var retained = Outcome<int, string>.Ok(2).WithSuppressed([], 3);
+        var overflowing = Outcome<int, string>.Ok(2).WithSuppressed(earlier.Suppressed, 3);
+        var first = new Effect<int, string, EmptyEnvironment>((_, _) => new(earlier));
+        Effect<int, string, EmptyEnvironment>[] next =
+        [
+            new((_, _) => new(retained)),
+            new((_, _) => new(overflowing)),
+        ];
+        var effects = next.Select(second => Effect.All([first, second])).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Result<int[], string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        foreach (var result in results)
+        {
+            Assert.True(result.TryGetOk(out var values));
+            Assert.Equal([1, 2], values);
+        }
+
+        Assert.Equal(allocated[0], allocated[1]);
+    }
+
+    [Fact]
     public async Task RunExitAsync_ReplacingSaturatedErrorContext_AllocatesLikeRetainedPrefix()
     {
         // Given

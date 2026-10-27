@@ -158,7 +158,7 @@ internal static class Concurrent
     private static int Earlier<T, E>(ChildEnd<T, E>[] ends, int? current, int candidate)
         => current is { } c && ends[c].Order < ends[candidate].Order ? c : candidate;
 
-    /// <summary>Every failure but the primary's, in order of ending, then what each child suppressed.</summary>
+    /// <summary>Retained context from non-primary children, in completion order, plus omitted counts.</summary>
     internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Others<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
     {
         var omitted = 0;
@@ -200,14 +200,17 @@ internal static class Concurrent
             if (i != primary && (end.Outcome.Kind == OutcomeKind.Die || (includeErrs && end.Outcome.Kind == OutcomeKind.Err)))
             {
                 var relation = end.IsIndependentFailure ? Relation.Parallel : Relation.Consequence;
+                // Project discarded errors too: union getters may run user code.
                 var failure = end.Outcome.Kind == OutcomeKind.Die ? ExitCases.Die(end.Outcome.Defect!) : ExitCases.Failed(end.Outcome.Error);
-                builder.Add(new Suppressed(failure, relation));
+                if (builder.Count < SuppressedLimit.MAX) builder.Add(new Suppressed(failure, relation));
+                else omitted++;
             }
 
             if (i != primary)
             {
-                builder.AddRange(end.Outcome.Suppressed);
-                omitted += end.Outcome.Omitted;
+                var retained = Math.Min(end.Outcome.Suppressed.Length, SuppressedLimit.MAX - builder.Count);
+                builder.AddRange(end.Outcome.Suppressed.AsSpan()[..retained]);
+                omitted += end.Outcome.Omitted + end.Outcome.Suppressed.Length - retained;
             }
         }
 
