@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Use one async wrapper for Sleep so suspended waits avoid an intermediate result state.
+
 - Fill group result arrays directly and avoid per-run wrapper closures in group and race execution.
 
 - Skip failure aggregation buffers when a group has no stored secondary failures, retaining omitted counts.
