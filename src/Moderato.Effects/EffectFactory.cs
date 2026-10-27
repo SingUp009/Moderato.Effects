@@ -87,8 +87,7 @@ public static class Effect<R>
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(map);
-        return new((_, context) => Steps.Then(Steps.RunAsync<T, E>(body, context), (map, context),
-            static (outcome, state) => Catching.Map(outcome, state.map, state.context)));
+        return new((_, context) => Catching.RunAsync(body, map, context));
     }
 
     /// <summary>The asynchronous form of <see cref="Try{T, E}(Func{T}, Func{Exception, E})"/>.</summary>
@@ -122,6 +121,38 @@ public static class Effect<R>
 
 file static class Catching
 {
+    /// <summary>Awaits user code and maps its outcome in one continuation.</summary>
+    internal static ValueTask<Outcome<T, E>> RunAsync<TException, T, E>(
+        Func<CancellationToken, ValueTask<T>> body, Func<TException, E> map, RunContext context) where TException : Exception
+    {
+        ValueTask<T> task;
+        try
+        {
+            task = body(context.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return new(Map(Defects.From<T, E>(exception, context), map, context));
+        }
+
+        return task.IsCompletedSuccessfully ? new(Outcome<T, E>.Ok(task.Result)) : Await(task, map, context);
+
+        static async ValueTask<Outcome<T, E>> Await(ValueTask<T> task, Func<TException, E> map, RunContext context)
+        {
+            Outcome<T, E> outcome;
+            try
+            {
+                outcome = Outcome<T, E>.Ok(await task.ConfigureAwait(false));
+            }
+            catch (Exception exception)
+            {
+                outcome = Defects.From<T, E>(exception, context);
+            }
+
+            return Map(outcome, map, context);
+        }
+    }
+
     /// <summary>Turns a defect of the caught type into the error; the run's own cancellation is never caught.</summary>
     internal static Outcome<T, E> Map<TException, T, E>(Outcome<T, E> outcome, Func<TException, E> map, RunContext context)
         where TException : Exception
