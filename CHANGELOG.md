@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Project Resource LINQ results directly without constructing mapped resources on each run.
+
 - Bound independent timeout-defect context before building its immutable array.
 
 - Copy only retained canceled-body context after a timeout, counting discarded entries as omitted.
