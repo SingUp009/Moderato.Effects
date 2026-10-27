@@ -42,6 +42,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Filter timeout failure context directly without allocating a LINQ sequence.
 
+- Bound context collected from failed releases and count entries beyond the retained prefix.
+
 - Bound carried context from successful releases before merging it with the final failure.
 
 - Copy only retained error context when a mapper replaces an error with a defect.

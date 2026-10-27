@@ -143,8 +143,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         omitted += body.Omitted;
         if (body.Kind == OutcomeKind.Die && !body.Consequential)
         {
-            suppressed.AddRange(body.Suppressed);
-            AddReleaseFailures(suppressed, defects, 0);
+            omitted += AddContext(suppressed, body.Suppressed);
+            omitted += AddReleaseFailures(suppressed, defects, 0);
             return Outcome<T, E>.Die(body.Defect!, suppressed.ToImmutable(), omitted: omitted);
         }
 
@@ -152,20 +152,32 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var primary = defects[0];
         if (ExitCases.FailureOf(body) is { } bodyFailure)
             suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));
-        suppressed.AddRange(body.Suppressed);
-        suppressed.AddRange(primary.Suppressed);
-        AddReleaseFailures(suppressed, defects, 1);
+        omitted += AddContext(suppressed, body.Suppressed);
+        omitted += AddContext(suppressed, primary.Suppressed);
+        omitted += AddReleaseFailures(suppressed, defects, 1);
         return Outcome<T, E>.Die(primary.Defect!, suppressed.ToImmutable(), omitted: omitted);
     }
 
-    private static void AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int start)
+    private static int AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int start)
     {
+        var omitted = 0;
         for (var i = start; i < defects.Count; i++)
         {
             var defect = defects[i];
-            suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
-            suppressed.AddRange(defect.Suppressed);
+            if (suppressed.Count < SuppressedLimit.MAX)
+                suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
+            else omitted++;
+            omitted += AddContext(suppressed, defect.Suppressed);
         }
+
+        return omitted;
+    }
+
+    private static int AddContext(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Suppressed> context)
+    {
+        var retained = Math.Min(context.Length, SuppressedLimit.MAX - suppressed.Count);
+        suppressed.AddRange(context.AsSpan()[..retained]);
+        return context.Length - retained;
     }
 }
 
