@@ -1,6 +1,6 @@
 # Moderato.Effects
 
-[Effect](https://effect.website) for C#
+Zero Allocation Effect System for C#
 
 ```csharp
 // async / await
@@ -45,26 +45,6 @@ var message = result switch
 Results are [Moderato.Results](https://github.com/SingUp009/Moderato.Results) `Result<T, E>` values, so everything that works with a `Result` works here.
 
 **Warning:** .NET 11 is in preview, and so is this library.
-
-## Zero allocation
-
-Running an effect that is already built should cost nothing on the managed heap. An effect is built once and run many times, so the library keeps its per-run work free of closures, context objects and boxing, and regression tests hold each covered operator to 0 bytes per run.
-
-A run allocates nothing when:
-
-- the effect, its callbacks and the environment were built beforehand and have run once;
-- it runs with no `CancellationToken` (or `CancellationToken.None`);
-- every step completes synchronously, and callbacks and the effects they return allocate nothing themselves;
-- it ends with Ok or Err, with no exception, interruption or suppressed failure.
-
-| Covered | Not yet covered |
-|---|---|
-| `Sync`, `Access`, `Try`, and `Async` / `AccessAsync` / `TryAsync` / `FromResultAsync` that complete at once | building effects |
-| `Map`, `MapErr`, `Tap`, `TapErr`, `Match`, `UnwrapOr`, `UnwrapOrElse`, `Attempt`, `Provide` | a cancelable token, `Timeout` |
-| `AndThen`, `AndThrough`, `OrElse` returning a reused effect, and `CatchCase` with a handler that cannot fail | Gen blocks, resources, fibers, `Race`, `OnThreadPool` |
-| LINQ query syntax over effects | `All`, `AllSettled`, `AllErrors` |
-| `Retry` / `Repeat` with a policy, or with a schedule whose waits are zero and not jittered | jitter, waits longer than zero, work that completes asynchronously |
-| `Effect.Sleep(TimeSpan.Zero)`, also with a value-type environment | exceptions and suppressed failures |
 
 ## Requirements
 
