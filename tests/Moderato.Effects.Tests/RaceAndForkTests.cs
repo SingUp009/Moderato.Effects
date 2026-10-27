@@ -585,3 +585,89 @@ public class RaceCanceledIntoErrTests
         lock (reported) return [.. reported.Select(static failure => failure.Value).OfType<Die>().Where(static die => die.Exception.Message == MESSAGE)];
     }
 }
+
+public class JoinSuppressedTests
+{
+    // A child that dies after registering releases that each fail, so its defect carries their failures.
+    private static Effect<int, string, EmptyEnvironment> DiesAfterFailedReleases(int releaseFailures, Func<Exception> cleanup)
+        => Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            for (var i = 0; i < releaseFailures; i++)
+            {
+#pragma warning disable MEFF305
+                scope.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw cleanup()));
+#pragma warning restore MEFF305
+            }
+
+            throw new InvalidOperationException("child");
+        });
+
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(120, 100, 20)]
+    public async Task Join_ChildDefectAlreadyReportedToTheParent_KeepsItsSuppressedFailuresOnce(int releaseFailures, int kept, int omitted)
+    {
+        // Given
+        var child = DiesAfterFailedReleases(releaseFailures, static () => new IOException("cleanup"));
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            var fiber = await scope.Fork(child);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("child", die.Exception.Message);
+        Assert.Equal(kept, die.Suppressed.Count);
+        Assert.All(die.Suppressed, s => Assert.IsType<IOException>(Assert.IsType<Die>(s.Case.Value).Exception));
+        Assert.Equal(omitted, die.OmittedSuppressed);
+    }
+
+    [Fact]
+    public async Task Join_ParentAlsoSuppressedTheSameException_KeepsTheParentsOwnFailure()
+    {
+        // Given
+        var cleanup = new IOException("cleanup");
+        var child = DiesAfterFailedReleases(1, () => cleanup);
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, string, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async token =>
+        {
+            loserStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            throw cleanup;
+        });
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            await scope.Run(Effect.Race(winner, loser));
+            var fiber = await scope.Fork(child);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("child", die.Exception.Message);
+        Assert.Equal(2, die.Suppressed.Count);
+        Assert.All(die.Suppressed, s => Assert.Same(cleanup, Assert.IsType<Die>(s.Case.Value).Exception));
+        Assert.Equal([Relation.Sequential, Relation.Consequence], die.Suppressed.Select(s => s.Relation).Order());
+    }
+}
