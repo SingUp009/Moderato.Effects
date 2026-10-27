@@ -149,6 +149,46 @@ public class LinqContinuationTests
         Assert.True(exit.TryGetValue(out Interrupted? _));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task SelectMany_ConstructingQueries_DoesNotRunStepsOrProjection(int overload)
+    {
+        // Given
+        var sourceRuns = 0;
+        var nextRuns = 0;
+        var projections = 0;
+        var source = Effect<EmptyEnvironment>.Sync(() => { sourceRuns++; return 20; });
+        var next = Effect<EmptyEnvironment>.Sync(() => { nextRuns++; return 22; });
+        Effect<int, string, EmptyEnvironment> typedSource = source;
+        Effect<int, string, EmptyEnvironment> typedNext = next;
+        int Project(int a, int b) { projections++; return a + b; }
+        Effect<int, string, EmptyEnvironment> query = default;
+
+        // When
+        for (var i = 0; i < 8; i++)
+        {
+            query = overload switch
+            {
+                0 => from a in typedSource from b in typedNext select Project(a, b),
+                1 => from a in typedSource from b in next select Project(a, b),
+                2 => from a in source from b in typedNext select Project(a, b),
+                _ => from a in source from b in next select Project(a, b),
+            };
+        }
+        var beforeRun = (sourceRuns, nextRuns, projections);
+        var first = await query.RunAsync(TestContext.Current.CancellationToken);
+        var second = await query.RunAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal((0, 0, 0), beforeRun);
+        Assert.Equal((2, 2, 2), (sourceRuns, nextRuns, projections));
+        Assert.Equal<Result<int, string>>(Result.Ok(42), first);
+        Assert.Equal(first, second);
+    }
+
     private static Effect<int, string, EmptyEnvironment> Query(int overload,
         Effect<int, Never, EmptyEnvironment> source, Effect<int, Never, EmptyEnvironment> next, Func<int, int, int> project)
     {

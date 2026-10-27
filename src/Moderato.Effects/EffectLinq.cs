@@ -25,7 +25,7 @@ public static class EffectLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return Bind(source, (value, env, context) => selector(value).Run(env, context), resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome);
     }
 
     /// <summary><c>from … from … select</c> where the second step cannot fail.</summary>
@@ -34,8 +34,7 @@ public static class EffectLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return Bind<T, E, R, U, V>(source, (value, env, context) =>
-            Steps.Then(selector(value).Run(env, context), static outcome => outcome.WithErrorType<E>()), resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome.WithErrorType<E>());
     }
 
     /// <summary><c>from … from … select</c> where the first step cannot fail.</summary>
@@ -45,7 +44,7 @@ public static class EffectLinq
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
         Effect<T, E, R> widened = source;
-        return Bind(widened, (value, env, context) => selector(value).Run(env, context), resultSelector);
+        return Bind(widened, selector, resultSelector, static outcome => outcome);
     }
 
     /// <summary><c>from … from … select</c> where neither step can fail.</summary>
@@ -54,28 +53,33 @@ public static class EffectLinq
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(resultSelector);
-        return Bind(source, (value, env, context) => selector(value).Run(env, context), resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome);
     }
 
     // Projects the next outcome directly, since building a Map per run would allocate.
-    private static Effect<V, E, R> Bind<T, E, R, U, V>(Effect<T, E, R> source,
-        Func<T, R, RunContext, ValueTask<Outcome<U, E>>> next, Func<T, U, V> project)
-        => source.Then<V, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(next(outcome.Value, env, context), (outcome, project, context), static (end, state) =>
+    private static Effect<V, E, R> Bind<T, E, R, U, F, V>(Effect<T, E, R> source,
+        Func<T, Effect<U, F, R>> next, Func<T, U, V> project, Func<Outcome<U, F>, Outcome<U, E>> widen)
+    {
+        // Kept with the query so suspended runs carry only their outcome and context.
+        Func<Outcome<U, F>, (Outcome<T, E> outcome, RunContext context), Outcome<V, E>> complete = (raw, state) =>
+        {
+            var end = widen(raw);
+            if (end.Kind != OutcomeKind.Ok) return end.WithValueType<V>().After(state.outcome);
+
+            Outcome<V, E> projected;
+            try
             {
-                if (end.Kind != OutcomeKind.Ok) return end.WithValueType<V>().After(state.outcome);
+                projected = Outcome<V, E>.Ok(project(state.outcome.Value, end.Value)).After(end);
+            }
+            catch (Exception exception)
+            {
+                projected = Defects.From<V, E>(exception, state.context).Replacing(end);
+            }
 
-                Outcome<V, E> projected;
-                try
-                {
-                    projected = Outcome<V, E>.Ok(state.project(state.outcome.Value, end.Value)).After(end);
-                }
-                catch (Exception exception)
-                {
-                    projected = Defects.From<V, E>(exception, state.context).Replacing(end);
-                }
-
-                return projected.After(state.outcome);
-            })
+            return projected.After(state.outcome);
+        };
+        return source.Then<V, E>((outcome, env, context) => outcome.Kind == OutcomeKind.Ok
+            ? Steps.Then(next(outcome.Value).Run(env, context), (outcome, context), complete)
             : new(outcome.WithValueType<V>()));
+    }
 }
