@@ -59,8 +59,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         // Releases ignore the run's token, which would otherwise stop a rollback.
         var context = new RunContext(CancellationToken.None);
 
-        var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>();
-        var carried = ImmutableArray.CreateBuilder<Suppressed>();
+        ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
+        ImmutableArray<Suppressed>.Builder? carried = null;
         var carriedOmitted = 0;
         for (var i = actions.Length - 1; i >= 0; i--)
         {
@@ -76,20 +76,21 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
 
             if (released.Kind == OutcomeKind.Die)
             {
-                defects.Add(released);
+                (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(released);
             }
             else
             {
                 // A successful release may still carry failures, such as a dead Race loser.
-                carried.AddRange(released.Suppressed);
+                if (!released.Suppressed.IsEmpty)
+                    (carried ??= ImmutableArray.CreateBuilder<Suppressed>()).AddRange(released.Suppressed);
                 carriedOmitted += released.Omitted;
             }
         }
 
-        var outcome = defects.Count == 0 ? body : Combine(body, defects.ToImmutable());
-        return carried.Count == 0 && carriedOmitted == 0
+        var outcome = defects is null ? body : Combine(body, defects.ToImmutable());
+        return carried is null && carriedOmitted == 0
             ? outcome
-            : outcome.WithSuppressed(outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
+            : outcome.WithSuppressed(carried is null ? outcome.Suppressed : outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
     }
 
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
