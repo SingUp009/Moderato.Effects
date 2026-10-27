@@ -78,16 +78,16 @@ public readonly struct Resource<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(mapper);
         var acquire = Acquire;
-        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), outcome =>
+        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), (mapper, context), static (outcome, state) =>
         {
             if (outcome.Kind != OutcomeKind.Ok) return outcome.WithValueType<U>();
             try
             {
-                return Outcome<U, E>.Ok(mapper(outcome.Value)).After(outcome);
+                return Outcome<U, E>.Ok(state.mapper(outcome.Value)).After(outcome);
             }
             catch (Exception exception)
             {
-                return Defects.From<U, E>(exception, context).After(outcome);
+                return Defects.From<U, E>(exception, state.context).After(outcome);
             }
         }));
     }
@@ -99,16 +99,16 @@ public readonly struct Resource<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(mapper);
         var acquire = Acquire;
-        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), outcome =>
+        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), (mapper, context), static (outcome, state) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return outcome.WithErrorType<F>();
             try
             {
-                return Outcome<T, F>.Err(mapper(outcome.Error)).After(outcome);
+                return Outcome<T, F>.Err(state.mapper(outcome.Error)).After(outcome);
             }
             catch (Exception exception)
             {
-                return Defects.From<T, F>(exception, context).Replacing(outcome);
+                return Defects.From<T, F>(exception, state.context).Replacing(outcome);
             }
         }));
     }
@@ -155,13 +155,14 @@ public static class Resource
     {
         ArgumentNullException.ThrowIfNull(release);
         acquire = acquire.Validate();
-        return new((env, context, releases) => Steps.Then(acquire.Run(env, context), outcome =>
+        return new((env, context, releases) => Steps.Then(acquire.Run(env, context), (release, releases), static (outcome, state) =>
         {
             // Registered before any token check, so a cancellation right after cannot leak the value.
             if (outcome.Kind == OutcomeKind.Ok)
             {
                 var value = outcome.Value;
-                releases.Add(exit => release(value, exit));
+                var release = state.release;
+                state.releases.Add(exit => release(value, exit));
             }
 
             return outcome;
