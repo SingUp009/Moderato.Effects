@@ -35,7 +35,7 @@ internal static class Timeouts
         bool timedOutFirst;
         try
         {
-            var clock = env.Resolve<TimeProvider>();
+            var clock = Services.Resolve<TimeProvider, R>(env);
             using var cancellation = new Cancellation(context.CancellationToken);
             var innerContext = new RunContext(cancellation.Token);
             var timer = clock.CreateTimer(
