@@ -8,6 +8,7 @@ public class ResourceReleaseBenchmarks
 {
     private Effect<int, Never, EmptyEnvironment> use;
     private Effect<int, Never, EmptyEnvironment> gen;
+    private Effect<int, Never, EmptyEnvironment> suspendedUse;
 
     private Effect<int, Never, EmptyEnvironment> empty;
     private Effect<int, Never, EmptyEnvironment> defects;
@@ -28,6 +29,12 @@ public class ResourceReleaseBenchmarks
         });
         pending = Scope<Never, EmptyEnvironment>.Gen(async scope => await scope.Run(delayed));
         use = Resource.Make(value, (_, _) => release).Use(_ => value);
+        var delayedRelease = Effect<EmptyEnvironment>.Async<Unit>(static async ct =>
+        {
+            await Task.Delay(1, ct).ConfigureAwait(false);
+            return Unit.Value;
+        });
+        suspendedUse = Resource.Make(value, (_, _) => delayedRelease).Use(_ => value);
         gen = Scope<Never, EmptyEnvironment>.Gen(scope =>
         {
             scope.Defer(_ => release);
@@ -53,8 +60,11 @@ public class ResourceReleaseBenchmarks
             throw new InvalidOperationException("Unexpected release context.");
         }
 
-        if (Use().Result.UnwrapOr(-1) != 42 || Gen().Result.UnwrapOr(-1) != 42)
+        if (Use().Result.UnwrapOr(-1) != 42 || Gen().Result.UnwrapOr(-1) != 42
+            || SuspendedUse().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42)
+        {
             throw new InvalidOperationException("Unexpected benchmark result.");
+        }
     }
 
     [Benchmark] public ValueTask<Result<int, Never>> ObservedStep() => observed.RunAsync();
@@ -62,5 +72,6 @@ public class ResourceReleaseBenchmarks
     [Benchmark] public ValueTask<Result<int, Never>> EmptyGen() => empty.RunAsync();
     [Benchmark] public ValueTask<Exit<int, Never>> FailingReleases() => defects.RunExitAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Use() => use.RunAsync();
+    [Benchmark] public ValueTask<Result<int, Never>> SuspendedUse() => suspendedUse.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Gen() => gen.RunAsync();
 }

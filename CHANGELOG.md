@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Avoid a per-acquisition bound delegate when registering resource releases.
+
 - Bound collected group failure context while counting discarded entries as omitted.
 
 - Collect group failure context by completion rank instead of sorting intermediate sequences.

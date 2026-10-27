@@ -158,12 +158,7 @@ public static class Resource
         return new((env, context, releases) => Steps.Then(acquire.Run(env, context), (release, releases), static (outcome, state) =>
         {
             // Registered before any token check, so a cancellation right after cannot leak the value.
-            if (outcome.Kind == OutcomeKind.Ok)
-            {
-                var value = outcome.Value;
-                var release = state.release;
-                state.releases.Add(exit => release(value, exit));
-            }
+            if (outcome.Kind == OutcomeKind.Ok) state.releases.Add(outcome.Value, state.release);
 
             return outcome;
         }));
