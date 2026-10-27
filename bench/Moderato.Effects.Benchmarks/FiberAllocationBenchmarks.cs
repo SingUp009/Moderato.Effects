@@ -9,6 +9,7 @@ public class FiberAllocationBenchmarks
     private Effect<int, Never, EmptyEnvironment> joined;
     private Effect<int, Never, EmptyEnvironment> unjoined;
     private Effect<int, Never, EmptyEnvironment> many;
+    private Effect<int, Never, EmptyEnvironment> defect;
 
     [GlobalSetup]
     public void Setup()
@@ -32,6 +33,14 @@ public class FiberAllocationBenchmarks
             return total;
         });
 
+        var failure = new IOException("child failed");
+        defect = Effect<EmptyEnvironment>.Sync<int>(() => throw failure).Fork().Use(static fiber => fiber.Join());
+        if (!ChildDefect().AsTask().GetAwaiter().GetResult().TryGetValue(out Die? die)
+            || !ReferenceEquals(die.Exception, failure) || die.Suppressed.Count != 0)
+        {
+            throw new InvalidOperationException("Unexpected child failure.");
+        }
+
         if (TaskControl().GetAwaiter().GetResult() != 42
             || Joined().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42
             || Unjoined().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42
@@ -41,6 +50,7 @@ public class FiberAllocationBenchmarks
         }
     }
 
+    [Benchmark] public ValueTask<Exit<int, Never>> ChildDefect() => defect.RunExitAsync();
     [Benchmark] public Task<int> TaskControl() => Task.Run(static () => 42);
     [Benchmark] public ValueTask<Result<int, Never>> Joined() => joined.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> Unjoined() => unjoined.RunAsync();

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Traverse child and release defects without allocating LINQ enumeration state or a captured predicate.
+
 - Unwrap single callback failures without building flattened aggregate exceptions.
 
 - Copy only the retained prefix when combined failure context exceeds its limit.

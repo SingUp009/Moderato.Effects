@@ -106,18 +106,32 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         }
 
         // A joined child's defect also reached the body, so it is not counted twice.
-        var sameDefect = body.Kind == OutcomeKind.Die && defects.Any(d => ReferenceEquals(d.Defect!.SourceException, body.Defect!.SourceException));
+        var sameDefect = false;
+        if (body.Kind == OutcomeKind.Die)
+        {
+            foreach (var defect in defects.AsSpan())
+            {
+                if (!ReferenceEquals(defect.Defect!.SourceException, body.Defect!.SourceException)) continue;
+                sameDefect = true;
+                break;
+            }
+        }
+
         if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
             suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
         suppressed.AddRange(body.Suppressed);
-        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + defects.Sum(static d => d.Omitted));
+        var omitted = 0;
+        foreach (var defect in defects.AsSpan()) omitted = checked(omitted + defect.Omitted);
+        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + omitted);
     }
 
     // Each failed release keeps its own suppressed failures.
     private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
     {
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
-        var omitted = body.Omitted + defects.Sum(static d => d.Omitted);
+        var omitted = 0;
+        foreach (var defect in defects.AsSpan()) omitted = checked(omitted + defect.Omitted);
+        omitted += body.Omitted;
         if (body.Kind == OutcomeKind.Die && !body.Consequential)
         {
             suppressed.AddRange(body.Suppressed);
