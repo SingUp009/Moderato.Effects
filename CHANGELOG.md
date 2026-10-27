@@ -8,8 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - Pass resource acquisition continuation state explicitly instead of capturing it on every run.
+- Transfer the registered release list to cleanup without copying it to an array.
 
 - Skip unobserved-step tracking lists when a Gen block has no steps left to settle.
+- Create step-completion notifications only when a Gen block must wait for an unobserved step.
 
 - Use one async wrapper for Sleep so suspended waits avoid an intermediate result state.
 - Avoid parallel-worker capture state in sequential groups and skip internal execution state for empty groups.
