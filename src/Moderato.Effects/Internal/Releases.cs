@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Moderato.Results;
 
@@ -50,6 +51,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     }
 
     /// <summary>Releases everything, then decides the final outcome.</summary>
+    // Use and Gen each await this internal ValueTask exactly once.
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
         List<object> actions;
