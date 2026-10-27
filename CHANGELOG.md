@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Verify recurrence execution-context isolation and pending exception boundaries without caller isolation.
+
 - Avoid capturing dispatch information for exceptions successfully handled by Try and TryAsync.
 
 - Map asynchronous try outcomes in the body continuation without a second async wrapper.
