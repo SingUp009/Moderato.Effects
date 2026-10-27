@@ -190,6 +190,7 @@ internal readonly struct ScheduleClock<R> where R : IHas<TimeProvider>
 /// <summary>A policy carried by value through one recurrence run.</summary>
 internal interface IRecurrencePolicy<TState, R>
 {
+    // Implementations may pool this ValueTask, so every consumer must await it exactly once.
     ValueTask<Outcome<bool, Never>> Decide(TState state, R env, RunContext context);
 }
 
