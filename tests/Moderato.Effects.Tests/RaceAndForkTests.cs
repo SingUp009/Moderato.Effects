@@ -602,6 +602,31 @@ public class JoinSuppressedTests
             throw new InvalidOperationException("child");
         });
 
+    // A race whose loser fails once it is canceled, so the scope keeps that failure as suppressed.
+    private static Effect<int, string, EmptyEnvironment> RaceWhoseLoserFails(Exception failure)
+    {
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<int, string, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            await loserStarted.Task;
+            return 1;
+        });
+        Effect<int, string, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async token =>
+        {
+            loserStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            throw failure;
+        });
+        return Effect.Race(winner, loser);
+    }
+
     [Theory]
     [InlineData(1, 1, 0)]
     [InlineData(120, 100, 20)]
@@ -627,34 +652,74 @@ public class JoinSuppressedTests
         Assert.Equal(omitted, die.OmittedSuppressed);
     }
 
+    [Theory]
+    [InlineData(99, 119)]
+    [InlineData(100, 120)]
+    public async Task Join_ChildDefectAfterTheParentsOwnSuppressedFailures_CountsItsOmittedFailuresOnce(int parentFailures, int omitted)
+    {
+        // Given
+        var child = DiesAfterFailedReleases(120, static () => new IOException("cleanup"));
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            for (var i = 0; i < parentFailures; i++)
+                await scope.Run(RaceWhoseLoserFails(new IOException("parent")));
+            var fiber = await scope.Fork(child);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("child", die.Exception.Message);
+        Assert.Equal(100, die.Suppressed.Count);
+        Assert.Equal(omitted, die.OmittedSuppressed);
+    }
+
+    [Fact]
+    public async Task Join_SameChildDefectJoinedTwice_CountsItsSuppressedFailuresOnce()
+    {
+        // Given
+        var child = DiesAfterFailedReleases(120, static () => new IOException("cleanup"));
+        var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
+        {
+            var fiber = await scope.Fork(child);
+            await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
+            for (var i = 0; i < 2; i++)
+            {
+                try
+                {
+                    await scope.Run(fiber.Join());
+                }
+                catch (InvalidOperationException exception) when (exception.Message == "child")
+                {
+                }
+            }
+
+            return 0;
+        });
+
+        // When
+        var exit = await parent.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("child", die.Exception.Message);
+        Assert.Equal(100, die.Suppressed.Count);
+        Assert.Equal(20, die.OmittedSuppressed);
+    }
+
     [Fact]
     public async Task Join_ParentAlsoSuppressedTheSameException_KeepsTheParentsOwnFailure()
     {
         // Given
         var cleanup = new IOException("cleanup");
         var child = DiesAfterFailedReleases(1, () => cleanup);
-        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Effect<int, string, EmptyEnvironment> winner = Effect<EmptyEnvironment>.Async(async _ =>
-        {
-            await loserStarted.Task;
-            return 1;
-        });
-        Effect<int, string, EmptyEnvironment> loser = Effect<EmptyEnvironment>.Async<int>(async token =>
-        {
-            loserStarted.SetResult();
-            try
-            {
-                await Task.Delay(Timeout.InfiniteTimeSpan, token);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-
-            throw cleanup;
-        });
         var parent = Scope<string, EmptyEnvironment>.Gen(async scope =>
         {
-            await scope.Run(Effect.Race(winner, loser));
+            await scope.Run(RaceWhoseLoserFails(cleanup));
             var fiber = await scope.Fork(child);
             await fiber.Join().RunExitAsync(TestContext.Current.CancellationToken);
             return await scope.Run(fiber.Join());

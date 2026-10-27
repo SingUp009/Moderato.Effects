@@ -102,27 +102,39 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var sameDefect = body.Kind == OutcomeKind.Die && defects.Any(d => ReferenceEquals(d.Defect!.SourceException, body.Defect!.SourceException));
         if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
             suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
-        var (bodySuppressed, bodyOmitted) = WithoutJoined(body, defects);
+        var (bodySuppressed, bodyOmitted) = WithoutJoined(body.Suppressed, body.Omitted, defects);
         suppressed.AddRange(bodySuppressed);
         return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: bodyOmitted + defects.Sum(static d => d.Omitted));
     }
 
-    /// <summary>The body's suppressed failures and omitted count, without what a joined child defect brought in.</summary>
-    private static (ImmutableArray<Suppressed> Suppressed, int Omitted) WithoutJoined<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>> defects)
+    /// <summary>A step's suppressed failures and omitted count, without what a child defect already reported here brought in.</summary>
+    internal (ImmutableArray<Suppressed> Suppressed, int Omitted) WithoutJoined(ImmutableArray<Suppressed> suppressed, int omitted)
+    {
+        if (suppressed.IsDefaultOrEmpty) return (suppressed, omitted);
+        ImmutableArray<Outcome<Unit, Never>> defects;
+        lock (gate)
+        {
+            if (childDefects is not { Count: > 0 }) return (suppressed, omitted);
+            defects = childDefects.ToImmutable();
+        }
+
+        return WithoutJoined(suppressed, omitted, defects);
+    }
+
+    private static (ImmutableArray<Suppressed> Suppressed, int Omitted) WithoutJoined(ImmutableArray<Suppressed> suppressed, int omitted, ImmutableArray<Outcome<Unit, Never>> defects)
     {
         // Join hands over the same instances the child reported, so only those are dropped, not other failures with equal contents.
         HashSet<Suppressed>? joined = null;
-        var omitted = body.Omitted;
         foreach (var defect in defects)
         {
-            var found = defect.Suppressed.Count(s => body.Suppressed.Contains(s, ReferenceEqualityComparer.Instance));
+            var found = defect.Suppressed.Count(s => suppressed.Contains(s, ReferenceEqualityComparer.Instance));
             if (found == 0) continue;
             joined ??= new HashSet<Suppressed>(ReferenceEqualityComparer.Instance);
             joined.UnionWith(defect.Suppressed);
             omitted -= defect.Omitted + defect.Suppressed.Length - found;
         }
 
-        return joined is null ? (body.Suppressed, omitted) : ([.. body.Suppressed.Where(s => !joined.Contains(s))], Math.Max(omitted, 0));
+        return joined is null ? (suppressed, omitted) : ([.. suppressed.Where(s => !joined.Contains(s))], Math.Max(omitted, 0));
     }
 
     // Each failed release keeps its own suppressed failures.
