@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Time.Testing;
+using Moderato.Effects.Internal;
+
 namespace Moderato.Effects.Tests;
 
 public class SleepTimerFailureTests
@@ -37,6 +40,27 @@ public class SleepTimerFailureTests
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
         Assert.Equal(1, clock.Calls);
+    }
+
+    [Fact]
+    public async Task RunExitAsync_SuspendedSleepCanceledByInnerContext_IsInterrupted()
+    {
+        // Given
+        using var cancellation = new CancellationTokenSource();
+        var clock = new FakeTimeProvider();
+        var sleep = Effect.Sleep<TimeEnvironment>(TimeSpan.FromHours(1));
+        // The inner token can cancel without adding caller isolation around the public run.
+        Effect<Unit, Never, TimeEnvironment> work = new((env, _) => sleep.Run(env, new RunContext(cancellation.Token)));
+
+        // When
+        var running = work.RunExitAsync(new TimeEnvironment(clock), CancellationToken.None).AsTask();
+        var finishedEarly = running.IsCompleted;
+        await cancellation.CancelAsync();
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.False(finishedEarly);
+        Assert.True(exit.TryGetValue(out Interrupted? _));
     }
 
     private sealed class ThrowingTimerClock(Exception failure, Action? beforeThrow = null) : TimeProvider
