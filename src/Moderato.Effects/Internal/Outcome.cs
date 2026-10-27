@@ -30,6 +30,14 @@ internal readonly struct Outcome<T, E>
     /// <summary>A Die thrown after its token was canceled, a consequence of the cancellation.</summary>
     internal readonly bool Consequential;
 
+    private Outcome(OutcomeKind kind, T value, E error)
+    {
+        Kind = kind;
+        Value = value;
+        Error = error;
+        Suppressed = [];
+    }
+
     private Outcome(
         OutcomeKind kind, T value, E error, ExceptionDispatchInfo? defect, bool consequential, ImmutableArray<Suppressed> suppressed, int omitted)
     {
@@ -49,14 +57,14 @@ internal readonly struct Outcome<T, E>
         Omitted = omitted;
     }
 
-    internal static Outcome<T, E> Ok(T value) => new(OutcomeKind.Ok, value, default!, null, false, [], 0);
+    internal static Outcome<T, E> Ok(T value) => new(OutcomeKind.Ok, value, default!);
 
-    internal static Outcome<T, E> Err(E error) => new(OutcomeKind.Err, default!, error, null, false, [], 0);
+    internal static Outcome<T, E> Err(E error) => new(OutcomeKind.Err, default!, error);
 
     internal static Outcome<T, E> Die(ExceptionDispatchInfo defect, ImmutableArray<Suppressed> suppressed = default, bool consequential = false, int omitted = 0)
         => new(OutcomeKind.Die, default!, default!, defect, consequential, suppressed, omitted);
 
-    internal static Outcome<T, E> Interrupted() => new(OutcomeKind.Interrupted, default!, default!, null, false, [], 0);
+    internal static Outcome<T, E> Interrupted() => new(OutcomeKind.Interrupted, default!, default!);
 
     /// <summary>Carries a non-Ok outcome over to another value type.</summary>
     internal Outcome<U, E> WithValueType<U>() => Kind == OutcomeKind.Ok
