@@ -91,7 +91,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var outcome = defects is null ? body : Combine(body, defects);
         return carried is null && carriedOmitted == 0
             ? outcome
-            : outcome.WithSuppressed(carried?.ToImmutable() ?? [], carriedOmitted).After(outcome);
+            : outcome.WithSuppressed(carried?.DrainToImmutable() ?? [], carriedOmitted).After(outcome);
     }
 
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
@@ -131,7 +131,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         discarded += AddContext(suppressed, body.Suppressed);
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
-        return Outcome<T, E>.Die(first.Defect!, suppressed.ToImmutable(), omitted: body.Omitted + omitted + discarded);
+        return Outcome<T, E>.Die(first.Defect!, suppressed.DrainToImmutable(), omitted: body.Omitted + omitted + discarded);
     }
 
     // Each failed release keeps its own suppressed failures.
@@ -151,7 +151,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         {
             omitted += AddContext(suppressed, body.Suppressed);
             omitted += AddReleaseFailures(suppressed, defects, 0);
-            return Outcome<T, E>.Die(body.Defect!, suppressed.ToImmutable(), omitted: omitted);
+            return Outcome<T, E>.Die(body.Defect!, suppressed.DrainToImmutable(), omitted: omitted);
         }
 
         // An independent release defect outranks a body defect caused by cancellation.
@@ -161,7 +161,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         omitted += AddContext(suppressed, body.Suppressed);
         omitted += AddContext(suppressed, primary.Suppressed);
         omitted += AddReleaseFailures(suppressed, defects, 1);
-        return Outcome<T, E>.Die(primary.Defect!, suppressed.ToImmutable(), omitted: omitted);
+        return Outcome<T, E>.Die(primary.Defect!, suppressed.DrainToImmutable(), omitted: omitted);
     }
 
     private static int AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int start)
