@@ -75,9 +75,13 @@ internal readonly struct Outcome<T, E>
 
     /// <summary>Puts failures suppressed by earlier steps in front of this outcome's own.</summary>
     internal Outcome<T, E> After(ImmutableArray<Suppressed> earlier, int earlierOmitted = 0)
-        => earlier.IsDefaultOrEmpty && earlierOmitted == 0
-            ? this
-            : new(Kind, Value, Error, Defect, Consequential, earlier.IsDefault ? Suppressed : earlier.AddRange(Suppressed), Omitted + earlierOmitted);
+    {
+        if (earlier.IsDefaultOrEmpty && earlierOmitted == 0) return this;
+        if (!earlier.IsDefault && earlier.Length >= SuppressedLimit.MAX)
+            return new(Kind, Value, Error, Defect, Consequential, earlier, Omitted + earlierOmitted + Suppressed.Length);
+
+        return new(Kind, Value, Error, Defect, Consequential, earlier.IsDefault ? Suppressed : earlier.AddRange(Suppressed), Omitted + earlierOmitted);
+    }
 
     /// <summary>Puts the failures suppressed by an earlier outcome in front of this outcome's own.</summary>
     internal Outcome<T, E> After<U, F>(Outcome<U, F> earlier) => After(earlier.Suppressed, earlier.Omitted);

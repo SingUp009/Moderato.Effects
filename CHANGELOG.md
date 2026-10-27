@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Reuse saturated failure context in continuations while counting later failures as omitted.
 - Transfer the registered release list to cleanup without copying it to an array.
 
 - Skip unobserved-step tracking lists when a Gen block has no steps left to settle.

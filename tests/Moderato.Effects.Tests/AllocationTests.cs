@@ -1,3 +1,4 @@
+using Moderato.Effects.Internal;
 using Moderato.Effects.Testing;
 
 namespace Moderato.Effects.Tests;
@@ -13,6 +14,42 @@ public class AllocationTests
     public static TheoryData<AllocationCase> Cases => new(Enum.GetValues<AllocationCase>());
 
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
+
+    [Fact]
+    public async Task RunAsync_ContinuationAfterSaturatedContext_AllocatesNothing()
+    {
+        // Given
+        // Prebuilt contexts isolate continuation allocation from failure creation.
+        var earlier = Outcome<int, string>.Ok(1).WithSuppressed(
+            [.. Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential))], 2);
+        var later = Outcome<int, string>.Ok(42).WithSuppressed(earlier.Suppressed, 3);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(earlier));
+        var next = new Effect<int, string, EmptyEnvironment>((_, _) => new(later));
+        var effect = source.AndThen(_ => next);
+        await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
+
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunAsync(CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
+
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal<Result<int, string>>(Result.Ok(42), result);
+        Assert.Equal(0L, allocated);
+    }
 
     [Theory]
     [InlineData(0, false)]
