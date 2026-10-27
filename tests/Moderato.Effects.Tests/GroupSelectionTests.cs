@@ -18,6 +18,7 @@ public class GroupSelectionTests
         Effect<int, string, EmptyEnvironment> invalid = new((_, _) => new(default(Outcome<int, string>)));
 
         // When
+        // A cancelable token adds Isolated's catch, which would hide a missing RunGroup boundary.
         object exit = operation switch
         {
             nameof(Effect.All) => await Effect.All([invalid]).RunExitAsync(CancellationToken.None),
