@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Moderato.Effects\Moderato.Effects.csproj" />
     <Compile Include="..\..\tests\Shared\AllocationScenarios.cs" Link="AllocationScenarios.cs" />
+    <Compile Include="..\..\tests\Shared\SchedulingAllocationScenarios.cs" Link="SchedulingAllocationScenarios.cs" />
   </ItemGroup>
 
 </Project>

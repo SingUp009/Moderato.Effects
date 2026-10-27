@@ -89,6 +89,8 @@ See the [performance measurements](docs/performance/README.md) for execution tim
 
 The [zero-allocation contract](docs/performance/zero-allocation/README.md) defines the supported execution paths and their regression tests, including LINQ and custom Retry/Repeat policies.
 
+See [allocation coverage by feature](docs/performance/coverage.md) for the current guarantees, built-in scheduling support and remaining API constraints.
+
 ## Changelog
 
 See [CHANGELOG.md](https://github.com/SingUp009/Moderato.Effects/blob/main/CHANGELOG.md). Breaking changes are listed first for every release.

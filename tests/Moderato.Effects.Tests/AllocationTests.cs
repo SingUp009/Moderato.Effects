@@ -19,6 +19,21 @@ public class AllocationTests
         }
     }
 
+    public static TheoryData<SchedulingAllocationCase, bool> SchedulingCases
+    {
+        get
+        {
+            var cases = new TheoryData<SchedulingAllocationCase, bool>();
+            foreach (var scenario in Enum.GetValues<SchedulingAllocationCase>())
+            {
+                cases.Add(scenario, false);
+                cases.Add(scenario, true);
+            }
+
+            return cases;
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task PrebuiltSynchronousEffect_WithNoCancellation_AllocatesZeroBytes(AllocationCase scenario, bool exit)
@@ -48,9 +63,26 @@ public class AllocationTests
         await AssertZeroAllocation(() => effect.RunAsync(0, CancellationToken.None), expected);
     }
 
+    [Theory]
+    [MemberData(nameof(SchedulingCases))]
+    public async Task BuiltInScheduling_WithNoCancellation_AllocatesZeroBytes(SchedulingAllocationCase scenario, bool exit)
+    {
+        var (effect, expected) = SchedulingAllocationScenarios.Create(scenario);
+        if (exit)
+        {
+            Exit<int, string> expectedExit = expected.TryGetOk(out var value) ? new(new Ok<int>(value))
+                : expected.TryGetErr(out var error) ? new(new Err<string>(error))
+                : throw new InvalidOperationException("The scenario must have an initialized expected result.");
+            await AssertZeroAllocation(() => effect.RunExitAsync(CancellationToken.None), expectedExit);
+        }
+        else
+        {
+            await AssertZeroAllocation(() => effect.RunAsync(CancellationToken.None), expected);
+        }
+    }
+
     private static async Task AssertZeroAllocation<T>(Func<ValueTask<T>> run, T expected)
     {
-
         // Warm up generic statics, cached delegates and tiered compilation before
         // measuring. Assertions and the test runner stay outside this region.
         for (var i = 0; i < 1024; i++) await run();

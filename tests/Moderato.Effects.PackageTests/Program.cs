@@ -7,13 +7,19 @@ var env = new AppEnv(new Users(), TimeProvider.System);
 var found = await Profiles<AppEnv>.Find(1).Timeout(TimeSpan.FromSeconds(5)).RunAsync(env);
 var missing = await Profiles<AppEnv>.Find(2).Timeout(TimeSpan.FromSeconds(5)).RunAsync(env);
 var exit = await Profiles<AppEnv>.Find(3).RunExitAsync(env);
+var retried = await Profiles<AppEnv>.Find(2).Retry(Schedule.Immediately.UpTo(1)).RunAsync(env);
+var repeated = await Profiles<AppEnv>.Find(1).Repeat(Schedule.Immediately.UpTo(1)).RunAsync(env);
+var slept = await Effect.Sleep<AppEnv>(TimeSpan.Zero).RunAsync(env);
 
-string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)"];
+string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
 [
     found.Match(user => $"Ok({user})", error => $"Err({error.Value})"),
     missing.Match(user => $"Ok({user})", error => error.Value is NotFound n ? $"Err(NotFound {n.Id})" : "Err(?)"),
     exit.TryGetValue(out Die? die) ? $"Die({die.Exception.GetType().Name})" : exit.ToString() ?? "",
+    retried.Match(user => $"Ok({user})", error => error.Value is NotFound n ? $"Err(NotFound {n.Id})" : "Err(?)"),
+    repeated.Match(user => $"Ok({user})", error => $"Err({error.Value})"),
+    slept.TryGetOk(out _) ? "Sleep(Ok)" : "Sleep(Err)",
 ];
 
 for (var i = 0; i < expected.Length; i++)
