@@ -715,6 +715,57 @@ public class AllocationTests
         Assert.True(allocated[1] <= allocated[0], $"Retained prefix: {allocated[0]}; overflowing: {allocated[1]}");
     }
 
+    [Fact]
+    public async Task RunExitAsync_FailedReleaseContextIsDiscarded_AllocatesLikeEmptyContext()
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
+        var bodyFailure = new IOException("body");
+        var bodyOutcome = Outcome<int, Never>.Die(System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(bodyFailure), [.. context], omitted: 3);
+        var body = new Effect<int, Never, EmptyEnvironment>((_, _) => new(bodyOutcome));
+        var releaseFailure = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(new IOException("release"));
+        var effects = new[] { 0, 100 }.Select(count =>
+        {
+            var outcome = Outcome<Unit, Never>.Die(releaseFailure, [.. context.Take(count)], omitted: 2);
+            var release = new Effect<Unit, Never, EmptyEnvironment>((_, _) => new(outcome));
+            var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(1), (_, _) => release);
+            return resource.AndThen(_ => resource).Use(_ => body);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, Never>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(bodyFailure, die.Exception);
+            Assert.Equal(context, die.Suppressed);
+            Assert.Equal(9 + scenario * 200, die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Empty release context: {allocated[0]}; full release context: {allocated[1]}");
+    }
+
     private static async Task WarmUpAsync<T>(Func<ValueTask<T>> run)
     {
         for (var i = 0; i < WARM_UP_RUNS; i++) await run();

@@ -62,6 +62,9 @@ public class ReleaseDefectTests
     [InlineData(8)]
     [InlineData(9)]
     [InlineData(17)]
+    [InlineData(101)]
+    [InlineData(102)]
+    [InlineData(257)]
     public async Task Defer_ManyFailedReleases_PreservesEveryFailureInReverseOrder(int count)
     {
         // Given
@@ -85,14 +88,14 @@ public class ReleaseDefectTests
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Same(failures[^1], die.Exception);
-        Assert.Equal(count - 1, die.Suppressed.Count);
+        Assert.Equal(Math.Min(count - 1, 100), die.Suppressed.Count);
         for (var i = 0; i < die.Suppressed.Count; i++)
         {
             Assert.Same(failures[count - 2 - i], Assert.IsType<Die>(die.Suppressed[i].Case.Value).Exception);
             Assert.Equal(Relation.Sequential, die.Suppressed[i].Relation);
         }
 
-        Assert.Equal(0, die.OmittedSuppressed);
+        Assert.Equal(Math.Max(0, count - 101), die.OmittedSuppressed);
     }
 
     [Theory]
