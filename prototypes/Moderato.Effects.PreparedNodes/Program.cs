@@ -27,6 +27,8 @@ Check(guarded.Run(0).Value == 99, "Guarded run failed.");
 Console.WriteLine($"Prepared arena construction, reassignment, mixed-node array, typed mapping, error short circuit and execution: {allocated} bytes.");
 Console.WriteLine("Capacity rejection, unchanged existing nodes, stale/default/foreign handles and reset during execution verified.");
 
+PendingChecks.Run();
+
 void Exercise()
 {
     Check(arena.TryReset() == Status.Ok, "Reset failed.");
@@ -49,8 +51,8 @@ void Exercise()
 }
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 
-enum Status { Ok, Error, Invalid, Capacity, Busy, EpochExhausted }
-readonly record struct Result<T, E>(Status Status, T Value, E Error)
+enum Status { Invalid, Ok, Error, Capacity, Busy, EpochExhausted, Pending, Faulted }
+readonly record struct Result<T, E>(Status Status, T Value, E Error, Exception? Exception = null)
 {
     public static Result<T, E> Ok(T value) => new(Status.Ok, value, default!);
     public static Result<T, E> Err(E error) => new(Status.Error, default!, error);
