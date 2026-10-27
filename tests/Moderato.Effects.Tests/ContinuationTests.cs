@@ -5,11 +5,16 @@ namespace Moderato.Effects.Tests;
 
 public class ContinuationTests
 {
-    [Fact]
-    public async Task MapErr_MapperThrowsWithSaturatedContext_KeepsOriginalErrorBeforeContext()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(99)]
+    [InlineData(100)]
+    [InlineData(101)]
+    public async Task MapErr_MapperThrowsWithContext_KeepsOriginalErrorBeforeContext(int count)
     {
         // Given
-        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var context = Enumerable.Range(0, count).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
         var original = Outcome<int, string>.Err("original").WithSuppressed([.. context], 2);
         var defect = new IOException("mapper failed");
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(original));
@@ -21,11 +26,11 @@ public class ContinuationTests
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Same(defect, die.Exception);
-        Assert.Equal(100, die.Suppressed.Count);
+        Assert.Equal(Math.Min(100, count + 1), die.Suppressed.Count);
         Assert.True(die.Suppressed[0].Case is Failed("original"));
         Assert.Equal(Relation.Sequential, die.Suppressed[0].Relation);
         Assert.Equal(context.Take(99), die.Suppressed.Skip(1));
-        Assert.Equal(3, die.OmittedSuppressed);
+        Assert.Equal(2 + Math.Max(0, count - 99), die.OmittedSuppressed);
     }
 
     [Theory]

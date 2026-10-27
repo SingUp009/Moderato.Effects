@@ -16,6 +16,52 @@ public class AllocationTests
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
     [Fact]
+    public async Task RunExitAsync_ReplacingSaturatedErrorContext_AllocatesLikeRetainedPrefix()
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var defect = new IOException("mapper failed");
+        var effects = new[] { 99, 100 }.Select(count =>
+        {
+            var outcome = Outcome<int, string>.Err("original").WithSuppressed([.. context.Take(count)], 7);
+            return new Effect<int, string, EmptyEnvironment>((_, _) => new(outcome)).MapErr<int>(_ => throw defect);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, int>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(defect, die.Exception);
+            Assert.Equal(100, die.Suppressed.Count);
+            Assert.Equal(7 + scenario, die.OmittedSuppressed);
+        }
+
+        Assert.Equal(allocated[0], allocated[1]);
+    }
+
+    [Fact]
     public async Task RunAsync_ContextExceedsLimit_AllocatesLikeRetainedPrefix()
     {
         // Given
