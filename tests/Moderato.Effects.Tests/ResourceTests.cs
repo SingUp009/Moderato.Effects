@@ -916,6 +916,33 @@ public class ReleaseSuppressedTests
 {
     private const string MESSAGE = "race loser failed during release";
 
+    [Fact]
+    public async Task Defer_CleanReleasesSurroundFailure_KeepsFailureAndReleaseOrder()
+    {
+        // Given
+        var order = new List<int>();
+        var failure = new IOException("release failed");
+        var first = Effect<EmptyEnvironment>.Sync(() => { order.Add(1); return Unit.Value; });
+        var broken = Effect<EmptyEnvironment>.Sync<Unit>(() => { order.Add(2); throw failure; });
+        var last = Effect<EmptyEnvironment>.Sync(() => { order.Add(3); return Unit.Value; });
+        var work = Scope<Never, EmptyEnvironment>.Gen(scope =>
+        {
+            scope.Defer(_ => last);
+            scope.Defer(_ => broken);
+            scope.Defer(_ => first);
+            return new ValueTask<int>(42);
+        });
+
+        // When
+        var exit = await work.RunExitAsync(CancellationToken.None);
+
+        // Then
+        Assert.Equal([1, 2, 3], order);
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Empty(die.Suppressed);
+    }
+
     // A release whose Race is Ok while its loser dies.
     private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
     {
