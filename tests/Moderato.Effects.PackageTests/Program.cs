@@ -44,15 +44,21 @@ static void AssertZeroAllocation<T, E, R>(Effect<T, E, R> effect, R environment,
 {
     for (var i = 0; i < 1024; i++) effect.RunAsync(environment).GetAwaiter().GetResult();
     Result<T, E> last = default;
-    var before = GC.GetAllocatedBytesForCurrentThread();
-    for (var i = 0; i < 4096; i++)
+    var allocated = long.MaxValue;
+    // A one-off runtime allocation can land in one window, while one made by every run lands in all of them.
+    for (var window = 0; window < 3 && allocated != 0; window++)
     {
-        var task = effect.RunAsync(environment);
-        if (!task.IsCompletedSuccessfully) throw new InvalidOperationException("Expected synchronous completion.");
-        last = task.GetAwaiter().GetResult();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 4096; i++)
+        {
+            var task = effect.RunAsync(environment);
+            if (!task.IsCompletedSuccessfully) throw new InvalidOperationException("Expected synchronous completion.");
+            last = task.GetAwaiter().GetResult();
+        }
+
+        allocated = GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
-    var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
     if (last != expected || allocated != 0)
     {
         throw new InvalidOperationException($"Expected {expected} and 0 B, got {last} and {allocated} B.");

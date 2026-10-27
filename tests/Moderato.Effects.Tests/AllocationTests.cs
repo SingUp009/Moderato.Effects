@@ -7,6 +7,9 @@ public class AllocationTests
     private const int WARM_UP_RUNS = 1024;
     private const int RUNS = 4096;
 
+    // A one-off runtime allocation can land in one window, while one made by every run lands in all of them.
+    private const int WINDOWS = 3;
+
     public static TheoryData<AllocationCase> Cases => new(Enum.GetValues<AllocationCase>());
 
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
@@ -22,15 +25,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Result<int, string> result = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunAsync(CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            result = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunAsync(CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -49,15 +56,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Exit<int, string> exit = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunExitAsync(CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            exit = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunExitAsync(CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                exit = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -79,15 +90,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Result<int, int> result = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunAsync(0, CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            result = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunAsync(0, CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -106,15 +121,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Result<int, string> result = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunAsync(CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            result = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunAsync(CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -133,15 +152,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Exit<int, string> exit = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunExitAsync(CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            exit = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunExitAsync(CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                exit = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -162,15 +185,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Result<int, string> result = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunAsync(default, CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            result = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunAsync(default, CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
@@ -191,15 +218,19 @@ public class AllocationTests
         // When
         var completedAtOnce = true;
         Exit<int, string> exit = default;
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < RUNS; i++)
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
         {
-            var run = effect.RunExitAsync(default, CancellationToken.None);
-            completedAtOnce &= run.IsCompletedSuccessfully;
-            exit = await run;
-        }
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = effect.RunExitAsync(default, CancellationToken.None);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                exit = await run;
+            }
 
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
 
         // Then
         Assert.True(completedAtOnce);
