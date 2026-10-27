@@ -3,10 +3,13 @@ namespace Moderato.Effects.Tests;
 public class GroupSnapshotTests
 {
     [Theory]
-    [InlineData("All")]
-    [InlineData("AllSettled")]
-    [InlineData("AllErrors")]
-    public async Task Group_ArrayChangesAfterConstruction_RunsTheOriginalLazySnapshotTwice(string operation)
+    [InlineData("All", false)]
+    [InlineData("All", true)]
+    [InlineData("AllSettled", false)]
+    [InlineData("AllSettled", true)]
+    [InlineData("AllErrors", false)]
+    [InlineData("AllErrors", true)]
+    public async Task Group_InputCollectionChangesAfterConstruction_RunsTheOriginalLazySnapshotTwice(string operation, bool useList)
     {
         // Given
         List<int> calls = [];
@@ -15,17 +18,18 @@ public class GroupSnapshotTests
             Effect<EmptyEnvironment>.Sync(() => { calls.Add(1); return 1; }),
             Effect<EmptyEnvironment>.Sync(() => { calls.Add(2); return 2; }),
         ];
+        IList<Effect<int, string, EmptyEnvironment>> source = useList ? effects.ToList() : effects;
 
         // When
         var group = operation switch
         {
-            "All" => Effect.All(effects).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
-            "AllSettled" => Effect.AllSettled(effects).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
-            _ => Effect.AllErrors(effects).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
+            "All" => Effect.All(source).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
+            "AllSettled" => Effect.AllSettled(source).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
+            _ => Effect.AllErrors(source).Map(static _ => Unit.Value).MapErr(static _ => Unit.Value),
         };
         var callsAtConstruction = calls.Count;
-        effects[0] = Effect<EmptyEnvironment>.Fail("replacement");
-        effects[1] = default;
+        source[0] = Effect<EmptyEnvironment>.Fail("replacement");
+        source[1] = default;
         var first = await group.RunAsync(CancellationToken.None);
         var second = await group.RunAsync(CancellationToken.None);
 
@@ -37,33 +41,69 @@ public class GroupSnapshotTests
     }
 
     [Theory]
-    [InlineData("All", 0)]
-    [InlineData("All", 1)]
-    [InlineData("AllSettled", 0)]
-    [InlineData("AllSettled", 1)]
-    [InlineData("AllErrors", 0)]
-    [InlineData("AllErrors", 1)]
-    public void Group_ArrayContainsDefault_RejectsItDuringConstruction(string operation, int invalidIndex)
+    [InlineData("All", 0, false)]
+    [InlineData("All", 0, true)]
+    [InlineData("All", 1, false)]
+    [InlineData("All", 1, true)]
+    [InlineData("AllSettled", 0, false)]
+    [InlineData("AllSettled", 0, true)]
+    [InlineData("AllSettled", 1, false)]
+    [InlineData("AllSettled", 1, true)]
+    [InlineData("AllErrors", 0, false)]
+    [InlineData("AllErrors", 0, true)]
+    [InlineData("AllErrors", 1, false)]
+    [InlineData("AllErrors", 1, true)]
+    public void Group_InputCollectionContainsDefault_RejectsItDuringConstruction(string operation, int invalidIndex, bool useList)
     {
         // Given
         var calls = 0;
         Effect<int, string, EmptyEnvironment> valid = Effect<EmptyEnvironment>.Sync(() => ++calls);
         Effect<int, string, EmptyEnvironment>[] effects = [valid, valid];
         effects[invalidIndex] = default;
+        IList<Effect<int, string, EmptyEnvironment>> source = useList ? effects.ToList() : effects;
 
         // When
         var exception = Record.Exception(() =>
         {
             switch (operation)
             {
-                case "All": _ = Effect.All(effects); break;
-                case "AllSettled": _ = Effect.AllSettled(effects); break;
-                default: _ = Effect.AllErrors(effects); break;
+                case "All": _ = Effect.All(source); break;
+                case "AllSettled": _ = Effect.AllSettled(source); break;
+                default: _ = Effect.AllErrors(source); break;
             }
         });
 
         // Then
         Assert.IsType<InvalidOperationException>(exception);
         Assert.Equal(0, calls);
+    }
+
+    [Theory]
+    [InlineData("All", false)]
+    [InlineData("All", true)]
+    [InlineData("AllSettled", false)]
+    [InlineData("AllSettled", true)]
+    [InlineData("AllErrors", false)]
+    [InlineData("AllErrors", true)]
+    public async Task Group_EmptyInputCollection_StaysEmptyAfterConstruction(string operation, bool useList)
+    {
+        // Given
+        IList<Effect<int, string, EmptyEnvironment>> source = useList
+            ? new List<Effect<int, string, EmptyEnvironment>>()
+            : Array.Empty<Effect<int, string, EmptyEnvironment>>();
+
+        // When
+        var group = operation switch
+        {
+            "All" => Effect.All(source).Map(static values => values.Length).MapErr(static _ => Unit.Value),
+            "AllSettled" => Effect.AllSettled(source).Map(static values => values.Length).MapErr(static _ => Unit.Value),
+            _ => Effect.AllErrors(source).Map(static values => values.Length).MapErr(static _ => Unit.Value),
+        };
+        if (useList) source.Add(Effect<EmptyEnvironment>.Fail("later"));
+        var result = await group.RunAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(result.TryGetOk(out var length));
+        Assert.Equal(0, length);
     }
 }
