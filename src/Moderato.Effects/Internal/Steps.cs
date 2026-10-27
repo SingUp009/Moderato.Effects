@@ -96,6 +96,37 @@ internal static class Steps
         }
     }
 
+    /// <summary>Runs asynchronous Result-producing code directly into an outcome.</summary>
+    internal static ValueTask<Outcome<T, E>> RunResultAsync<T, E>(Func<CancellationToken, ValueTask<Result<T, E>>> body, RunContext context)
+    {
+        ValueTask<Result<T, E>> task;
+        try
+        {
+            task = body(context.CancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return new(Defects.From<T, E>(exception, context));
+        }
+
+        return task.IsCompletedSuccessfully ? new(FromResult(task.Result)) : Await(task, context);
+
+        static async ValueTask<Outcome<T, E>> Await(ValueTask<Result<T, E>> task, RunContext context)
+        {
+            Result<T, E> result;
+            try
+            {
+                result = await task.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<T, E>(exception, context);
+            }
+
+            return FromResult(result);
+        }
+    }
+
     /// <summary>Converts a Result into an outcome; a default Result is a defect.</summary>
     internal static Outcome<T, E> FromResult<T, E>(Result<T, E> result)
     {
