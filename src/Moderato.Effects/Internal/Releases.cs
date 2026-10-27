@@ -81,16 +81,17 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             else
             {
                 // A successful release may still carry failures, such as a dead Race loser.
-                if (!released.Suppressed.IsEmpty)
-                    (carried ??= ImmutableArray.CreateBuilder<Suppressed>()).AddRange(released.Suppressed);
-                carriedOmitted += released.Omitted;
+                var retained = Math.Min(released.Suppressed.Length, SuppressedLimit.MAX - (carried?.Count ?? 0));
+                if (retained > 0)
+                    (carried ??= ImmutableArray.CreateBuilder<Suppressed>()).AddRange(released.Suppressed.AsSpan()[..retained]);
+                carriedOmitted += released.Omitted + released.Suppressed.Length - retained;
             }
         }
 
         var outcome = defects is null ? body : Combine(body, defects);
         return carried is null && carriedOmitted == 0
             ? outcome
-            : outcome.WithSuppressed(carried is null ? outcome.Suppressed : outcome.Suppressed.AddRange(carried), outcome.Omitted + carriedOmitted);
+            : outcome.WithSuppressed(carried?.ToImmutable() ?? [], carriedOmitted).After(outcome);
     }
 
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
