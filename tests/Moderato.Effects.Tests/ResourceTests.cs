@@ -943,6 +943,54 @@ public class ReleaseSuppressedTests
         Assert.Empty(die.Suppressed);
     }
 
+    [Fact]
+    public async Task Use_SuccessfulReleaseHasOnlyOmittedFailures_PreservesOmittedCount()
+    {
+        // Given
+        var failure = new IOException("body failed");
+        var release = new Effect<Unit, Never, EmptyEnvironment>((_, _) =>
+            new(Internal.Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([], 3)));
+        var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(42), (_, _) => release);
+        var body = Effect<EmptyEnvironment>.Sync<int>(() => throw failure);
+
+        // When
+        var exit = await resource.Use(_ => body).RunExitAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Empty(die.Suppressed);
+        Assert.Equal(3, die.OmittedSuppressed);
+    }
+
+    [Fact]
+    public async Task Defer_SuccessfulReleasesHaveOnlyOmittedFailures_AccumulatesOmittedCounts()
+    {
+        // Given
+        var failure = new IOException("body failed");
+        var first = new Effect<Unit, Never, EmptyEnvironment>((_, _) =>
+            new(Internal.Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([], 2)));
+        var last = new Effect<Unit, Never, EmptyEnvironment>((_, _) =>
+            new(Internal.Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([], 3)));
+        var clean = Effect<EmptyEnvironment>.Succeed(Unit.Value);
+        var work = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            scope.Defer(_ => last);
+            scope.Defer(_ => clean);
+            scope.Defer(_ => first);
+            throw failure;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Empty(die.Suppressed);
+        Assert.Equal(5, die.OmittedSuppressed);
+    }
+
     // A release whose Race is Ok while its loser dies.
     private static Effect<Unit, Never, EmptyEnvironment> RaceWithDyingLoser()
     {
