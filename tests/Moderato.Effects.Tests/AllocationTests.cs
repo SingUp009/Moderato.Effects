@@ -67,6 +67,59 @@ public class AllocationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task RunExitAsync_SaturatedPolicyContext_DoesNotCopyDiscardedAttemptContext(bool retry)
+    {
+        // Given
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var defect = new IOException("policy");
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(defect);
+        var decision = Outcome<bool, Never>.Die(captured, [.. context], omitted: 3);
+        var policy = new Effect<bool, Never, EmptyEnvironment>((_, _) => new(decision));
+        var effects = new[] { 0, 100 }.Select(count =>
+        {
+            var last = (retry ? Outcome<int, string>.Err("last") : Outcome<int, string>.Ok(42))
+                .WithSuppressed([.. context.Take(count)], 2);
+            var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(last));
+            return retry ? source.Retry(_ => policy) : source.Repeat(_ => policy);
+        }).ToArray();
+        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(CancellationToken.None));
+        long[] allocated = [long.MaxValue, long.MaxValue];
+        var results = new Exit<int, string>[2];
+
+        // When
+        var completedAtOnce = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunExitAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    results[scenario] = await run;
+                }
+
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        for (var scenario = 0; scenario < results.Length; scenario++)
+        {
+            Assert.True(results[scenario].TryGetValue(out Die? die));
+            Assert.Same(defect, die.Exception);
+            Assert.Equal(context, die.Suppressed);
+            Assert.Equal(5 + scenario * 100 + (retry ? 1 : 0), die.OmittedSuppressed);
+        }
+
+        Assert.True(allocated[1] <= allocated[0], $"Empty attempt: {allocated[0]}; full attempt: {allocated[1]}");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task RunExitAsync_FullPolicyContext_DoesNotAllocateMoreThanPartialPrefix(bool retry)
     {
         // Given

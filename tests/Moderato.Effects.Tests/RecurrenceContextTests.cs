@@ -40,4 +40,45 @@ public class RecurrenceContextTests
         Assert.Equal(5 + Math.Max(0, expected.Length - 100), die.OmittedSuppressed);
         for (var i = 0; i < policyCount; i++) Assert.Same(policyContext[i], die.Suppressed[i]);
     }
+    [Theory]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    [InlineData(false, int.MaxValue)]
+    [InlineData(true, int.MaxValue)]
+    public async Task RunExitAsync_PolicyContextIsFull_StillReadsDiscardedError(bool throws, int omitted)
+    {
+        // Given
+        var error = new ObservedError(throws);
+        var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Parallel)).ToArray();
+        var last = Outcome<int, ObservedError>.Err(error).WithSuppressed([.. context], omitted);
+        var source = new Effect<int, ObservedError, EmptyEnvironment>((_, _) => new(last));
+        var failure = new IOException("policy");
+        var decision = Outcome<bool, Never>.Die(ExceptionDispatchInfo.Capture(failure), [.. context], omitted: 3);
+        var policy = new Effect<bool, Never, EmptyEnvironment>((_, _) => new(decision));
+
+        // When
+        var exit = await source.Retry(_ => policy).RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Equal(context, die.Suppressed);
+        Assert.Equal(unchecked(omitted + 104), die.OmittedSuppressed);
+        Assert.Equal(1, error.Reads);
+    }
+
+    private sealed class ObservedError(bool throws) : System.Runtime.CompilerServices.IUnion
+    {
+        internal int Reads { get; private set; }
+
+        public object? Value
+        {
+            get
+            {
+                Reads++;
+                if (throws) throw new IOException("error projection");
+                return "last error";
+            }
+        }
+    }
 }
