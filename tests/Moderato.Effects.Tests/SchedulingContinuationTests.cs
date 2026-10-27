@@ -3,22 +3,32 @@ namespace Moderato.Effects.Tests;
 public class SchedulingContinuationTests
 {
     [Fact]
-    public async Task Scheduling_NullReferenceEnvironment_KeepsTheArgumentNullDefect()
+    public async Task Retry_NullEnvironment_DiesWithArgumentNullException()
     {
         // Given
         Effect<int, string, CountingClock> source = Effect<CountingClock>.Fail("failed");
         var scheduled = source.Retry(Schedule.Immediately.UpTo(1));
+
+        // When
+        var exit = await scheduled.RunExitAsync(null!, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(die.Exception).ParamName);
+    }
+
+    [Fact]
+    public async Task Sleep_NullEnvironment_DiesWithArgumentNullException()
+    {
+        // Given
         var sleep = Effect.Sleep<CountingClock>(TimeSpan.Zero);
 
         // When
-        var scheduledExit = await scheduled.RunExitAsync(null!, TestContext.Current.CancellationToken);
-        var sleepExit = await sleep.RunExitAsync(null!, TestContext.Current.CancellationToken);
+        var exit = await sleep.RunExitAsync(null!, TestContext.Current.CancellationToken);
 
         // Then
-        Assert.True(scheduledExit.TryGetValue(out Die? scheduledDie));
-        Assert.True(sleepExit.TryGetValue(out Die? sleepDie));
-        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(scheduledDie.Exception).ParamName);
-        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(sleepDie.Exception).ParamName);
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Equal("environment", Assert.IsType<ArgumentNullException>(die.Exception).ParamName);
     }
 
     [Fact]
@@ -72,20 +82,13 @@ public class SchedulingContinuationTests
         Assert.Equal(new Failed("failed"), Assert.Single(die.Suppressed).Case.Value);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Schedule_FilterThrows_KeepsTheLastErrorWhenRetrying(bool repeat)
+    [Fact]
+    public async Task Retry_FilterThrows_DiesWithTheLastErrorAsContext()
     {
         // Given
         var defect = new InvalidOperationException("filter failed");
-        Effect<int, string, DefaultEnvironment> source = repeat
-            ? Effect<DefaultEnvironment>.Succeed(20)
-            : Effect<DefaultEnvironment>.Fail("failed");
-        Func<string, bool> retryFilter = _ => throw defect;
-        Func<int, bool> repeatFilter = _ => throw defect;
-        var effect = repeat ? source.Repeat(Schedule.Immediately.UpTo(1), repeatFilter)
-            : source.Retry(Schedule.Immediately.UpTo(1), retryFilter);
+        Effect<int, string, DefaultEnvironment> source = Effect<DefaultEnvironment>.Fail("failed");
+        var effect = source.Retry(Schedule.Immediately.UpTo(1), _ => throw defect);
 
         // When
         var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
@@ -93,8 +96,24 @@ public class SchedulingContinuationTests
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Same(defect, die.Exception);
-        if (repeat) Assert.Empty(die.Suppressed);
-        else Assert.Equal(new Failed("failed"), Assert.Single(die.Suppressed).Case.Value);
+        Assert.Equal(new Failed("failed"), Assert.Single(die.Suppressed).Case.Value);
+    }
+
+    [Fact]
+    public async Task Repeat_FilterThrows_DiesWithTheFilterDefect()
+    {
+        // Given
+        var defect = new InvalidOperationException("filter failed");
+        Effect<int, string, DefaultEnvironment> source = Effect<DefaultEnvironment>.Succeed(20);
+        var effect = source.Repeat(Schedule.Immediately.UpTo(1), _ => throw defect);
+
+        // When
+        var exit = await effect.RunExitAsync(TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(defect, die.Exception);
+        Assert.Empty(die.Suppressed);
     }
 
     private sealed class CountingClock : TimeProvider, IHas<TimeProvider>
