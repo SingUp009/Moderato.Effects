@@ -7,17 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Verify recurrence execution-context isolation and pending exception boundaries without caller isolation.
-
 - Avoid capturing dispatch information for exceptions successfully handled by Try and TryAsync.
 
 - Map asynchronous try outcomes in the body continuation without a second async wrapper.
-- Verify asynchronous Result failure classification without caller isolation.
-
 - Pass Effect composition state directly to continuations without separate callback closures.
 - Convert asynchronous Results directly into outcomes without an intermediate outcome continuation.
-
-- Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
 
 - Remove Effect LINQ selector adapters and widen second-step outcomes in the projection continuation.
 
@@ -90,6 +84,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Store cancellation bookkeeping on the owned token source to avoid a separate wrapper allocation.
 
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
+
+### Tests
+
+- Verify recurrence execution-context isolation and pending exception boundaries without caller isolation.
+- Verify asynchronous Result failure classification without caller isolation.
+- Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
 
 ## [0.1.0-preview.1] - 2026-10-27
 
