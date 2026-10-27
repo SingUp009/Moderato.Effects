@@ -70,7 +70,8 @@ internal static class Timeouts
             // An independent defect outranks the timeout, checked before onTimeout so that it cannot hide the defect.
             var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
             suppressed.Add(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
-            suppressed.AddRange(inner.Suppressed.Where(static s => s.Case is not Interrupted));
+            foreach (var failure in inner.Suppressed.AsSpan())
+                if (failure.Case is not Interrupted) suppressed.Add(failure);
             return inner.WithSuppressed(suppressed.ToImmutable(), inner.Omitted).WithTypes<U, F>();
         }
 

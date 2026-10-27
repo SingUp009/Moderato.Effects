@@ -35,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Independently constructed constant effects can now compare equal through inherited `Equals`, because their stored results replace distinct captured delegate targets.
 - Create release failure buffers only when a release has failures to preserve.
 
+- Filter timeout failure context directly without allocating a LINQ sequence.
+
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
 
 ## [0.1.0-preview.1] - 2026-10-27
