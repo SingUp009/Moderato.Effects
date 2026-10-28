@@ -9,7 +9,7 @@ public class GroupRetentionTests
     [InlineData(0)]
     [InlineData(50)]
     [InlineData(100)]
-    public async Task AllErrors_ChildrenAndPrimaryHaveContext_KeepsPrimaryPrefixAndCountsEveryOmission(int primaryCount)
+    public async Task AllErrors_ChildrenAndPrimaryHaveContext_KeepsCompletionOrderAndCountsEveryOmission(int primaryCount)
     {
         // Given
         var failure = new IOException("primary");
@@ -25,8 +25,8 @@ public class GroupRetentionTests
 
         var primary = Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(failure), [.. primaryContext], omitted: 5);
         children[^1] = new((_, _) => new(primary));
-        Suppressed[] expected = [.. primaryContext, .. Enumerable.Range(0, 3).SelectMany(i =>
-            new[] { new Suppressed(new Failed($"error {i}"), Relation.Parallel) }.Concat(childContext[i]))];
+        Suppressed[] expected = [.. Enumerable.Range(0, 3).SelectMany(i =>
+            new[] { new Suppressed(new Failed($"error {i}"), Relation.Parallel) }.Concat(childContext[i])), .. primaryContext];
 
         // When
         var exit = await Effect.AllErrors(children).RunExitAsync(TestContext.Current.CancellationToken);
@@ -36,7 +36,7 @@ public class GroupRetentionTests
         Assert.Same(failure, die.Exception);
         Assert.Equal(expected.Take(100), die.Suppressed);
         Assert.Equal(11 + expected.Length - 100, die.OmittedSuppressed);
-        for (var i = 0; i < primaryCount; i++) Assert.Same(primaryContext[i], die.Suppressed[i]);
+        for (var i = 0; i < childContext[0].Length; i++) Assert.Same(childContext[0][i], die.Suppressed[i + 1]);
     }
 
     [Fact]

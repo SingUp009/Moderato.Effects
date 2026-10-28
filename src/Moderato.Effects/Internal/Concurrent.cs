@@ -161,8 +161,8 @@ internal static class Concurrent
     private static int Earlier<T, E>(ChildEnd<T, E>[] ends, int? current, int candidate)
         => current is { } c && ends[c].Order < ends[candidate].Order ? c : candidate;
 
-    /// <summary>Retained context from non-primary children, in completion order, plus omitted counts.</summary>
-    internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Others<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
+    /// <summary>Retained child context and non-primary failures in completion order, plus omitted counts.</summary>
+    internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Context<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
     {
         var omitted = 0;
         for (var i = 0; i < ends.Length; i++)
@@ -173,14 +173,16 @@ internal static class Concurrent
                 || (includeErrs && end.Outcome.Kind == OutcomeKind.Err)
                 || !end.Outcome.Suppressed.IsEmpty)
             {
-                return CollectOthers(ends, primary, includeErrs);
+                return CollectContext(ends, primary, includeErrs);
             }
             omitted += end.Outcome.Omitted;
         }
-        return ([], omitted);
+        return primary is { } selected
+            ? (ends[selected].Outcome.Suppressed, omitted + ends[selected].Outcome.Omitted)
+            : ([], omitted);
     }
 
-    private static (ImmutableArray<Suppressed> Suppressed, int Omitted) CollectOthers<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs)
+    private static (ImmutableArray<Suppressed> Suppressed, int Omitted) CollectContext<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs)
     {
         var builder = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
@@ -216,12 +218,9 @@ internal static class Concurrent
                 }
             }
 
-            if (i != primary)
-            {
-                var retained = Math.Min(end.Outcome.Suppressed.Length, SuppressedLimit.MAX - builder.Count);
-                builder.AddRange(end.Outcome.Suppressed.AsSpan()[..retained]);
-                omitted += end.Outcome.Omitted + end.Outcome.Suppressed.Length - retained;
-            }
+            var retained = Math.Min(end.Outcome.Suppressed.Length, SuppressedLimit.MAX - builder.Count);
+            builder.AddRange(end.Outcome.Suppressed.AsSpan()[..retained]);
+            omitted += end.Outcome.Omitted + end.Outcome.Suppressed.Length - retained;
         }
 
         return (builder.DrainToImmutable(), omitted);
@@ -230,9 +229,9 @@ internal static class Concurrent
     /// <summary>The primary child's failure, with the others' failures suppressed.</summary>
     internal static Outcome<U, F> Fail<T, E, U, F>(ChildEnd<T, E>[] ends, int primary, Func<E, F> error)
     {
-        var (others, omitted) = Others(ends, primary);
+        var (suppressed, omitted) = Context(ends, primary);
         var chosen = ends[primary].Outcome;
         var failure = chosen.Kind == OutcomeKind.Err ? Outcome<U, F>.Err(error(chosen.Error)) : chosen.WithTypes<U, F>();
-        return failure.WithSuppressed(others, omitted).After(chosen);
+        return failure.WithSuppressed(suppressed, omitted);
     }
 }
