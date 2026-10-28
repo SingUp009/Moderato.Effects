@@ -117,6 +117,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Tests
 
+- Pin scoped composition laws for binding, mapping, queries, recovery, environment provision, validation, resource release, retry and repeat.
+
 - Verify recurrence execution-context isolation and pending exception boundaries without caller isolation.
 - Verify asynchronous Result failure classification without caller isolation.
 - Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
