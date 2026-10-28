@@ -128,7 +128,7 @@ internal static class Concurrent
         _ => false,
     };
 
-    /// <summary>The deciding failure: independent Die &gt; caller's cancellation &gt; earliest independent Err &gt; consequential Die (F26).</summary>
+    /// <summary>The deciding failure: independent Die &gt; earliest independent Err &gt; caller's cancellation &gt; consequential Die (F26).</summary>
     internal static int? PrimaryFailure<T, E>(ChildEnd<T, E>[] ends, bool callerCanceled)
     {
         int? independentDie = null, independentErr = null, anyDie = null, interrupted = null;
@@ -154,8 +154,9 @@ internal static class Concurrent
         }
 
         if (independentDie is not null) return independentDie;
+        if (independentErr is not null) return independentErr;
         if (callerCanceled && interrupted is not null) return interrupted;
-        return independentErr ?? anyDie ?? interrupted;
+        return anyDie ?? interrupted;
     }
 
     private static int Earlier<T, E>(ChildEnd<T, E>[] ends, int? current, int candidate)
