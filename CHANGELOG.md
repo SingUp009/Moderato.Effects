@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Return a Die from RunExitAsync when an execution exception escapes, including a pending invalid Never conversion without a cancelable token.
+
 ### Changed
 
 - Reuse internal release-loop async state when cleanup suspends.

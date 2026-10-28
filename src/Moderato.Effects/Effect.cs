@@ -76,10 +76,27 @@ public readonly partial struct Effect<T, E, R>
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
         if (constant.HasValue) return new(ToExit(Steps.FromResult(constant)));
 
-        var task = Start(environment, cancellationToken);
-        return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task);
+        try
+        {
+            var task = Start(environment, cancellationToken);
+            return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            return new(ToExit(Defects.From<T, E>(exception, new RunContext(cancellationToken))));
+        }
 
-        static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task) => ToExit(await task.ConfigureAwait(false));
+        static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return ToExit(await task.ConfigureAwait(false));
+            }
+            catch (Exception exception)
+            {
+                return ToExit(Defects.From<T, E>(exception, new RunContext(cancellationToken)));
+            }
+        }
     }
 
     private ValueTask<Outcome<T, E>> Start(R environment, CancellationToken cancellationToken)
