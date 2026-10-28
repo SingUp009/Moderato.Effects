@@ -531,6 +531,42 @@ public class AllocationTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task WidenEnv_ConstantConstructionAndRun_AllocatesNothing(bool failure, bool cancelable)
+    {
+        // Given
+        using var cancellation = new CancellationTokenSource();
+        var token = cancelable ? cancellation.Token : CancellationToken.None;
+        Result<int, string> expected = failure ? Result.Err("failed") : Result.Ok(42);
+        var source = Effect<object>.FromResult(expected);
+        await WarmUpAsync(() => source.WidenEnv<string>().RunAsync("environment", token));
+
+        // When
+        var completedAtOnce = true;
+        Result<int, string> result = default;
+        var allocated = long.MaxValue;
+        for (var window = 0; window < WINDOWS && allocated != 0; window++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < RUNS; i++)
+            {
+                var run = source.WidenEnv<string>().RunAsync("environment", token);
+                completedAtOnce &= run.IsCompletedSuccessfully;
+                result = await run;
+            }
+            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.Equal(expected, result);
+        Assert.Equal(0L, allocated);
+    }
+
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]

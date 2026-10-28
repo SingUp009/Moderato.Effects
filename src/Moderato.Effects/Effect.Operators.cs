@@ -178,7 +178,11 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R2> WidenEnv<R2>() where R2 : R
     {
         var effect = Validate();
-        return new((env, context) => effect.Run(env, context));
+        if (effect.constant.HasValue) return new(effect.constant);
+        return Deferred(effect);
+
+        static Effect<T, E, R2> Deferred(Effect<T, E, R> effect)
+            => new((env, context) => effect.Run(env, context));
     }
 
     /// <summary>A resource running the effect as a fiber, canceled and awaited on release (in a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>).</summary>
