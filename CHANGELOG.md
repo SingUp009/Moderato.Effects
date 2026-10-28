@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Preserve inline constant results when widening an effect's environment type.
+
 - Build retained cancellation-callback context without a temporary prefix array.
 
 - Reuse internal release-loop async state when cleanup suspends.
