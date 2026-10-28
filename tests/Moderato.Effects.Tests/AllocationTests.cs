@@ -844,7 +844,7 @@ public class AllocationTests
 
     // Warm-up first, so one-time static, delegate and JIT allocations stay out of the measurement.
     [Fact]
-    public async Task RunExitAsync_FullPrimaryContext_DoesNotAllocateMoreThanPartialPrefix()
+    public async Task RunExitAsync_PrimaryContextExceedsRemainingCapacity_AllocatesLikeRetainedPrefix()
     {
         // Given
         var context = Enumerable.Range(0, 100).Select(i => new Suppressed(new Failed(i), Relation.Sequential)).ToArray();
@@ -889,10 +889,11 @@ public class AllocationTests
             Assert.Same(defect, die.Exception);
             Assert.Equal(100, die.Suppressed.Count);
             Assert.Equal(5 + scenario, die.OmittedSuppressed);
-            Assert.Same(scenario == 0 ? other : context[99], die.Suppressed[^1]);
+            Assert.Same(other, die.Suppressed[0]);
+            Assert.Same(context[98], die.Suppressed[^1]);
         }
 
-        Assert.True(allocated[1] <= allocated[0], $"Partial prefix: {allocated[0]}; full prefix: {allocated[1]}");
+        Assert.Equal(allocated[0], allocated[1]);
     }
 
     [Fact]

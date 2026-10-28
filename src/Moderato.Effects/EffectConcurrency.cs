@@ -156,12 +156,12 @@ public static partial class Effect
                 if (end.Outcome.Kind == OutcomeKind.Err) errorCount++;
             if (errorCount > 0)
             {
-                var (others, omitted) = Concurrent.Others(ends, null, includeErrs: false);
+                var (suppressed, omitted) = Concurrent.Context(ends, null, includeErrs: false);
                 var errors = new E[errorCount];
                 var index = 0;
                 foreach (var end in ends)
                     if (end.Outcome.Kind == OutcomeKind.Err) errors[index++] = end.Outcome.Error;
-                return Outcome<T[], E[]>.Err(errors).WithSuppressed(others, omitted);
+                return Outcome<T[], E[]>.Err(errors).WithSuppressed(suppressed, omitted);
             }
 
             return Succeeded<T, E, T[], E[]>(ends, static values => values);
@@ -221,8 +221,8 @@ public static partial class Effect
         if (decidedByFailure) return Concurrent.Fail<T, E, T, E>(ends, primary!.Value, static error => error);
 
         var chosen = ends[winner!.Value].Outcome;
-        var (others, omitted) = Concurrent.Others(ends, winner);
-        return chosen.WithSuppressed(others, omitted).After(chosen);
+        var (suppressed, omitted) = Concurrent.Context(ends, winner);
+        return chosen.WithSuppressed(suppressed, omitted);
     }
 
     private static Effect<T, E, R>[] Runs<T, E, R>(IEnumerable<Effect<T, E, R>> effects)
@@ -251,18 +251,18 @@ public static partial class Effect
     // The caller's cancellation decides, and the children's failures stay as context.
     private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)
     {
-        var (others, omitted) = Concurrent.Others(ends, null);
-        return Outcome<U, F>.Interrupted().WithSuppressed(others, omitted);
+        var (suppressed, omitted) = Concurrent.Context(ends, null);
+        return Outcome<U, F>.Interrupted().WithSuppressed(suppressed, omitted);
     }
 
     // No failure decided, so a child that is not Ok was stopped by the caller's cancellation.
     private static Outcome<U, F> Succeeded<T, E, U, F>(ChildEnd<T, E>[] ends, Func<T[], U> build)
     {
         if (ends.Any(static end => end.Outcome.Kind != OutcomeKind.Ok || !end.Ran)) return InterruptedWithOthers<T, E, U, F>(ends);
-        var (others, omitted) = Concurrent.Others(ends, null);
+        var (suppressed, omitted) = Concurrent.Context(ends, null);
         T[] values = ends.Length == 0 ? [] : new T[ends.Length];
         for (var i = 0; i < ends.Length; i++) values[i] = ends[i].Outcome.Value;
-        return Outcome<U, F>.Ok(build(values)).WithSuppressed(others, omitted);
+        return Outcome<U, F>.Ok(build(values)).WithSuppressed(suppressed, omitted);
     }
 
     private static async ValueTask<Outcome<U, F>> RunGroup<T, E, R, U, F>(
