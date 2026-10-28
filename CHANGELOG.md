@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Build retained cancellation-callback context without a temporary prefix array.
+
 - Reuse internal release-loop async state when cleanup suspends.
 
 - Skip creating discarded defect cases after grouped failure context reaches its limit.

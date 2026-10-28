@@ -109,7 +109,12 @@ internal sealed class Cancellation : CancellationTokenSource
 
     /// <summary>Takes the callback defect, if any, onto the outcome as a consequence of the cancellation.</summary>
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
-        => TakeCallbackFailure() is { } failure ? outcome.After([new Suppressed(ExitCases.Die(failure), Relation.Consequence)]) : outcome;
+    {
+        if (TakeCallbackFailure() is not { } failure) return outcome;
+        var retained = Math.Min(outcome.Suppressed.Length, SuppressedLimit.MAX - 1);
+        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
+            outcome.Omitted + outcome.Suppressed.Length - retained);
+    }
 
     /// <summary>Marks the work finished; false if a reason won first.</summary>
     internal bool TrySettle() => Interlocked.CompareExchange(ref state, SETTLED, 0) == 0;
