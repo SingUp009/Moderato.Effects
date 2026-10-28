@@ -21,7 +21,7 @@ public readonly partial struct Effect<T, E, R>
         => constant.HasValue || run is not null ? this : ThrowHelper.ThrowUninitializedEffect<Effect<T, E, R>>();
 
     internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context)
-        => constant.HasValue ? new(Steps.FromResult(constant))
+        => constant.HasValue ? new(Steps.FromResult(constant, context))
             : (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>

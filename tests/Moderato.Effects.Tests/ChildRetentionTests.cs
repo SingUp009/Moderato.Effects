@@ -32,17 +32,17 @@ public class ChildRetentionTests
         var lastContext = Enumerable.Range(0, 60).Select(i => new Suppressed(new Failed($"last {i}"), Relation.Consequence)).ToArray();
         var bodyContext = Enumerable.Range(0, 60).Select(i => new Suppressed(new Failed($"body {i}"), Relation.Parallel)).ToArray();
         var error = new ObservedError();
-        var bodyOutcome = (kind switch
-        {
-            "Ok" or "Wrapped" or "Overflow" => Outcome<int, object>.Ok(42),
-            "Err" => Outcome<int, object>.Err(error),
-            "Interrupted" => Outcome<int, object>.Interrupted(),
-            _ => Outcome<int, object>.Die(ExceptionDispatchInfo.Capture(bodyFailure), consequential: kind == "Consequential"),
-        }).WithSuppressed([.. bodyContext], 7);
         var firstOmitted = kind is "Wrapped" or "Overflow" ? int.MaxValue : 2;
         var lastOmitted = kind == "Wrapped" ? 0 : 3;
         var firstOutcome = Outcome<int, Never>.Die(ExceptionDispatchInfo.Capture(firstFailure), [.. firstContext], omitted: firstOmitted);
         var lastOutcome = Outcome<int, Never>.Die(ExceptionDispatchInfo.Capture(lastFailure), [.. lastContext], omitted: lastOmitted);
+        var bodyOutcome = (kind switch
+        {
+            "Ok" or "Wrapped" or "Overflow" => Outcome<int, object>.Ok(42),
+            "Err" => Outcome<int, object>.Err(error, consequential: true),
+            "Interrupted" => Outcome<int, object>.Interrupted(),
+            _ => Outcome<int, object>.Die(ExceptionDispatchInfo.Capture(bodyFailure), consequential: kind == "Consequential"),
+        }).WithSuppressed([.. bodyContext], 7);
         var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var lastStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstGo = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

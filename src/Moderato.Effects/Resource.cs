@@ -104,7 +104,7 @@ public readonly struct Resource<T, E, R>
             if (outcome.Kind != OutcomeKind.Err) return outcome.WithErrorType<F>();
             try
             {
-                return Outcome<T, F>.Err(state.mapper(outcome.Error)).After(outcome);
+                return outcome.WithError<T, F>(state.mapper(outcome.Error));
             }
             catch (Exception exception)
             {

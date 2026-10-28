@@ -5,8 +5,20 @@ namespace Moderato.Effects.Internal;
 /// <summary>Runs an effect against a timer that cancels it, waiting for it to finish.</summary>
 internal static class Timeouts
 {
+    private sealed class Deadline(CancellationToken parent) : Cancellation(parent)
+    {
+        internal long FailureOrder { get; private set; }
+
+        internal void Expire()
+        {
+            if (!TryBeginCancel(CancellationReason.Timeout)) return;
+            FailureOrder = FailureSequence.Next();
+            CancelWork();
+        }
+    }
+
     internal static Effect<U, F, R> Create<T, E, U, F, R>(
-        Effect<T, E, R> effect, TimeSpan after, Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, Outcome<U, F>> timedOut)
+        Effect<T, E, R> effect, TimeSpan after, Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut)
         where R : IHas<TimeProvider>
     {
         ThrowIfInvalid(after);
@@ -28,18 +40,19 @@ internal static class Timeouts
 
     private static async ValueTask<Outcome<U, F>> RunAsync<T, E, U, F, R>(
         Effect<T, E, R> effect, R env, RunContext context, TimeSpan after, TimeoutError error,
-        Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, Outcome<U, F>> timedOut)
+        Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut)
         where R : IHas<TimeProvider>
     {
         Outcome<T, E> inner;
         bool timedOutFirst;
+        long timeoutOrder;
         try
         {
             var clock = Services.Resolve<TimeProvider, R>(env);
-            using var cancellation = new Cancellation(context.CancellationToken);
+            using var cancellation = new Deadline(context.CancellationToken);
             var innerContext = new RunContext(cancellation.Token);
             var timer = clock.CreateTimer(
-                static state => ((Cancellation)state!).TryCancel(CancellationReason.Timeout), cancellation, after, Timeout.InfiniteTimeSpan);
+                static state => ((Deadline)state!).Expire(), cancellation, after, Timeout.InfiniteTimeSpan);
             await using (timer.ConfigureAwait(false))
             {
                 try
@@ -56,6 +69,7 @@ internal static class Timeouts
 
             // Taken after disposing the timer, which waits for its callback.
             inner = cancellation.WithCallbackFailure(inner);
+            timeoutOrder = cancellation.FailureOrder;
         }
         catch (Exception exception)
         {
@@ -83,7 +97,7 @@ internal static class Timeouts
         Outcome<U, F> timeout;
         try
         {
-            timeout = timedOut(error);
+            timeout = timedOut(error, timeoutOrder);
         }
         catch (Exception exception)
         {

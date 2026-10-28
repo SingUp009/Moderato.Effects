@@ -53,7 +53,7 @@ public static class EffectTimeExtensions
     public static Effect<T, E, R> Timeout<T, E, R>(this Effect<T, E, R> effect, TimeSpan after)
         where E : IUnionCase<E, TimeoutError>
         where R : IHas<TimeProvider>
-        => Timeouts.Create(effect, after, static outcome => outcome, static error => Outcome<T, E>.Err(E.From(error)));
+        => Timeouts.Create(effect, after, static outcome => outcome, static (error, order) => Outcome<T, E>.Err(E.From(error), failureOrder: order));
 
     /// <summary>Fails with <see cref="TimeoutError"/> if the effect does not finish in time.</summary>
     /// <param name="effect">The effect, which cannot fail otherwise.</param>
@@ -61,7 +61,7 @@ public static class EffectTimeExtensions
     /// <returns>An effect whose only error is the timeout.</returns>
     public static Effect<T, TimeoutError, R> Timeout<T, R>(this Effect<T, Never, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
-        => Timeouts.Create(effect, after, static outcome => outcome.WithErrorType<TimeoutError>(), static error => Outcome<T, TimeoutError>.Err(error));
+        => Timeouts.Create(effect, after, static outcome => outcome.WithErrorType<TimeoutError>(), static (error, order) => Outcome<T, TimeoutError>.Err(error, failureOrder: order));
 
     /// <summary>Fails with <see cref="TimeoutError"/> if the effect does not finish in time.</summary>
     /// <param name="effect">The effect, whose only error is already a timeout.</param>
@@ -69,7 +69,7 @@ public static class EffectTimeExtensions
     /// <returns>An effect with the same error type.</returns>
     public static Effect<T, TimeoutError, R> Timeout<T, R>(this Effect<T, TimeoutError, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
-        => Timeouts.Create(effect, after, static outcome => outcome, static error => Outcome<T, TimeoutError>.Err(error));
+        => Timeouts.Create(effect, after, static outcome => outcome, static (error, order) => Outcome<T, TimeoutError>.Err(error, failureOrder: order));
 
     /// <summary>Fails with the error <paramref name="onTimeout"/> builds if the effect does not finish in time.</summary>
     /// <param name="effect">The effect.</param>
@@ -80,7 +80,7 @@ public static class EffectTimeExtensions
         where R : IHas<TimeProvider>
     {
         ArgumentNullException.ThrowIfNull(onTimeout);
-        return Timeouts.Create(effect, after, static outcome => outcome, error => Outcome<T, E>.Err(onTimeout(error)));
+        return Timeouts.Create(effect, after, static outcome => outcome, (error, order) => Outcome<T, E>.Err(onTimeout(error), failureOrder: order));
     }
 
     /// <summary>Succeeds with <c>Err(TimeoutError)</c> if the effect runs out of time, making the timeout a value.</summary>
@@ -95,5 +95,5 @@ public static class EffectTimeExtensions
             static outcome => outcome.Kind == OutcomeKind.Ok
                 ? Outcome<Result<T, TimeoutError>, E>.Ok(new Result<T, TimeoutError>(new Ok<T>(outcome.Value))).After(outcome)
                 : outcome.WithValueType<Result<T, TimeoutError>>(),
-            static error => Outcome<Result<T, TimeoutError>, E>.Ok(new Result<T, TimeoutError>(new Err<TimeoutError>(error))));
+            static (error, _) => Outcome<Result<T, TimeoutError>, E>.Ok(new Result<T, TimeoutError>(new Err<TimeoutError>(error))));
 }

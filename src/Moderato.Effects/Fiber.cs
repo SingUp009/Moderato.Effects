@@ -61,7 +61,7 @@ public sealed class Fiber<T, E, R>
             // Only an outcome the joiner received counts as observed.
             Volatile.Write(ref joined, 1);
             // The owner already carries a reported defect's suppressed failures, so Join hands over the defect alone.
-            return reportedToOwner ? Outcome<T, E>.Die(outcome.Defect!) : outcome;
+            return reportedToOwner ? outcome.WithSuppressed([], 0) : outcome;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {

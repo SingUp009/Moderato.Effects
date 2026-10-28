@@ -174,9 +174,11 @@ file static class Catching
             return Defects.From<T, E>(exception, context);
         }
 
+        var order = FailureSequence.Next();
+        var consequential = context.CancellationToken.IsCancellationRequested;
         try
         {
-            return Outcome<T, E>.Err(map(caught));
+            return Outcome<T, E>.Err(map(caught), consequential, order);
         }
         catch (Exception mappingFailure)
         {

@@ -25,7 +25,7 @@ internal readonly record struct ChildEnd<T, E>(Outcome<T, E> Outcome, bool After
     internal bool IsIndependentFailure => Outcome.Kind switch
     {
         OutcomeKind.Die => !Outcome.Consequential,
-        OutcomeKind.Err => !AfterCancel,
+        OutcomeKind.Err => !Outcome.Consequential,
         _ => false,
     };
 }
@@ -159,7 +159,9 @@ internal static class Concurrent
     }
 
     private static int Earlier<T, E>(ChildEnd<T, E>[] ends, int? current, int candidate)
-        => current is { } c && ends[c].Order < ends[candidate].Order ? c : candidate;
+        => current is { } c && (ends[candidate].Outcome.Kind == OutcomeKind.Interrupted
+            ? ends[c].Order < ends[candidate].Order
+            : FailureSequence.Before(ends[c].Outcome.FailureOrder, ends[candidate].Outcome.FailureOrder)) ? c : candidate;
 
     /// <summary>Retained child context and non-primary failures in completion order, plus omitted counts.</summary>
     internal static (ImmutableArray<Suppressed> Suppressed, int Omitted) Context<T, E>(ChildEnd<T, E>[] ends, int? primary, bool includeErrs = true)
@@ -231,7 +233,7 @@ internal static class Concurrent
     {
         var (suppressed, omitted) = Context(ends, primary);
         var chosen = ends[primary].Outcome;
-        var failure = chosen.Kind == OutcomeKind.Err ? Outcome<U, F>.Err(error(chosen.Error)) : chosen.WithTypes<U, F>();
+        var failure = chosen.Kind == OutcomeKind.Err ? chosen.WithError<U, F>(error(chosen.Error)) : chosen.WithTypes<U, F>();
         return failure.WithSuppressed(suppressed, omitted);
     }
 }

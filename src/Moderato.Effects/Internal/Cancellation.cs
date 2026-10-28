@@ -15,7 +15,7 @@ internal enum CancellationReason
 }
 
 /// <summary>A cancellation unit linked to its parent, where settling or the first reason wins for good.</summary>
-internal sealed class Cancellation : CancellationTokenSource
+internal class Cancellation : CancellationTokenSource
 {
     private const int SETTLED = -1;
 
@@ -42,7 +42,15 @@ internal sealed class Cancellation : CancellationTokenSource
     /// <summary>Cancels the work unless it already settled or another reason won.</summary>
     internal bool TryCancel(CancellationReason reason)
     {
-        if (Interlocked.CompareExchange(ref state, (int)reason, 0) != 0) return false;
+        if (!TryBeginCancel(reason)) return false;
+        CancelWork();
+        return true;
+    }
+
+    protected bool TryBeginCancel(CancellationReason reason) => Interlocked.CompareExchange(ref state, (int)reason, 0) == 0;
+
+    protected void CancelWork()
+    {
         try
         {
             Cancel();
@@ -55,8 +63,6 @@ internal sealed class Cancellation : CancellationTokenSource
             // The owner still waits for its work, so a callback's defect is kept for it.
             Keep(exception);
         }
-
-        return true;
     }
 
     // Disposal must not turn parent cancellation into a callback failure.

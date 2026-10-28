@@ -23,7 +23,7 @@ public readonly partial struct Effect<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(mapper);
         return Then<T, F, Func<E, F>>(mapper, static (outcome, _, _, map) => new(outcome.Kind == OutcomeKind.Err
-            ? Outcome<T, F>.Err(map(outcome.Error)).After(outcome)
+            ? outcome.WithError<T, F>(map(outcome.Error))
             : outcome.WithErrorType<F>()));
     }
 
@@ -140,7 +140,7 @@ public readonly partial struct Effect<T, E, R>
         return Then<T, F, Func<TCase, Effect<T, F, R>>>(handler, static (outcome, env, context, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
-            if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(Outcome<T, F>.Err(rest).After(outcome));
+            if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(outcome.WithError<T, F>(rest));
             UnobservedFailures.ReportDefects(outcome.Suppressed);
             return handle(caught).Run(env, context);
         });

@@ -25,13 +25,13 @@ public class ReleaseDefectTests
         var order = new List<int>();
         var firstOutcome = Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([.. firstContext], 2);
         var lastOutcome = Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([.. lastContext], 3);
+        var bodyOutcome = Outcome<int, Never>.Die(ExceptionDispatchInfo.Capture(failure), [.. bodyContext], omitted: 7);
         var middleOutcome = releaseFails
             ? Outcome<Unit, Never>.Die(ExceptionDispatchInfo.Capture(releaseFailure), [failedContext], omitted: 5)
             : Outcome<Unit, Never>.Ok(Unit.Value).WithSuppressed([], 5);
         var first = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(1); return new(firstOutcome); });
         var middle = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(2); return new(middleOutcome); });
         var last = new Effect<Unit, Never, EmptyEnvironment>((_, _) => { order.Add(3); return new(lastOutcome); });
-        var bodyOutcome = Outcome<int, Never>.Die(ExceptionDispatchInfo.Capture(failure), [.. bodyContext], omitted: 7);
         var body = new Effect<int, Never, EmptyEnvironment>((_, _) => new(bodyOutcome));
         var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
