@@ -8,6 +8,50 @@ public class FailureProvenanceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Parallel_NestedFailureWaitsForSibling_KeepsItsOriginalOrder(bool race)
+    {
+        // Given
+        var early = new IOException("early");
+        var later = new IOException("later");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var a = Effect<EmptyEnvironment>.Async<int>(async _ =>
+        {
+            await started.Task;
+            throw early;
+        });
+        var b = Effect<EmptyEnvironment>.Async(async ct =>
+        {
+            _ = ct.Register(() => canceled.TrySetResult());
+            started.SetResult();
+            await finish.Task;
+            return 0;
+        });
+        var c = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            _ = ct.Register(() => finish.TrySetResult());
+            await canceled.Task;
+            throw later;
+        });
+        var inner = race ? Effect.Race(a, b) : Effect.All([a, b], Concurrency.Parallel).Map(static values => values.Length);
+        var work = race ? Effect.Race(inner, c) : Effect.All([inner, c], Concurrency.Parallel).Map(static values => values.Length);
+
+        // When
+        var exit = await work.RunExitAsync(CancellationToken.None).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(early, die.Exception);
+        var other = Assert.Single(die.Suppressed);
+        Assert.Same(later, Assert.IsType<Die>(other.Case.Value).Exception);
+        Assert.Equal(Relation.Parallel, other.Relation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task All_RecoveredFailureRunsAgain_UsesTheNewFailureOrigin(bool retry)
     {
         // Given
@@ -280,6 +324,114 @@ public class FailureProvenanceTests
         // Then
         Assert.True(exit.TryGetValue(out Err<MutableError> error));
         Assert.Equal(1, error.Error.Count);
+    }
+
+    [Fact]
+    public async Task All_CallbackFailureWaitsForFiber_KeepsTheCallbackOrigin()
+    {
+        // Given
+        var callback = new IOException("callback");
+        var later = new IOException("later");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var child = Effect<EmptyEnvironment>.Async(async ct =>
+        {
+            _ = ct.Register(() => throw callback);
+            started.SetResult();
+            await finish.Task;
+            return 0;
+        });
+        var core = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Keep the body synchronous so Run returns only after the callback failure has been captured.
+#pragma warning disable MEFF306, MEFF310
+            scope.Fork(child).AsTask().GetAwaiter().GetResult();
+            started.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+#pragma warning restore MEFF306, MEFF310
+            return new(0);
+        });
+        var first = new Effect<int, Never, EmptyEnvironment>((env, context) =>
+        {
+            var pending = core.Run(env, context);
+            captured.SetResult();
+            return pending;
+        });
+        var second = Effect<EmptyEnvironment>.Async<int>(async ct =>
+        {
+            _ = ct.Register(() => finish.TrySetResult());
+            await captured.Task;
+            throw later;
+        });
+
+        // When
+        var exit = await Effect.All([first, second], Concurrency.Parallel).RunExitAsync(CancellationToken.None)
+            .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(callback, die.Exception);
+        Assert.Contains(die.Suppressed, failure => failure.Case.Value is Die other && ReferenceEquals(other.Exception, later));
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 100)]
+    public async Task Fork_CallbackAndChildFailDuringRelease_KeepsTheEarlierFailure(bool childFirst, int contextCount)
+    {
+        // Given
+        var callback = new IOException("callback");
+        var childFailure = new IOException("child");
+        var held = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acquire = Effect<EmptyEnvironment>.Async<Unit>(ct =>
+        {
+            _ = ct.Register(() => throw callback);
+            return new(Unit.Value);
+        });
+        var child = Resource.Make(acquire, (_, _) => Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            held.SetResult();
+            await finish.Task;
+            if (!childFirst) throw childFailure;
+            return Unit.Value;
+        })).Use(_ => Effect<EmptyEnvironment>.Sync(() => childFirst ? throw childFailure : 0));
+        var contextFailure = new IOException("context");
+        if (contextCount > 0)
+        {
+            child = child.Then<int, Never>((outcome, _, _) => new(outcome.WithSuppressed(
+                [.. Enumerable.Range(0, contextCount).Select(_ => new Suppressed(new Die(contextFailure, []), Relation.Sequential))], 7)));
+        }
+        var core = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+        {
+            // Keep the body synchronous so Run returns only after the callback failure has been captured.
+#pragma warning disable MEFF306, MEFF310
+            scope.Fork(child).AsTask().GetAwaiter().GetResult();
+            held.Task.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+#pragma warning restore MEFF306, MEFF310
+            return new(0);
+        });
+        var work = new Effect<int, Never, EmptyEnvironment>((env, context) =>
+        {
+            var pending = core.Run(env, context);
+            finish.SetResult();
+            return pending;
+        });
+
+        // When
+        var exit = await work.RunExitAsync(CancellationToken.None).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(childFirst ? childFailure : callback, die.Exception);
+        Assert.Equal(Math.Min(100, contextCount + 1), die.Suppressed.Count);
+        var other = die.Suppressed[0];
+        Assert.Same(childFirst ? callback : childFailure, Assert.IsType<Die>(other.Case.Value).Exception);
+        Assert.Equal(Relation.Sequential, other.Relation);
+        Assert.All(die.Suppressed.Skip(1), failure => Assert.Same(contextFailure, Assert.IsType<Die>(failure.Case.Value).Exception));
+        Assert.Equal(contextCount == 0 ? 0 : 8, die.OmittedSuppressed);
     }
 
     private struct MutableError(int count) : System.Runtime.CompilerServices.IUnion

@@ -17,6 +17,12 @@ internal enum CancellationReason
 /// <summary>A cancellation unit linked to its parent, where settling or the first reason wins for good.</summary>
 internal class Cancellation : CancellationTokenSource
 {
+    internal sealed class CallbackFailure(ExceptionDispatchInfo dispatch, long order)
+    {
+        internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
+        internal long Order { get; } = order;
+    }
+
     private const int SETTLED = -1;
 
     private static readonly object closed = new();
@@ -95,6 +101,7 @@ internal class Cancellation : CancellationTokenSource
     // A failure arriving after the owner took it has no outcome left to carry it, so it is reported.
     private void Keep(AggregateException exception)
     {
+        var order = FailureSequence.Next();
         // Linked tokens nest one AggregateException per level.
         Exception single = exception;
         while (single is AggregateException aggregate && aggregate.InnerExceptions.Count == 1)
@@ -106,19 +113,19 @@ internal class Cancellation : CancellationTokenSource
             single = flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat;
         }
 
-        var failure = ExceptionDispatchInfo.Capture(single);
-        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
+        var failure = new CallbackFailure(ExceptionDispatchInfo.Capture(single), order);
+        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure.Dispatch));
     }
 
     /// <summary>Takes a callback's defect from the cancellation, after which defects are reported.</summary>
-    internal ExceptionDispatchInfo? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as ExceptionDispatchInfo;
+    internal CallbackFailure? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as CallbackFailure;
 
     /// <summary>Takes the callback defect, if any, onto the outcome as a consequence of the cancellation.</summary>
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
     {
         if (TakeCallbackFailure() is not { } failure) return outcome;
         var retained = Math.Min(outcome.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
+        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure.Dispatch), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
             outcome.Omitted + outcome.Suppressed.Length - retained);
     }
 
