@@ -246,7 +246,7 @@ public static partial class Effect
         => ends.Any(static end => !end.Ran || end.Outcome.Kind == OutcomeKind.Interrupted) && context.CancellationToken.IsCancellationRequested;
 
     private static bool CanceledIntoErr<T, E>(ChildEnd<T, E>[] ends, RunContext context)
-        => context.CancellationToken.IsCancellationRequested && ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err && end.AfterCancel);
+        => context.CancellationToken.IsCancellationRequested && ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err && end.Outcome.Consequential);
 
     // The caller's cancellation decides, and the children's failures stay as context.
     private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)

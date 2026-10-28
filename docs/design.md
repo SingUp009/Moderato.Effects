@@ -260,8 +260,8 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - 主となる失敗は、**キャンセルのきっかけになった失敗**（時間順で最初のもの）。キャンセルより前に独立して起きた失敗の中では Die を優先する。キャンセルより後に兄弟が起こした失敗は、キャンセルされたせいで起きたものなので、付属情報（`Consequence`）にするだけ。規則の全体は D18。
 - fail-fast しない版：
   - `AllSettled`：`Effect<Exit<T, E>[], Never, R>`。全部の結果を Exit で受け取る。
-  - 呼び出し側のキャンセルを子が Err に変えた場合（`catch (OperationCanceledException)` で `scope.Fail` するなど）、`All` と `AllErrors` は Interrupted で終わる。その Err は付属情報に残る。`AllSettled` は、その Err をそのまま集める（Issue #27）。
-  - `AllErrors`：`Effect<T[], E[], R>`。エラーを全部集める（入力値の検証向け。Results の `CombineAll` と同じ考え方）。
+  - 呼び出し側のキャンセルを子が Err に変えた場合（`catch (OperationCanceledException)` で `scope.Fail` するなど）、`All` は独立した失敗がなければ Interrupted、`AllErrors` は Interrupted で終わる。キャンセルから生じた Err は付属情報に残る。`AllSettled` は、その Err をそのまま集める（Issue #27）。
+  - `AllErrors`：`Effect<T[], E[], R>`。エラーを全部集める（入力値の検証向け。Results の `CombineAll` と同じ考え方）。 集約した Err は、全件の検証を終えて配列を作った時点の新しい失敗として記録し、個々の Err の順序は引き継がない。
 - 名前を Results の `Combine` / `CombineAll` と分けるのは、すでに計算し終えた Result をまとめる操作とは違い、並列数など実行のしかたを伴うため。
 
 **`Race`**
@@ -886,6 +886,8 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 2. **Interrupted**：本体が呼び出し側のキャンセルによって終わったとき。本体がすでに終わってから呼び出し側がキャンセルした場合（解放処理の途中など）は、結果を変えない。
 3. **キャンセルのきっかけが決めた結果**：Timeout なら `Err(TimeoutError)`、All なら最初に独立して起きた失敗、Race なら勝った側。
 4. **通常の Ok / Err**。
+
+`All`・`Race`・`RaceFirst` は、すでに観測した独立した Err を、後始末を待つ間の呼び出し側キャンセルで Interrupted に置き換えない。キャンセル後に観測した Err はこの対象ではない。`AllErrors`・`AllSettled` は全件の結果が必要なため、キャンセルで未実行・中断の子が残れば Interrupted にする。`AllErrors` は、全件の結果が確定していて解放だけを待っていた場合、その結果を保持する。
 
 この順位で、各場面の結果は次のようになる。
 
