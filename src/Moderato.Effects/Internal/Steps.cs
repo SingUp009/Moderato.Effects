@@ -109,7 +109,7 @@ internal static class Steps
             return new(Defects.From<T, E>(exception, context));
         }
 
-        return task.IsCompletedSuccessfully ? new(FromResult(task.Result)) : Await(task, context);
+        return task.IsCompletedSuccessfully ? new(FromResult(task.Result, context)) : Await(task, context);
 
         static async ValueTask<Outcome<T, E>> Await(ValueTask<Result<T, E>> task, RunContext context)
         {
@@ -123,15 +123,15 @@ internal static class Steps
                 return Defects.From<T, E>(exception, context);
             }
 
-            return FromResult(result);
+            return FromResult(result, context);
         }
     }
 
     /// <summary>Converts a Result into an outcome; a default Result is a defect.</summary>
-    internal static Outcome<T, E> FromResult<T, E>(Result<T, E> result)
+    internal static Outcome<T, E> FromResult<T, E>(Result<T, E> result, RunContext context = default)
     {
         if (result.TryGetOk(out var value)) return Outcome<T, E>.Ok(value);
-        if (result.TryGetErr(out var error)) return Outcome<T, E>.Err(error);
-        return Outcome<T, E>.Die(System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ThrowHelper.UninitializedResultException()));
+        if (result.TryGetErr(out var error)) return Outcome<T, E>.Err(error, consequential: context.CancellationToken.IsCancellationRequested);
+        return Defects.From<T, E>(ThrowHelper.UninitializedResultException(), context);
     }
 }

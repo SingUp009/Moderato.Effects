@@ -37,7 +37,7 @@ public class SingleChildContextTests
         {
             "Ok" => Outcome<int, string>.Ok(42),
             "Interrupted" => Outcome<int, string>.Interrupted(),
-            "Err" => Outcome<int, string>.Err("body error"),
+            "Err" => Outcome<int, string>.Err("body error", consequential: true),
             _ => Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(bodyFailure)),
         }).WithSuppressed([.. bodyContext], 7);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -99,7 +99,8 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
 
             if (released.Kind == OutcomeKind.Die)
             {
-                (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(released);
+                (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(
+                    Outcome<Unit, Never>.Die(released.Defect!, released.Suppressed, omitted: released.Omitted, failureOrder: released.FailureOrder));
             }
             else
             {
@@ -120,24 +121,30 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>
     private static Outcome<T, E> AfterChildDefects<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
-        var first = defects[0];
-        if (defects.Count == 1
+        var primary = First(defects);
+        var bodyFirst = body.Kind == OutcomeKind.Die && !body.Consequential
+            && FailureSequence.Before(body.FailureOrder, defects[primary].FailureOrder);
+        var first = bodyFirst ? body.WithTypes<Unit, Never>() : defects[primary];
+        if (!bodyFirst && defects.Count == 1
             && (body.Kind is OutcomeKind.Ok or OutcomeKind.Interrupted
                 || body.Kind == OutcomeKind.Die && ReferenceEquals(first.Defect!.SourceException, body.Defect!.SourceException)))
         {
             return body.Suppressed.IsEmpty
-                ? Outcome<T, E>.Die(first.Defect!, first.Suppressed, omitted: first.Omitted + body.Omitted)
-                : Outcome<T, E>.Die(first.Defect!, body.Suppressed, omitted: body.Omitted).After(first);
+                ? first.WithTypes<T, E>().WithSuppressed(first.Suppressed, first.Omitted + body.Omitted)
+                : first.WithTypes<T, E>().WithSuppressed(body.Suppressed, body.Omitted).After(first);
         }
 
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
-        var discarded = AddContext(suppressed, first.Suppressed);
-        for (var i = 1; i < defects.Count; i++)
+        var discarded = 0;
+        for (var i = 0; i < defects.Count; i++)
         {
             var other = defects[i];
-            if (suppressed.Count < SuppressedLimit.MAX)
-                suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
-            else discarded++;
+            if (bodyFirst || i != primary)
+            {
+                if (suppressed.Count < SuppressedLimit.MAX)
+                    suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
+                else discarded++;
+            }
             discarded += AddContext(suppressed, other.Suppressed);
         }
 
@@ -154,16 +161,16 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             }
         }
 
-        if (!sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
+        if (!bodyFirst && !sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
         {
             if (suppressed.Count < SuppressedLimit.MAX)
-                suppressed.Add(new Suppressed(bodyFailure, body.Kind == OutcomeKind.Die && !body.Consequential ? Relation.Parallel : Relation.Consequence));
+                suppressed.Add(new Suppressed(bodyFailure, !body.Consequential ? Relation.Parallel : Relation.Consequence));
             else discarded++;
         }
         discarded += AddContext(suppressed, body.Suppressed);
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
-        return Outcome<T, E>.Die(first.Defect!, suppressed.DrainToImmutable(), omitted: body.Omitted + omitted + discarded);
+        return first.WithTypes<T, E>().WithSuppressed(suppressed.DrainToImmutable(), body.Omitted + omitted + discarded);
     }
 
     // Each failed release keeps its own suppressed failures.
@@ -172,43 +179,55 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         if (body.Kind == OutcomeKind.Ok && defects.Count == 1)
         {
             var only = defects[0];
-            return Outcome<T, E>.Die(only.Defect!, only.Suppressed, omitted: only.Omitted).After(body);
+            return only.WithTypes<T, E>().After(body);
         }
 
         var suppressed = ImmutableArray.CreateBuilder<Suppressed>();
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
         omitted += body.Omitted;
-        if (body.Kind == OutcomeKind.Die && !body.Consequential)
+        var primaryIndex = First(defects);
+        if (body.Kind == OutcomeKind.Die && !body.Consequential
+            && !FailureSequence.Before(defects[primaryIndex].FailureOrder, body.FailureOrder))
         {
             omitted += AddContext(suppressed, body.Suppressed);
-            omitted += AddReleaseFailures(suppressed, defects, 0);
-            return Outcome<T, E>.Die(body.Defect!, suppressed.DrainToImmutable(), omitted: omitted);
+            omitted += AddReleaseFailures(suppressed, defects, null);
+            return body.WithSuppressed(suppressed.DrainToImmutable(), omitted);
         }
 
         // An independent release defect outranks a body defect caused by cancellation.
-        var primary = defects[0];
+        var primary = defects[primaryIndex];
         if (ExitCases.FailureOf(body) is { } bodyFailure)
             suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));
         omitted += AddContext(suppressed, body.Suppressed);
-        omitted += AddContext(suppressed, primary.Suppressed);
-        omitted += AddReleaseFailures(suppressed, defects, 1);
-        return Outcome<T, E>.Die(primary.Defect!, suppressed.DrainToImmutable(), omitted: omitted);
+        omitted += AddReleaseFailures(suppressed, defects, primaryIndex);
+        return primary.WithTypes<T, E>().WithSuppressed(suppressed.DrainToImmutable(), omitted);
     }
 
-    private static int AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int start)
+    private static int AddReleaseFailures(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Outcome<Unit, Never>>.Builder defects, int? primary)
     {
         var omitted = 0;
-        for (var i = start; i < defects.Count; i++)
+        for (var i = 0; i < defects.Count; i++)
         {
             var defect = defects[i];
-            if (suppressed.Count < SuppressedLimit.MAX)
-                suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
-            else omitted++;
+            if (i != primary)
+            {
+                if (suppressed.Count < SuppressedLimit.MAX)
+                    suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
+                else omitted++;
+            }
             omitted += AddContext(suppressed, defect.Suppressed);
         }
 
         return omitted;
+    }
+
+    private static int First(ImmutableArray<Outcome<Unit, Never>>.Builder defects)
+    {
+        var first = 0;
+        for (var i = 1; i < defects.Count; i++)
+            if (FailureSequence.Before(defects[i].FailureOrder, defects[first].FailureOrder)) first = i;
+        return first;
     }
 
     private static int AddContext(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Suppressed> context)

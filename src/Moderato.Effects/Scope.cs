@@ -19,11 +19,8 @@ public sealed class Scope<E, R>
     private readonly Lock gate = new();
     private ImmutableArray<Suppressed>.Builder? suppressed;
     private int omitted;
-    private ExceptionDispatchInfo? rethrown;
+    private FailureState? failures;
     private OperationCanceledException? interruption;
-    private bool rethrownConsequential;
-    private bool failed;
-    private E error = default!;
     private int busy;
     private bool closed;
     private PendingStep? running;
@@ -174,7 +171,7 @@ public sealed class Scope<E, R>
             lock (gate)
             {
                 // Whether this Err becomes the block's own, read before Unwrap records it.
-                var recordsError = outcome.Kind == OutcomeKind.Err && !failed;
+                var recordsError = outcome.Kind == OutcomeKind.Err && failures is not { Failed: true };
                 try
                 {
                     value = Unwrap(outcome);
@@ -185,13 +182,31 @@ public sealed class Scope<E, R>
                 }
 
                 // Finished with the recording, so the block's end sees both or neither.
-                pending.Finish(outcome, recordsError);
+                pending.Finish(outcome, recordsError, outcome.Kind == OutcomeKind.Die ? failures?.Rethrown : null);
             }
 
             // Outside the lock, since the awaiting body may continue inline.
             if (failure is null) pending.Succeed(value);
             else pending.Fail(failure);
         }
+    }
+
+    // Successful scopes do not need storage for failure origins.
+    private sealed class FailureState
+    {
+        // ScopeFailure exposes a boxed copy, which must stay separate from the original error.
+        internal E Error = default!;
+        internal bool Failed;
+        internal long ErrorOrder;
+        internal bool ErrorConsequential;
+        internal ObservedDefect? Rethrown;
+    }
+
+    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential)
+    {
+        internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
+        internal long Order { get; } = order;
+        internal bool Consequential { get; } = consequential;
     }
 
     /// <summary>A step that did not finish at once, tracking whether the body read it.</summary>
@@ -209,19 +224,22 @@ public sealed class Scope<E, R>
 
         internal bool Completed { get; private set; }
 
-        internal ExceptionDispatchInfo? Defect { get; private set; }
+        private ObservedDefect? defect;
 
-        internal bool Consequential { get; private set; }
+        internal ExceptionDispatchInfo? Defect => defect?.Dispatch;
+
+        internal bool Consequential => defect?.Consequential ?? false;
+
+        internal long FailureOrder => defect?.Order ?? 0;
 
         /// <summary>Whether the step's Err became the block's own error.</summary>
         internal bool RecordedError { get; private set; }
 
         protected void Observe() => Volatile.Write(ref observed, 1);
 
-        protected void Finish(ExitCase? failure, ExceptionDispatchInfo? defect, bool consequential, bool recordedError)
+        protected void Finish(ExitCase? failure, ObservedDefect? defect, bool recordedError)
         {
-            Defect = defect;
-            Consequential = consequential;
+            this.defect = defect;
             RecordedError = recordedError;
             this.failure = failure;
             Completed = true;
@@ -235,8 +253,8 @@ public sealed class Scope<E, R>
 
         internal ValueTask<T> Result => new(this, core.Version);
 
-        internal void Finish(Outcome<T, E> outcome, bool recordedError)
-            => Finish(ExitCases.FailureOf(outcome), outcome.Kind == OutcomeKind.Die ? outcome.Defect : null, outcome.Consequential, recordedError);
+        internal void Finish(Outcome<T, E> outcome, bool recordedError, ObservedDefect? defect)
+            => Finish(ExitCases.FailureOf(outcome), defect, recordedError);
 
         internal void Succeed(T value) => core.SetResult(value);
 
@@ -273,7 +291,7 @@ public sealed class Scope<E, R>
         lock (gate)
         {
             if (thrown is not null) outcome = Thrown<T>(thrown);
-            else outcome = failed ? Outcome<T, E>.Err(error) : Outcome<T, E>.Ok(value);
+            else outcome = failures is { Failed: true } ? RecordedError<T>() : Outcome<T, E>.Ok(value);
             steps = unobserved;
             if (Volatile.Read(ref running) is { Observed: false } last) (steps ??= []).Add(last);
             // A step ended by now has its Err on the outcome already.
@@ -296,18 +314,18 @@ public sealed class Scope<E, R>
 
     private Outcome<T, E> Thrown<T>(Exception exception)
     {
-        if (exception is ScopeFailure failure && ReferenceEquals(failure.Owner, this)) return Outcome<T, E>.Err(error);
+        if (exception is ScopeFailure failure && ReferenceEquals(failure.Owner, this)) return RecordedError<T>();
 
         // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
-        if (rethrown is { } defect && ReferenceEquals(exception, defect.SourceException))
-            outcome = Outcome<T, E>.Die(defect, consequential: rethrownConsequential);
+        if (failures?.Rethrown is { } defect && ReferenceEquals(exception, defect.Dispatch.SourceException))
+            outcome = Outcome<T, E>.Die(defect.Dispatch, consequential: defect.Consequential, failureOrder: defect.Order);
         else if (ReferenceEquals(exception, interruption))
             outcome = Outcome<T, E>.Interrupted();
         else
             outcome = Defects.From<T, E>(exception, context);
         // An earlier Err stays as context for what replaced it.
-        if (failed) AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
+        if (failures is { Failed: true } earlier) AddSuppressed(new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential));
         return outcome;
     }
 
@@ -331,9 +349,9 @@ public sealed class Scope<E, R>
 
                 // An Ok block takes the step's failure, while a failed block keeps its own first.
                 if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
-                    outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential);
+                    outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential, failureOrder: step.FailureOrder);
                 else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
-                    outcome = Outcome<T, E>.Err(error);
+                    outcome = RecordedError<T>();
                 else
                     AddSuppressed(new Suppressed(failure, Relation.Sequential));
             }
@@ -354,10 +372,9 @@ public sealed class Scope<E, R>
                 case OutcomeKind.Ok:
                     return outcome.Value;
                 case OutcomeKind.Err:
-                    throw Record(outcome.Error);
+                    throw Record(outcome.Error, outcome.FailureOrder, outcome.Consequential);
                 case OutcomeKind.Die:
-                    rethrown = outcome.Defect;
-                    rethrownConsequential = outcome.Consequential;
+                    (failures ??= new()).Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential);
                     outcome.Defect!.Throw();
                     return default!;
                 default:
@@ -367,28 +384,34 @@ public sealed class Scope<E, R>
         }
     }
 
-    private ScopeFailure Record(E error)
+    private Outcome<T, E> RecordedError<T>()
+        => Outcome<T, E>.Err(failures!.Error, failures.ErrorConsequential, failures.ErrorOrder);
+
+    private ScopeFailure Record(E error, long? failureOrder = null, bool? consequential = null)
     {
         lock (gate)
         {
-            if (!failed)
+            var state = failures ??= new();
+            if (!state.Failed)
             {
-                failed = true;
-                this.error = error;
+                state.Failed = true;
+                state.Error = error;
+                state.ErrorOrder = failureOrder ?? FailureSequence.Next();
+                state.ErrorConsequential = consequential ?? context.CancellationToken.IsCancellationRequested;
             }
             else
             {
                 AddSuppressed(new Suppressed(ExitCases.Failed(error), Relation.Sequential));
             }
 
-            return new ScopeFailure(this, this.error);
+            return new ScopeFailure(this, state.Error);
         }
     }
 
     private void ThrowIfFailed()
     {
         // F20: after an Err, later steps must not run even if a catch swallowed the ScopeFailure.
-        if (failed) throw new ScopeFailure(this, error);
+        if (failures is { Failed: true } state) throw new ScopeFailure(this, state.Error);
     }
 
     private void Enter()

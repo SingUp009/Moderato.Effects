@@ -15,8 +15,14 @@ internal enum CancellationReason
 }
 
 /// <summary>A cancellation unit linked to its parent, where settling or the first reason wins for good.</summary>
-internal sealed class Cancellation : CancellationTokenSource
+internal class Cancellation : CancellationTokenSource
 {
+    internal sealed class CallbackFailure(ExceptionDispatchInfo dispatch, long order)
+    {
+        internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
+        internal long Order { get; } = order;
+    }
+
     private const int SETTLED = -1;
 
     private static readonly object closed = new();
@@ -42,7 +48,15 @@ internal sealed class Cancellation : CancellationTokenSource
     /// <summary>Cancels the work unless it already settled or another reason won.</summary>
     internal bool TryCancel(CancellationReason reason)
     {
-        if (Interlocked.CompareExchange(ref state, (int)reason, 0) != 0) return false;
+        if (!TryBeginCancel(reason)) return false;
+        CancelWork();
+        return true;
+    }
+
+    protected bool TryBeginCancel(CancellationReason reason) => Interlocked.CompareExchange(ref state, (int)reason, 0) == 0;
+
+    protected void CancelWork()
+    {
         try
         {
             Cancel();
@@ -55,8 +69,6 @@ internal sealed class Cancellation : CancellationTokenSource
             // The owner still waits for its work, so a callback's defect is kept for it.
             Keep(exception);
         }
-
-        return true;
     }
 
     // Disposal must not turn parent cancellation into a callback failure.
@@ -89,6 +101,7 @@ internal sealed class Cancellation : CancellationTokenSource
     // A failure arriving after the owner took it has no outcome left to carry it, so it is reported.
     private void Keep(AggregateException exception)
     {
+        var order = FailureSequence.Next();
         // Linked tokens nest one AggregateException per level.
         Exception single = exception;
         while (single is AggregateException aggregate && aggregate.InnerExceptions.Count == 1)
@@ -100,19 +113,19 @@ internal sealed class Cancellation : CancellationTokenSource
             single = flat.InnerExceptions.Count == 1 ? flat.InnerExceptions[0] : flat;
         }
 
-        var failure = ExceptionDispatchInfo.Capture(single);
-        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure));
+        var failure = new CallbackFailure(ExceptionDispatchInfo.Capture(single), order);
+        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure.Dispatch));
     }
 
     /// <summary>Takes a callback's defect from the cancellation, after which defects are reported.</summary>
-    internal ExceptionDispatchInfo? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as ExceptionDispatchInfo;
+    internal CallbackFailure? TakeCallbackFailure() => Interlocked.Exchange(ref callbackFailure, closed) as CallbackFailure;
 
     /// <summary>Takes the callback defect, if any, onto the outcome as a consequence of the cancellation.</summary>
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
     {
         if (TakeCallbackFailure() is not { } failure) return outcome;
         var retained = Math.Min(outcome.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
+        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure.Dispatch), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
             outcome.Omitted + outcome.Suppressed.Length - retained);
     }
 

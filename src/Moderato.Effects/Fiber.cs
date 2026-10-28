@@ -61,7 +61,7 @@ public sealed class Fiber<T, E, R>
             // Only an outcome the joiner received counts as observed.
             Volatile.Write(ref joined, 1);
             // The owner already carries a reported defect's suppressed failures, so Join hands over the defect alone.
-            return reportedToOwner ? Outcome<T, E>.Die(outcome.Defect!) : outcome;
+            return reportedToOwner ? outcome.WithSuppressed([], 0) : outcome;
         }
         catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
         {
@@ -79,9 +79,14 @@ public sealed class Fiber<T, E, R>
         if (callbackFailure is null) return released;
 
         // A callback that threw during cancellation fails the release once the fiber has ended.
-        return released.Kind == OutcomeKind.Die
-            ? released.After([new Suppressed(ExitCases.Die(callbackFailure), Relation.Sequential)])
-            : Outcome<Unit, Never>.Die(callbackFailure);
+        if (released.Kind == OutcomeKind.Die && !FailureSequence.Before(callbackFailure.Order, released.FailureOrder))
+            return released.After([new Suppressed(ExitCases.Die(callbackFailure.Dispatch), Relation.Sequential)]);
+
+        var failure = Outcome<Unit, Never>.Die(callbackFailure.Dispatch, failureOrder: callbackFailure.Order);
+        if (released.Kind != OutcomeKind.Die) return failure;
+        var retained = Math.Min(released.Suppressed.Length, SuppressedLimit.MAX - 1);
+        return failure.WithSuppressed([new Suppressed(ExitCases.Die(released.Defect!), Relation.Sequential), .. released.Suppressed.AsSpan()[..retained]],
+            released.Omitted + released.Suppressed.Length - retained);
     }
 
     private Outcome<Unit, Never> Observe(Outcome<T, E> outcome)
