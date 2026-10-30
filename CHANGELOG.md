@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Report duplicate environment services that differ only in reference nullability or tuple element names.
+
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.
 
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
