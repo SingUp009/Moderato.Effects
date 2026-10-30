@@ -60,8 +60,9 @@ public readonly partial struct Effect<T, E, R>
         return Then<T, F, Func<E, Effect<T, F, R>>>(binder, static (outcome, env, context, recover) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
+            var recovery = recover(outcome.Error).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return recover(outcome.Error).Run(env, context);
+            return recovery.Run(env, context);
         });
     }
 
@@ -141,8 +142,9 @@ public readonly partial struct Effect<T, E, R>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(outcome.WithError<T, F>(rest));
+            var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return handle(caught).Run(env, context);
+            return recovery.Run(env, context);
         });
     }
 
