@@ -11,10 +11,10 @@ namespace Moderato.Effects.SourceGenerator;
 [Generator]
 public sealed class RestOfGenerator : IIncrementalGenerator
 {
-    private sealed record Rest(string Case, CasePath Path);
+    private sealed record Rest(string Case, string Pattern, CasePath Path);
 
     private sealed record Model(
-        Declaration? Declaration, string Source, string Caught, string? NullCase, EquatableArray<Rest> Rests, EquatableArray<DiagnosticInfo> Diagnostics);
+        Declaration? Declaration, string Source, string Caught, string CaughtPattern, string? NullCase, EquatableArray<Rest> Rests, EquatableArray<DiagnosticInfo> Diagnostics);
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -47,7 +47,9 @@ public sealed class RestOfGenerator : IIncrementalGenerator
 
         // F16: only a direct case of the source can be left out.
         var held = Shapes.Reachable(type);
-        var sourceCases = Shapes.Cases(source).Select(Shapes.Name).ToList();
+        var caseTypes = Shapes.Cases(source);
+        var sourceCases = caseTypes.Select(Shapes.Name).ToList();
+        var patterns = caseTypes.ToDictionary(Shapes.Name, Shapes.PatternType);
         var missing = sourceCases.Where(c => !held.ContainsKey(c)).ToList();
         if (missing.Count != 1)
         {
@@ -68,12 +70,12 @@ public sealed class RestOfGenerator : IIncrementalGenerator
 
         var rests = sourceCases
             .Where(c => c != missing[0])
-            .Select(c => new Rest(c, held[c].OrderBy(static p => p.Steps.Length).First()))
+            .Select(c => new Rest(c, patterns[c], held[c].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
         // An [Error] union reports its nullable cases itself.
         var isError = type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "Moderato.Effects.ErrorAttribute");
         var nullable = isError ? default : Shapes.NullableCases(type, location).ToEquatableArray();
-        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], Shapes.NullCase(sourceCases), rests, nullable);
+        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], patterns[missing[0]], Shapes.NullCase(sourceCases), rests, nullable);
     }
 
     // A rest case ∉ E's cases is extra, unless it is a union grouping E's cases.
@@ -102,7 +104,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         }
     }
 
-    private static Model Failed(DiagnosticInfo diagnostic) => new(null, "", "", null, default, new[] { diagnostic }.ToEquatableArray());
+    private static Model Failed(DiagnosticInfo diagnostic) => new(null, "", "", "", null, default, new[] { diagnostic }.ToEquatableArray());
 
     private static string Short(string fullName) => fullName.Substring(fullName.LastIndexOf('.') + 1);
 
@@ -124,11 +126,11 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             sb.Append($"            case null:\n                caught = default!;\n                rest = {Shapes.Widen(nullRest.Path, $"({nullRest.Path.Target})null")};\n                return false;\n");
         }
 
-        sb.Append($"            case {Shapes.PatternType(model.Caught)} found:\n                caught = found;\n                rest = default!;\n                return true;\n");
+        sb.Append($"            case {model.CaughtPattern} found:\n                caught = found;\n                rest = default!;\n                return true;\n");
         var i = 0;
         foreach (var rest in model.Rests)
         {
-            sb.Append($"            case {Shapes.PatternType(rest.Case)} other{i}:\n                caught = default!;\n");
+            sb.Append($"            case {rest.Pattern} other{i}:\n                caught = default!;\n");
             sb.Append($"                rest = {Shapes.Widen(rest.Path, $"other{i}")};\n                return false;\n");
             i++;
         }
