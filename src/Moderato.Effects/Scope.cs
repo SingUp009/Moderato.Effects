@@ -202,8 +202,9 @@ public sealed class Scope<E, R>
         internal ObservedDefect? Rethrown;
     }
 
-    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential)
+    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential, ObservedDefect? previous)
     {
+        internal ObservedDefect? Previous { get; } = previous;
         internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
         internal long Order { get; } = order;
         internal bool Consequential { get; } = consequential;
@@ -318,7 +319,9 @@ public sealed class Scope<E, R>
 
         // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
-        if (failures?.Rethrown is { } defect && ReferenceEquals(exception, defect.Dispatch.SourceException))
+        var defect = failures?.Rethrown;
+        while (defect is not null && !ReferenceEquals(exception, defect.Dispatch.SourceException)) defect = defect.Previous;
+        if (defect is not null)
             outcome = Outcome<T, E>.Die(defect.Dispatch, consequential: defect.Consequential, failureOrder: defect.Order);
         else if (ReferenceEquals(exception, interruption))
             outcome = Outcome<T, E>.Interrupted();
@@ -374,7 +377,8 @@ public sealed class Scope<E, R>
                 case OutcomeKind.Err:
                     throw Record(outcome.Error, outcome.FailureOrder, outcome.Consequential);
                 case OutcomeKind.Die:
-                    (failures ??= new()).Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential);
+                    var state = failures ??= new();
+                    state.Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential, state.Rethrown);
                     outcome.Defect!.Throw();
                     return default!;
                 default:
