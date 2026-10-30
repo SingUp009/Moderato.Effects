@@ -7,13 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
+- Report MEFF006 on file-local Error, Environment and RestOf targets instead of emitting unrelated partial types.
+
+- Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
+
+- Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
 
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.
 
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
 
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
+
+- Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
 

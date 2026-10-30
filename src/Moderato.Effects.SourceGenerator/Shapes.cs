@@ -24,7 +24,7 @@ internal sealed record Declaration(string Namespace, string Keyword, string Name
 }
 
 /// <summary>The cases from a union down to one type; <paramref name="HoldsNull"/> means a null in the last union belongs to it.</summary>
-internal sealed record CasePath(EquatableArray<string> Steps, bool HoldsNull = false)
+internal sealed record CasePath(EquatableArray<string> Steps, EquatableArray<string> Patterns, bool HoldsNull = false)
 {
     public string Target => Steps.Items[Steps.Length - 1];
 
@@ -55,23 +55,24 @@ internal static class Shapes
     {
         var found = new Dictionary<string, List<CasePath>>(StringComparer.Ordinal);
         var onPath = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { union };
-        Visit(union, ImmutableArray<string>.Empty);
+        Visit(union, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
         return found;
 
-        void Visit(INamedTypeSymbol current, ImmutableArray<string> path)
+        void Visit(INamedTypeSymbol current, ImmutableArray<string> path, ImmutableArray<string> patterns)
         {
             var cases = Cases(current);
             var nullCase = NullCase(cases.Select(Name));
             foreach (var @case in cases)
             {
                 var steps = path.Add(Name(@case));
+                var casePatterns = patterns.Add(PatternType(@case));
                 var name = Name(@case);
                 if (!found.TryGetValue(name, out var paths)) found[name] = paths = [];
-                paths.Add(new CasePath(steps.ToEquatableArray(), name == nullCase));
+                paths.Add(new CasePath(steps.ToEquatableArray(), casePatterns.ToEquatableArray(), name == nullCase));
 
                 if (@case is INamedTypeSymbol nested && IsUnion(nested) && onPath.Add(nested))
                 {
-                    Visit(nested, steps);
+                    Visit(nested, steps, casePatterns);
                     onPath.Remove(nested);
                 }
             }
@@ -101,6 +102,8 @@ internal static class Shapes
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
     public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location)
     {
+        if (type.IsFileLocal)
+            return DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, attribute, type.Name);
         if (type.ContainingType is { } outer)
             return DiagnosticInfo.Create(Diagnostics.NestedNotSupported, location, attribute, type.Name, outer.Name);
         if (type.IsGenericType)
@@ -118,7 +121,13 @@ internal static class Shapes
     }
 
     /// <summary>The type as a pattern names it, without the outer <c>?</c>.</summary>
-    public static string PatternType(string name) => name.EndsWith("?", StringComparison.Ordinal) ? name.Substring(0, name.Length - 1) : name;
+    public static string PatternType(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
+            type = nullable.TypeArguments[0];
+        return type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
+            .ToDisplayString(FullName.AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple));
+    }
 
     /// <summary>The direct case a null value belongs to: the only one admitting null, else none.</summary>
     public static string? NullCase(IEnumerable<string> directCases)
@@ -139,7 +148,7 @@ internal static class Shapes
         var current = value;
         for (var i = 0; i < path.Steps.Length - 1; i++)
         {
-            tests.Add($"{current} is {PatternType(path.Steps.Items[i])} null{i}");
+            tests.Add($"{current} is {path.Patterns.Items[i]} null{i}");
             current = $"null{i}";
         }
 
@@ -155,7 +164,7 @@ internal static class Shapes
         for (var i = 0; i < path.Steps.Length; i++)
         {
             var name = i == path.Steps.Length - 1 ? result : $"step{i}";
-            tests.Add($"{current} is {PatternType(path.Steps.Items[i])} {name}");
+            tests.Add($"{current} is {path.Patterns.Items[i]} {name}");
             current = name;
         }
 
