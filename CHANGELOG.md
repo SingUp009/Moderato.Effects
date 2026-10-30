@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
+
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
 
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
