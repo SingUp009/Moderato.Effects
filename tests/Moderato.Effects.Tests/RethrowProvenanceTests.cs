@@ -40,8 +40,11 @@ public class RethrowProvenanceTests
             {
                 if (catchAnother)
                 {
-                    try { await scope.Run(Effect<TimeEnvironment>.Sync<int>(() => throw other)); }
-                    catch (FormatException) { }
+                    for (var i = 0; i < 200; i++)
+                    {
+                        try { await scope.Run(Effect<TimeEnvironment>.Sync<int>(() => throw other)); }
+                        catch (FormatException) { }
+                    }
                 }
                 caught.SetResult();
                 if (recover) return 42;
@@ -96,5 +99,38 @@ public class RethrowProvenanceTests
                 Assert.DoesNotContain(die.Suppressed, s => s.Case.Value is Die d && ReferenceEquals(d.Exception, other));
             }
         }
+    }
+    [Fact]
+    public async Task Gen_HandlesManyDefects_DoesNotRetainDiscardedExceptions()
+    {
+        // Given
+        var references = new List<WeakReference>();
+        var work = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            for (var i = 0; i < 500; i++)
+            {
+                try
+                {
+                    await scope.Run(Effect<EmptyEnvironment>.Sync<int>(() =>
+                    {
+                        var exception = new IOException("handled");
+                        references.Add(new WeakReference(exception));
+                        throw exception;
+                    }));
+                }
+                catch (IOException) { }
+            }
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            return references.Count(static reference => reference.IsAlive);
+        });
+
+        // When
+        var result = await work.RunAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(result.TryGetOk(out var retained));
+        Assert.InRange(retained, 0, 2);
     }
 }

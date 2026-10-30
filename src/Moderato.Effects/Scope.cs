@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Sources;
 using Moderato.Effects.Internal;
@@ -200,11 +201,15 @@ public sealed class Scope<E, R>
         internal long ErrorOrder;
         internal bool ErrorConsequential;
         internal ObservedDefect? Rethrown;
+        internal ConditionalWeakTable<Exception, ObservedDefect>? Origins;
+
+        internal ObservedDefect? Find(Exception exception)
+            => Rethrown is { } latest && ReferenceEquals(exception, latest.Dispatch.SourceException) ? latest
+                : Origins is { } origins && origins.TryGetValue(exception, out var previous) ? previous : null;
     }
 
-    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential, ObservedDefect? previous)
+    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential)
     {
-        internal ObservedDefect? Previous { get; } = previous;
         internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
         internal long Order { get; } = order;
         internal bool Consequential { get; } = consequential;
@@ -319,9 +324,7 @@ public sealed class Scope<E, R>
 
         // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
-        var defect = failures?.Rethrown;
-        while (defect is not null && !ReferenceEquals(exception, defect.Dispatch.SourceException)) defect = defect.Previous;
-        if (defect is not null)
+        if (failures?.Find(exception) is { } defect)
             outcome = Outcome<T, E>.Die(defect.Dispatch, consequential: defect.Consequential, failureOrder: defect.Order);
         else if (ReferenceEquals(exception, interruption))
             outcome = Outcome<T, E>.Interrupted();
@@ -378,7 +381,9 @@ public sealed class Scope<E, R>
                     throw Record(outcome.Error, outcome.FailureOrder, outcome.Consequential);
                 case OutcomeKind.Die:
                     var state = failures ??= new();
-                    state.Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential, state.Rethrown);
+                    if (state.Rethrown is { } previous && !ReferenceEquals(previous.Dispatch.SourceException, outcome.Defect!.SourceException))
+                        (state.Origins ??= new()).AddOrUpdate(previous.Dispatch.SourceException, previous);
+                    state.Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential);
                     outcome.Defect!.Throw();
                     return default!;
                 default:
