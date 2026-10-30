@@ -45,6 +45,9 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfNotUnion, location, name));
         }
 
+        if (source.IsFileLocal)
+            return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", source.Name));
+
         // F16: only a direct case of the source can be left out.
         var held = Shapes.Reachable(type);
         var sourceCases = Shapes.Cases(source);
