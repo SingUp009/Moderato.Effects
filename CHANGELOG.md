@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Report duplicate environment services that differ only in reference nullability or tuple element names.
 
+- Preserve the body error cancellation classification when its unreadable union value becomes a new defect before release.
+
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
