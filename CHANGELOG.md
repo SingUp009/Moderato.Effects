@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Publish timeout failure order before its cancellation reason, even when timer disposal does not wait for the callback.
+- Report MEFF006 on file-local Error, Environment and RestOf targets instead of emitting unrelated partial types.
+
+- Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
 
 - Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
 
@@ -18,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
+
+- Publish timeout failure order before its cancellation reason, even when timer disposal does not wait for the callback.
 
 - Return a Die from RunExitAsync when an execution exception escapes, including a pending invalid Never conversion without a cancelable token.
 

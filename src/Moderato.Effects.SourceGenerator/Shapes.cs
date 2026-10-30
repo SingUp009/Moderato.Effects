@@ -102,6 +102,8 @@ internal static class Shapes
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
     public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location)
     {
+        if (type.IsFileLocal)
+            return DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, attribute, type.Name);
         if (type.ContainingType is { } outer)
             return DiagnosticInfo.Create(Diagnostics.NestedNotSupported, location, attribute, type.Name, outer.Name);
         if (type.IsGenericType)

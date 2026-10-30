@@ -28,8 +28,9 @@ public static class EffectUnionExtensions
         return effect.Then<T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, env, context, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
+            var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return Steps.Then(handle(caught).Run(env, context), static end => end.WithErrorType<E>());
+            return Steps.Then(recovery.Run(env, context), static end => end.WithErrorType<E>());
         });
     }
 
@@ -38,7 +39,8 @@ public static class EffectUnionExtensions
         => effect.Then<T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, env, context, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
+            var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return handle(caught).Run(env, context);
+            return recovery.Run(env, context);
         });
 }
