@@ -10,6 +10,9 @@ namespace Moderato.Effects.SourceGenerator;
 [Generator]
 public sealed class EnvironmentGenerator : IIncrementalGenerator
 {
+    private static readonly SymbolDisplayFormat serviceIdentity = SymbolDisplayFormat.FullyQualifiedFormat
+        .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple);
+
     private sealed record Service(string Type, string Parameter);
 
     private sealed record Model(Declaration? Declaration, EquatableArray<Service> Services, EquatableArray<DiagnosticInfo> Diagnostics);
@@ -63,13 +66,14 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
                 }
 
                 var name = Shapes.Name(serviceType);
-                if (providers.TryGetValue(name, out var first))
+                var key = serviceType.ToDisplayString(serviceIdentity);
+                if (providers.TryGetValue(key, out var first))
                 {
                     diagnostics.Add(DiagnosticInfo.Create(Diagnostics.DuplicateService, parameterLocation, serviceType.ToDisplayString(), first, parameter.Name));
                     continue;
                 }
 
-                providers[name] = parameter.Name;
+                providers[key] = parameter.Name;
                 services.Add(new Service(name, parameter.Name));
             }
         }

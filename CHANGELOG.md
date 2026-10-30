@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
 
+- Report duplicate environment services that differ only in reference nullability or tuple element names.
+
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
