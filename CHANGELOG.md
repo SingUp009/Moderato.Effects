@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
+
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.
 
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
