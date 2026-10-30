@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
+
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.
 
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.

@@ -435,6 +435,44 @@ public class StepNotAwaitedTests
     }
 }
 
+public class AwaitedBranchTests
+{
+    [Theory]
+    [InlineData("return await (true ? scope.Run(Load()) : scope.Run(Load()));")]
+    [InlineData("return await (1 switch { 1 => scope.Run(Load()), _ => scope.Run(Load()) });")]
+    [InlineData("return await (true ? scope.Run(Load()) : scope.Run(Load())).ConfigureAwait(false);")]
+    [InlineData("return await (true ? (1 switch { 1 => scope.Run(Load()), _ => scope.Run(Load()) }) : scope.Run(Load()));")]
+    public void GenBlock_StepAwaitedThroughBranches_ReportsNothing(string body)
+    {
+        // Given
+        var source = Code.InGen(body);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("var pending = true ? scope.Run(Load()) : scope.Run(Load()); await Task.Yield(); return await pending;", 2)]
+    [InlineData("var pending = 1 switch { 1 => scope.Run(Load()), _ => scope.Run(Load()) }; await Task.Yield(); return await pending;", 2)]
+    [InlineData("return await (scope.Run(Load()).IsCompleted ? new ValueTask<int>(1) : new ValueTask<int>(2));", 1)]
+    [InlineData("return await (scope.Run(Load()) switch { _ => new ValueTask<int>(1) });", 1)]
+    public void GenBlock_StepNotDirectlyAwaited_ReportsMEFF310(string body, int count)
+    {
+        // Given
+        var source = Code.InGen(body);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Equal(count, build.Diagnostics.Count(d => d.Id == "MEFF310"));
+    }
+}
+
 public class SystemClockTests
 {
     [Fact]
