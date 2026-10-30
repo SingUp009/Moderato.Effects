@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Preserve the earliest independent member error origin in AllErrors aggregates, or the earliest consequential origin when no independent error exists.
+
 - Preserve inline constant results when widening an effect's environment type.
 
 - Build retained cancellation-callback context without a temporary prefix array.

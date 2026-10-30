@@ -33,11 +33,13 @@ public class CompositionBoundaryLawsTests
         Assert.Equal(["c", "b", "a"], observed);
     }
 
-    [Fact]
-    public async Task AllErrors_CompletedAggregate_UsesANewFailureOrigin()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AllErrors_CompletedAggregate_KeepsTheEarliestMemberOrigin(bool race)
     {
         // Given
-        // Observation: observe the outer primary failure; an aggregate is new, not its earliest member's failure.
+        // Observation: aggregation retains the first independent member origin even while validation continues.
         var member = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var aggregated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -65,14 +67,15 @@ public class CompositionBoundaryLawsTests
         })).Use(_ => outside);
 
         // When
-        var exit = await Effect.Race(aggregate, heldOutside).RunExitAsync(CancellationToken.None).AsTask()
+        var work = race ? Effect.Race(aggregate, heldOutside) : Effect.All([aggregate, heldOutside], Concurrency.Parallel).Map(static values => values[0]);
+        var exit = await work.RunExitAsync(CancellationToken.None).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
         Assert.NotNull(collected);
         Assert.Equal(["a", "b"], collected);
         Assert.True(exit.TryGetValue(out Err<string[]> error));
-        Assert.Equal(["outside"], error.Error);
+        Assert.Equal(["a", "b"], error.Error);
     }
 
     [Theory]
