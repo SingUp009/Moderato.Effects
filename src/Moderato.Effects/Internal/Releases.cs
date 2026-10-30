@@ -72,7 +72,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         // An error that cannot be read is a defect, and the block ends with what its releases were told.
         if (body.Kind == OutcomeKind.Err && exit.Value is Die unreadable)
         {
-            body = Outcome<T, E>.Die(ExceptionDispatchInfo.Capture(unreadable.Exception), [.. unreadable.Suppressed, .. body.Suppressed], omitted: body.Omitted);
+            body = Outcome<T, E>.Die(ExceptionDispatchInfo.Capture(unreadable.Exception), [.. unreadable.Suppressed, .. body.Suppressed], consequential: body.Consequential, omitted: body.Omitted);
             exit = ExitCases.From(body);
         }
         // Releases ignore the run's token, which would otherwise stop a rollback.
