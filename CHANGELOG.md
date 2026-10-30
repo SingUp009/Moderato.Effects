@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Publish timeout failure order before its cancellation reason, even when timer disposal does not wait for the callback.
+
 - Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
 
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.

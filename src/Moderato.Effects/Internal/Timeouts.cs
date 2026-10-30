@@ -8,12 +8,16 @@ internal static class Timeouts
 {
     private sealed class Deadline(CancellationToken parent) : Cancellation(parent)
     {
+        private int expirationStarted;
+
         internal long FailureOrder { get; private set; }
 
         internal void Expire()
         {
-            if (!TryBeginCancel(CancellationReason.Timeout)) return;
+            if (Interlocked.Exchange(ref expirationStarted, 1) != 0) return;
+            // Publish the order before the reason, independently of timer disposal.
             FailureOrder = FailureSequence.Next();
+            if (!TryBeginCancel(CancellationReason.Timeout)) return;
             CancelWork();
         }
     }
@@ -75,7 +79,7 @@ internal static class Timeouts
                 inner = Releases<R>.Combine(inner, defects);
             }
 
-            // Taken after disposing the timer, which waits for its callback.
+            // Taking callback failures closes collection; later failures go to diagnostics.
             inner = cancellation.WithCallbackFailure(inner);
             timeoutOrder = cancellation.FailureOrder;
         }
