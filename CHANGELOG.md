@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Publish timeout failure order before its cancellation reason, even when timer disposal does not wait for the callback.
 
+- Return a faulted ValueTask from RunAsync when execution throws synchronously, including invalid Never conversions without a cancelable token.
+
 - Return a Die from RunExitAsync when an execution exception escapes, including a pending invalid Never conversion without a cancelable token.
 
 ### Changed
