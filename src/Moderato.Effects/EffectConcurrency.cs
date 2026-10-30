@@ -152,8 +152,18 @@ public static partial class Effect
             if (Interrupted(ends, context) || CanceledIntoErr(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
 
             var errorCount = 0;
+            Outcome<T, E> origin = default;
             foreach (var end in ends)
-                if (end.Outcome.Kind == OutcomeKind.Err) errorCount++;
+            {
+                var error = end.Outcome;
+                if (error.Kind != OutcomeKind.Err) continue;
+                if (errorCount == 0 || (origin.Consequential && !error.Consequential)
+                    || (origin.Consequential == error.Consequential && FailureSequence.Before(error.FailureOrder, origin.FailureOrder)))
+                {
+                    origin = error;
+                }
+                errorCount++;
+            }
             if (errorCount > 0)
             {
                 var (suppressed, omitted) = Concurrent.Context(ends, null, includeErrs: false);
@@ -161,7 +171,7 @@ public static partial class Effect
                 var index = 0;
                 foreach (var end in ends)
                     if (end.Outcome.Kind == OutcomeKind.Err) errors[index++] = end.Outcome.Error;
-                return Outcome<T[], E[]>.Err(errors).WithSuppressed(suppressed, omitted);
+                return Outcome<T[], E[]>.Err(errors, origin.Consequential, origin.FailureOrder).WithSuppressed(suppressed, omitted);
             }
 
             return Succeeded<T, E, T[], E[]>(ends, static values => values);
