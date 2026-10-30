@@ -107,6 +107,12 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     when access.Expression == node:
                     node = configured;
                     continue;
+                case ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse:
+                    node = conditional;
+                    continue;
+                case SwitchExpressionArmSyntax arm when node == arm.Expression && arm.Parent is SwitchExpressionSyntax expression:
+                    node = expression;
+                    continue;
                 case AwaitExpressionSyntax or ReturnStatementSyntax:
                     return true;
                 case var parent:
