@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Report MEFF301 when an unfiltered catch mixes rethrow with replacement throws or rethrows a nested catch exception.
+
 - Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
 
 - Report MEFF006 on file-local Error, Environment and RestOf targets, and RestOf source unions instead of emitting unrelated partial types.
