@@ -43,7 +43,7 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         var source = effect.TypeArguments[1];
         if (rest.AllInterfaces.Any(i => i.OriginalDefinition.ToDisplayString() == "Moderato.Effects.IUnionRest<TSelf, TSource, TCase>"
             && SymbolEqualityComparer.Default.Equals(i.TypeArguments[1], source)
-            && SymbolEqualityComparer.Default.Equals(i.TypeArguments[2], caught)))
+            && Shapes.Identity(i.TypeArguments[2]) == Shapes.Identity(caught)))
         {
             return;
         }
@@ -60,7 +60,7 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
 
         if (source is not INamedTypeSymbol sourceUnion) return;
         var held = Shapes.Reachable(rest);
-        var leftOut = Shapes.Cases(sourceUnion).Where(c => !held.ContainsKey(Shapes.Name(c))).ToList();
+        var leftOut = Shapes.Cases(sourceUnion).Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (leftOut.Count == 1)
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.RestLeavesOutAnother, location, rest.Name, leftOut[0].Name, caught.Name));
     }

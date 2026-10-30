@@ -36,7 +36,12 @@ internal static class Shapes
     public static readonly SymbolDisplayFormat FullName = SymbolDisplayFormat.FullyQualifiedFormat
         .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
+    private static readonly SymbolDisplayFormat identity = SymbolDisplayFormat.FullyQualifiedFormat
+        .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple);
+
     public static string Name(ITypeSymbol type) => type.ToDisplayString(FullName);
+
+    public static string Identity(ITypeSymbol type) => type.ToDisplayString(identity);
 
     // Source unions implement IUnion; unions from metadata also carry [Union].
     public static bool IsUnion(ITypeSymbol type)
@@ -67,7 +72,8 @@ internal static class Shapes
                 var steps = path.Add(Name(@case));
                 var casePatterns = patterns.Add(PatternType(@case));
                 var name = Name(@case);
-                if (!found.TryGetValue(name, out var paths)) found[name] = paths = [];
+                var key = Identity(@case);
+                if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
                 paths.Add(new CasePath(steps.ToEquatableArray(), casePatterns.ToEquatableArray(), name == nullCase));
 
                 if (@case is INamedTypeSymbol nested && IsUnion(nested) && onPath.Add(nested))

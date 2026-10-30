@@ -47,20 +47,19 @@ public sealed class RestOfGenerator : IIncrementalGenerator
 
         // F16: only a direct case of the source can be left out.
         var held = Shapes.Reachable(type);
-        var caseTypes = Shapes.Cases(source);
-        var sourceCases = caseTypes.Select(Shapes.Name).ToList();
-        var patterns = caseTypes.ToDictionary(Shapes.Name, Shapes.PatternType);
-        var missing = sourceCases.Where(c => !held.ContainsKey(c)).ToList();
+        var sourceCases = Shapes.Cases(source);
+        var missing = sourceCases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (missing.Count != 1)
         {
-            var leftOut = missing.Count == 0 ? "none" : string.Join(", ", missing.Select(Short));
+            var leftOut = missing.Count == 0 ? "none" : string.Join(", ", missing.Select(c => Short(Shapes.Name(c))));
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfWrongCases, location, type.Name, source.Name, leftOut));
         }
 
+        var caughtKey = Shapes.Identity(missing[0]);
         var allowed = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var @case in Shapes.Cases(source).Where(c => Shapes.Name(c) != missing[0]))
+        foreach (var @case in sourceCases.Where(c => Shapes.Identity(c) != caughtKey))
         {
-            allowed.Add(Shapes.Name(@case));
+            allowed.Add(Shapes.Identity(@case));
             if (@case is INamedTypeSymbol union && Shapes.IsUnion(union)) allowed.UnionWith(Shapes.Reachable(union).Keys);
         }
 
@@ -69,13 +68,13 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfExtraCases, location, type.Name, source.Name, string.Join(", ", extras.Select(Short))));
 
         var rests = sourceCases
-            .Where(c => c != missing[0])
-            .Select(c => new Rest(c, patterns[c], held[c].OrderBy(static p => p.Steps.Length).First()))
+            .Where(c => Shapes.Identity(c) != caughtKey)
+            .Select(c => new Rest(Shapes.Name(c), Shapes.PatternType(c), held[Shapes.Identity(c)].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
         // An [Error] union reports its nullable cases itself.
         var isError = type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "Moderato.Effects.ErrorAttribute");
         var nullable = isError ? default : Shapes.NullableCases(type, location).ToEquatableArray();
-        return new Model(Shapes.Declare(type, node), Shapes.Name(source), missing[0], patterns[missing[0]], Shapes.NullCase(sourceCases), rests, nullable);
+        return new Model(Shapes.Declare(type, node), Shapes.Name(source), Shapes.Name(missing[0]), Shapes.PatternType(missing[0]), Shapes.NullCase(sourceCases.Select(Shapes.Name)), rests, nullable);
     }
 
     // A rest case ∉ E's cases is extra, unless it is a union grouping E's cases.
@@ -91,7 +90,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             foreach (var @case in Shapes.Cases(current))
             {
                 var name = Shapes.Name(@case);
-                if (allowed.Contains(name)) continue;
+                if (allowed.Contains(Shapes.Identity(@case))) continue;
                 if (@case is INamedTypeSymbol union && Shapes.IsUnion(union))
                 {
                     if (visited.Add(union)) Visit(union);
