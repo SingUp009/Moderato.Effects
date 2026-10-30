@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
+
 - Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
 
 - Preserve body failures and cancellation callback defects when timeout timer disposal throws.
