@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
 
-- Report MEFF006 on file-local Error, Environment and RestOf targets instead of emitting unrelated partial types.
+- Report MEFF006 on file-local Error, Environment and RestOf targets, and RestOf source unions instead of emitting unrelated partial types.
 
 - Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
 
@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Preserve the body error cancellation classification when its unreadable union value becomes a new defect before release.
 
+- Preserve an earlier scoped defect when it is rethrown after handling another defect.
+
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
@@ -34,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Return a Die from RunExitAsync when an execution exception escapes, including a pending invalid Never conversion without a cancelable token.
 
 ### Changed
+
+- Preserve the earliest independent member error origin in AllErrors aggregates, or the earliest consequential origin when no independent error exists.
 
 - Preserve inline constant results when widening an effect's environment type.
 

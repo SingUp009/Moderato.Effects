@@ -261,7 +261,7 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - fail-fast しない版：
   - `AllSettled`：`Effect<Exit<T, E>[], Never, R>`。全部の結果を Exit で受け取る。
   - 呼び出し側のキャンセルを子が Err に変えた場合（`catch (OperationCanceledException)` で `scope.Fail` するなど）、`All` は独立した失敗がなければ Interrupted、`AllErrors` は Interrupted で終わる。キャンセルから生じた Err は付属情報に残る。`AllSettled` は、その Err をそのまま集める（Issue #27）。
-  - `AllErrors`：`Effect<T[], E[], R>`。エラーを全部集める（入力値の検証向け。Results の `CombineAll` と同じ考え方）。 集約した Err は、全件の検証を終えて配列を作った時点の新しい失敗として記録し、個々の Err の順序は引き継がない。
+  - `AllErrors`：`Effect<T[], E[], R>`。エラーを全部集める（入力値の検証向け。Results の `CombineAll` と同じ考え方）。 集約した Err は、最初に観測した独立した Err の順序とキャンセル分類を引き継ぐ。独立した Err がなければ、最初に観測した consequential な Err の両方を引き継ぐ。配列の完成時点とは区別し、全件を待つ規則と配列の入力順は変えない。
 - 名前を Results の `Combine` / `CombineAll` と分けるのは、すでに計算し終えた Result をまとめる操作とは違い、並列数など実行のしかたを伴うため。
 
 **`Race`**
@@ -549,7 +549,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、ある union の中で null を許す case がちょうど1つなら、その union の null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。入れ子の union の case でも同じで、途中の union までは型で狭め、最後の union の値が null かを調べる（Issue #48）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
 - C# の union は値を `object? Value` の1つしか持たないので、null を許す case に null が入った union と、初期化されていない `default` の union は区別できない（`Equals` も true になる）。そのため、null を許す case がちょうど1つの union では、`default` もその case の null として扱われ、「`default` は無効」という方針をこの union には当てはめられない。null を許す case には警告（MEFF005）を出し、record で包むことを勧める（Issue #51）。警告を抑えた場合の動きは上のとおりで、変わらない。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
-- file-local 型は、生成ファイルの宣言と同じ型にならないため、3つの生成器すべてで拒否する（MEFF006）。
+- file-local 型は、生成ファイルの宣言と同じ型にならないため、3つの生成器すべてで拒否する（MEFF006）。RestOf の参照元も、生成ファイルから参照できない file-local 型なら拒否する。
 - 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
 - `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。ただし、E に null を許す case がちょうど1つあるときは、上のとおり `default` をその case の null として扱い、例外は投げない（Issue #51）。
 - `[Environment]` で公開できない型を `[Expose<T>]` に指定したとき（MEFF104）と、同じ型が2回公開されるとき（MEFF103）は、何も生成しない。

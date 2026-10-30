@@ -28,4 +28,43 @@ public class FileLocalTargetTests
         Assert.Equal("Target", source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length));
         Assert.Empty(build.Generated);
     }
+    [Fact]
+    public void RestOf_FileLocalSource_ReportsMEFF006WithoutGeneratingAType()
+    {
+        // Given
+        var source = """
+            namespace App;
+            file union Source(int, string);
+            [RestOf<Source>] internal partial union Rest(int);
+            """;
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Equal(["MEFF006"], build.Errors);
+        var diagnostic = build.Single("MEFF006");
+        Assert.Contains("file-local type 'Source'", diagnostic.GetMessage());
+        Assert.Empty(build.Generated);
+    }
+
+    [Theory]
+    [InlineData("public union Source<T>(T, string);", "Source<int>")]
+    [InlineData("public class Container { public union Source(int, string); }", "Container.Source")]
+    public void RestOf_AccessibleSource_Compiles(string declaration, string type)
+    {
+        // Given
+        var source = $$"""
+            namespace App;
+            {{declaration}}
+            [RestOf<{{type}}>] public partial union Rest(int);
+            """;
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.NotEmpty(build.Generated);
+    }
 }
