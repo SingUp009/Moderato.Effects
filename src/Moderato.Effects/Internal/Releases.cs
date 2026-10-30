@@ -174,7 +174,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     }
 
     // Each failed release keeps its own suppressed failures.
-    private static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
+    internal static Outcome<T, E> Combine<T, E>(Outcome<T, E> body, ImmutableArray<Outcome<Unit, Never>>.Builder defects)
     {
         if (body.Kind == OutcomeKind.Ok && defects.Count == 1)
         {

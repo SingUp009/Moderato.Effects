@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Moderato.Results;
 
 namespace Moderato.Effects.Internal;
 
@@ -53,18 +54,25 @@ internal static class Timeouts
             var innerContext = new RunContext(cancellation.Token);
             var timer = clock.CreateTimer(
                 static state => ((Deadline)state!).Expire(), cancellation, after, Timeout.InfiniteTimeSpan);
-            await using (timer.ConfigureAwait(false))
+            try
             {
-                try
-                {
-                    inner = await effect.Run(env, innerContext).ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    inner = Defects.From<T, E>(exception, innerContext);
-                }
+                inner = await effect.Run(env, innerContext).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                inner = Defects.From<T, E>(exception, innerContext);
+            }
 
-                timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
+            timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
+            try
+            {
+                await timer.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>(1);
+                defects.Add(Defects.From<Unit, Never>(exception, new RunContext(CancellationToken.None)));
+                inner = Releases<R>.Combine(inner, defects);
             }
 
             // Taken after disposing the timer, which waits for its callback.
