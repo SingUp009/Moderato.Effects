@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Keep grouped failure context in child completion order, including the selected child, before applying the retention limit.
 
+- Publish timeout failure order before its cancellation reason, even when timer disposal does not wait for the callback.
+
 - Return a Die from RunExitAsync when an execution exception escapes, including a pending invalid Never conversion without a cancelable token.
 
 ### Changed
