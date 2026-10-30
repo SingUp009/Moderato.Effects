@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Preserve body failures and cancellation callback defects when timeout timer disposal throws.
+
 - Keep independent group errors when caller cancellation arrives during cleanup, and classify canceled validation errors by observation rather than completion.
 
 - Preserve observed failure order and cancellation classification through nested groups, error transformations, Gen, and resource cleanup.
