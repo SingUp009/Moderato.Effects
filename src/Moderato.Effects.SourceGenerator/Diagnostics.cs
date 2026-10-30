@@ -28,6 +28,10 @@ internal static class Diagnostics
         "Case '{1}' admits null, which '{0}' cannot tell apart from its default value; wrap it in a record",
         CATEGORY, DiagnosticSeverity.Warning, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor FileLocalNotSupported = new(
+        "MEFF006", "File-local types are not supported", "[{0}] does not support file-local type '{1}'",
+        CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NeedsPartialType = new(
         "MEFF101", "Needs a partial type", "'{0}' must be partial to use [Environment]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);

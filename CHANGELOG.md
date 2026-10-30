@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Report MEFF006 on file-local Error, Environment and RestOf targets instead of emitting unrelated partial types.
+
 - Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
 
 - Emit valid type patterns for tuple error cases in Error and RestOf generators while preserving tuple element names in signatures.
