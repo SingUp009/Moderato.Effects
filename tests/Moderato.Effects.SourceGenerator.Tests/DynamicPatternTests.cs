@@ -3,12 +3,14 @@ namespace Moderato.Effects.SourceGenerator.Tests;
 public class DynamicPatternTests
 {
     [Theory]
-    [InlineData("dynamic")]
-    [InlineData("dynamic?")]
-    [InlineData("dynamic[]")]
-    [InlineData("System.Collections.Generic.List<dynamic>")]
-    [InlineData("(dynamic Value, int Code)")]
-    public void Error_DynamicCase_Compiles(string caseType)
+    [InlineData("object", "object")]
+    [InlineData("object?", "object")]
+    [InlineData("dynamic", "object")]
+    [InlineData("dynamic?", "object")]
+    [InlineData("dynamic[]", "object[]")]
+    [InlineData("System.Collections.Generic.List<dynamic>", "global::System.Collections.Generic.List<object>")]
+    [InlineData("(dynamic Value, int Code)", "global::System.ValueTuple<object, int>")]
+    public void Error_DynamicCase_CompilesWithObjectPattern(string caseType, string pattern)
     {
         // Given
         var source = $$"""
@@ -22,15 +24,18 @@ public class DynamicPatternTests
 
         // Then
         Assert.Empty(build.Errors);
+        Assert.Contains($"if (self is {pattern} found)", build.Generated["App.Problem.Error.g.cs"]);
     }
 
     [Theory]
-    [InlineData("dynamic")]
-    [InlineData("dynamic?")]
-    [InlineData("dynamic[]")]
-    [InlineData("System.Collections.Generic.List<dynamic>")]
-    [InlineData("(dynamic Value, int Code)")]
-    public void RestOf_RetainedDynamicCase_Compiles(string caseType)
+    [InlineData("object", "object")]
+    [InlineData("object?", "object")]
+    [InlineData("dynamic", "object")]
+    [InlineData("dynamic?", "object")]
+    [InlineData("dynamic[]", "object[]")]
+    [InlineData("System.Collections.Generic.List<dynamic>", "global::System.Collections.Generic.List<object>")]
+    [InlineData("(dynamic Value, int Code)", "global::System.ValueTuple<object, int>")]
+    public void RestOf_RetainedDynamicCase_CompilesWithObjectPattern(string caseType, string pattern)
     {
         // Given
         var source = $$"""
@@ -45,6 +50,7 @@ public class DynamicPatternTests
 
         // Then
         Assert.Empty(build.Errors);
+        Assert.Contains($"case {pattern} other0:", build.Generated["App.Rest.RestOf.g.cs"]);
     }
 
     [Theory]
@@ -65,5 +71,6 @@ public class DynamicPatternTests
 
         // Then
         Assert.Empty(build.Errors);
+        Assert.Contains("step0 is object found", build.Generated["App.Problem.Error.g.cs"]);
     }
 }
