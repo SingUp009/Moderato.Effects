@@ -458,6 +458,89 @@ public class StepNotAwaitedTests
     }
 }
 
+public class AwaitedAdapterTests
+{
+    [Theory]
+    [InlineData("return await scope.Run(Load()).AsTask();")]
+    [InlineData("return await scope.Run(Load()).AsTask().ConfigureAwait(false);")]
+    [InlineData("return await scope.Run(Load()).Preserve();")]
+    [InlineData("return await scope.Run(Load()).Preserve().ConfigureAwait(false);")]
+    [InlineData("return await scope.Run(Load()).Preserve().AsTask().ConfigureAwait(false);")]
+    [InlineData("return await (true ? scope.Run(Load()).AsTask() : scope.Run(Load()).AsTask());")]
+    [InlineData("return await scope.Acquire(Resource.Make(Load(), (_, _) => Effect<R>.Succeed(Unit.Value))).AsTask();")]
+    [InlineData("return await scope.Acquire(Resource.Make(Load(), (_, _) => Effect<R>.Succeed(Unit.Value))).Preserve();")]
+    [InlineData("var fiber = await scope.Fork(Load()).AsTask(); return await scope.Run(fiber.Join());")]
+    [InlineData("var fiber = await scope.Fork(Load()).Preserve(); return await scope.Run(fiber.Join());")]
+    public void GenBlock_ImmediatelyAwaitedValueTaskAdapter_ReportsNothing(string body)
+    {
+        // Given
+        var source = Code.InGen(body);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("_ = scope.Run(Load()).AsTask(); await Task.Yield(); return 0;")]
+    [InlineData("var pending = scope.Run(Load()).AsTask(); await Task.Yield(); return await pending;")]
+    [InlineData("_ = scope.Run(Load()).Preserve(); await Task.Yield(); return 0;")]
+    [InlineData("var pending = scope.Run(Load()).Preserve(); await Task.Yield(); return await pending;")]
+    [InlineData("return await scope.Run(Load()).AsTask().WaitAsync(TimeSpan.FromSeconds(1));")]
+    public void GenBlock_AdapterResultNotImmediatelyAwaited_ReportsMEFF310(string body)
+    {
+        // Given
+        var source = Code.InGen(body);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Single(build.Diagnostics, static diagnostic => diagnostic.Id == "MEFF310");
+    }
+
+    [Theory]
+    [InlineData("AsTask")]
+    [InlineData("Preserve")]
+    public void GenBlock_UnrelatedAdapterOverload_ReportsMEFF310(string method)
+    {
+        // Given
+        var source = Code.InGen($"return await scope.Run(Load()).{method}(0);") + $$"""
+
+            public static class Adapters
+            {
+                public static Task<T> {{method}}<T>(this ValueTask<T> value, int ignored) => Task.FromResult(default(T)!);
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Single(build.Diagnostics, static diagnostic => diagnostic.Id == "MEFF310");
+    }
+
+    [Fact]
+    public void GenBlock_PreservedStepReturnedForGenToAwait_ReportsNothing()
+    {
+        // Given
+        var source = Code.InClass("""
+            static Effect<int, Never, R> Load() => Effect<R>.Succeed(1);
+            public static Effect<int, Never, R> Work() => Scope<Never, R>.Gen(scope => scope.Run(Load()).Preserve());
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
+}
+
 public class AwaitedBranchTests
 {
     [Theory]
