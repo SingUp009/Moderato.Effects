@@ -45,8 +45,8 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfNotUnion, location, name));
         }
 
-        if (source.IsFileLocal)
-            return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", source.Name));
+        if (Shapes.FileLocalReference(source) is { } hiddenSource)
+            return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", hiddenSource.Name));
 
         // F16: only a direct case of the source can be left out.
         var held = Shapes.Reachable(type);
@@ -74,6 +74,10 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             .Where(c => Shapes.Identity(c) != caughtKey)
             .Select(c => new Rest(Shapes.Name(c), Shapes.PatternType(c), held[Shapes.Identity(c)].OrderBy(static p => p.Steps.Length).First()))
             .ToEquatableArray();
+        var hidden = Shapes.FileLocalReference(missing[0])?.Name
+            ?? rests.Items.Select(static rest => rest.Path.FileLocal).FirstOrDefault(static name => name is not null);
+        if (hidden is not null)
+            return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", hidden));
         // An [Error] union reports its nullable cases itself.
         var isError = type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "Moderato.Effects.ErrorAttribute");
         var nullable = isError ? default : Shapes.NullableCases(type, location).ToEquatableArray();

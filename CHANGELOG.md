@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Recognize immediately awaited conditional and switch branches in MEFF310 without allowing stored or discarded scope steps.
 
-- Report MEFF006 on file-local Error, Environment and RestOf targets, and RestOf source unions instead of emitting unrelated partial types.
+- Report MEFF006 on file-local generator targets and references, including union conversion paths, RestOf sources/cases and exposed services, before emitting inaccessible types.
 
 - Keep suppressed defects on the returned Die without also reporting them when a recovery handler throws or returns an uninitialized effect.
 

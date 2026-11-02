@@ -24,7 +24,7 @@ internal sealed record Declaration(string Namespace, string Keyword, string Name
 }
 
 /// <summary>The cases from a union down to one type; <paramref name="HoldsNull"/> means a null in the last union belongs to it.</summary>
-internal sealed record CasePath(EquatableArray<string> Steps, EquatableArray<string> Patterns, bool HoldsNull = false)
+internal sealed record CasePath(EquatableArray<string> Steps, EquatableArray<string> Patterns, bool HoldsNull = false, string? FileLocal = null)
 {
     public string Target => Steps.Items[Steps.Length - 1];
 
@@ -63,7 +63,7 @@ internal static class Shapes
         Visit(union, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
         return found;
 
-        void Visit(INamedTypeSymbol current, ImmutableArray<string> path, ImmutableArray<string> patterns)
+        void Visit(INamedTypeSymbol current, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal = null)
         {
             var cases = Cases(current);
             var nullCase = NullCase(cases.Select(Name));
@@ -74,11 +74,12 @@ internal static class Shapes
                 var name = Name(@case);
                 var key = Identity(@case);
                 if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
-                paths.Add(new CasePath(steps.ToEquatableArray(), casePatterns.ToEquatableArray(), name == nullCase));
+                var hidden = fileLocal ?? FileLocalReference(@case)?.Name;
+                paths.Add(new CasePath(steps.ToEquatableArray(), casePatterns.ToEquatableArray(), name == nullCase, hidden));
 
                 if (@case is INamedTypeSymbol nested && IsUnion(nested) && onPath.Add(nested))
                 {
-                    Visit(nested, steps, casePatterns);
+                    Visit(nested, steps, casePatterns, hidden);
                     onPath.Remove(nested);
                 }
             }
@@ -105,11 +106,24 @@ internal static class Shapes
     // A keyword name such as @class must keep its @.
     private static string Escape(string name) => SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None ? name : "@" + name;
 
+    /// <summary>The file-local type contained in a type reference, if any.</summary>
+    public static INamedTypeSymbol? FileLocalReference(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol array) return FileLocalReference(array.ElementType);
+        if (type is IPointerTypeSymbol pointer) return FileLocalReference(pointer.PointedAtType);
+        if (type is not INamedTypeSymbol named) return null;
+        if (named.IsFileLocal) return named;
+        if (named.ContainingType is { } containing && FileLocalReference(containing) is { } outer) return outer;
+        foreach (var argument in named.TypeArguments)
+            if (FileLocalReference(argument) is { } hidden) return hidden;
+        return null;
+    }
+
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
     public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location)
     {
-        if (type.IsFileLocal)
-            return DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, attribute, type.Name);
+        if (FileLocalReference(type) is { } hidden)
+            return DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, attribute, hidden.Name);
         if (type.ContainingType is { } outer)
             return DiagnosticInfo.Create(Diagnostics.NestedNotSupported, location, attribute, type.Name, outer.Name);
         if (type.IsGenericType)
