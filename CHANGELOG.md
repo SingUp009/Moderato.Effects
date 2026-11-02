@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Recognize immediately consumed scope steps through checked and unchecked expressions, null-forgiving expressions, identity casts and Task upcasts without accepting unrelated user awaiters.
+
 - Exclude once-only loop setup from resource-retention warnings while retaining warnings for regions that can repeat.
 
 - Report scope-owned resources retained by deconstructing foreach and await foreach loops.
