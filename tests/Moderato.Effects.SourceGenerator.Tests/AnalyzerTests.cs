@@ -35,6 +35,29 @@ file static class Code
 
 public class CatchAllInGenTests
 {
+    [Theory]
+    [InlineData("if (ex is FormatException) throw; throw new InvalidOperationException();", true)]
+    [InlineData("if (ex is FormatException) throw; else throw;", false)]
+    [InlineData("try { Console.WriteLine(ex); } catch (FormatException) { throw; } throw new InvalidOperationException();", true)]
+    [InlineData("try { Console.WriteLine(ex); } catch (FormatException) { throw; } throw;", true)]
+    [InlineData("_ = ex is FormatException ? 1 : throw new InvalidOperationException(); throw;", true)]
+    [InlineData("try { throw; } finally { throw new InvalidOperationException(); }", true)]
+    [InlineData("try { throw; } finally { Console.WriteLine(ex); }", false)]
+    [InlineData("void Later() { throw new InvalidOperationException(); } Console.WriteLine((Action)Later); throw;", false)]
+    [InlineData("if (ex is FormatException) return 0; throw;", true)]
+    public void GenBlock_CatchBranches_ExemptsOnlyOriginalRethrows(string statements, bool warns)
+    {
+        // Given
+        var source = Code.InGen($"try {{ return await scope.Run(Load()); }} catch (Exception ex) {{ {statements} }}");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Equal(warns, build.Ids.Contains("MEFF301"));
+    }
+
     [Fact]
     public void GenBlock_CatchAllAroundAScopeStep_ReportsMEFF301()
     {

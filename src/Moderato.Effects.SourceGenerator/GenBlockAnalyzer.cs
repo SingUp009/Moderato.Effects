@@ -168,10 +168,16 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     // Only a catch whose every path ends in a bare throw lets ScopeFailure through.
     private static bool Rethrows(SemanticModel model, CatchClauseSyntax clause)
     {
+        if (model.AnalyzeControlFlow(clause.Block) is not { Succeeded: true, EndPointIsReachable: false } flow
+            || !flow.ExitPoints.IsEmpty)
+        {
+            return false;
+        }
         var statements = clause.Block.DescendantNodes(static n => !IsFunction(n)).ToList();
-        if (!statements.OfType<ThrowStatementSyntax>().Any(static t => t.Expression is null)) return false;
-        if (statements.OfType<ReturnStatementSyntax>().Any()) return false;
-        return model.AnalyzeControlFlow(clause.Block) is { Succeeded: true, EndPointIsReachable: false };
+        if (statements.OfType<ThrowExpressionSyntax>().Any()) return false;
+        var throws = statements.OfType<ThrowStatementSyntax>().ToList();
+        return throws.Count > 0 && throws.All(t => t.Expression is null
+            && t.Ancestors().OfType<CatchClauseSyntax>().FirstOrDefault() == clause);
     }
 
     // A nested Gen block catches its own ScopeFailure, so only this block's scope counts.
