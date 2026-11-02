@@ -162,7 +162,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 
     private static bool InLoop(SyntaxNode node, SyntaxNode function)
         => node.Ancestors().TakeWhile(a => a != function)
-            .Any(static a => a is ForStatementSyntax or ForEachStatementSyntax or WhileStatementSyntax or DoStatementSyntax);
+            .Any(static a => a is ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax or WhileStatementSyntax or DoStatementSyntax);
 
     // Passing the scope on is fine, but storing it where it can outlive the block is not.
     private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
