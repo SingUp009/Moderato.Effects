@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Keep suppressed defects and omitted counts once when combining release, child and pending scope failures.
+
 - Preserve the original RunAsync defect when Exception.Data rejects metadata, reporting the attachment failure and its context through diagnostics.
 
 - Keep pending scope steps unobserved after a premature synchronous read so Gen waits and releases acquired resources.

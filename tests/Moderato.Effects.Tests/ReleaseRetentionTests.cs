@@ -49,7 +49,7 @@ public class ReleaseRetentionTests
         var expected = new List<Suppressed>();
         if (kind == "Err") expected.Add(new(new Failed("body error"), Relation.Sequential));
         if (kind == "Interrupted") expected.Add(new(new Interrupted(), Relation.Sequential));
-        if (kind == "Consequential") expected.Add(new(new Die(bodyFailure, bodyOutcome.Suppressed) { OmittedSuppressed = 7 }, Relation.Consequence));
+        if (kind == "Consequential") expected.Add(new(new Die(bodyFailure, []), Relation.Consequence));
         expected.AddRange(bodyContext);
         if (kind == "Die") expected.Add(new(new Die(firstFailure, []), Relation.Sequential));
         expected.AddRange(firstContext);
