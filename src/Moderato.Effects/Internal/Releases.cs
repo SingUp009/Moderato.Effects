@@ -252,9 +252,14 @@ internal static class ExitCases
         _ => interrupted,
     };
 
-    /// <summary>The outcome as a suppressed failure, or <see langword="null"/> if it succeeded.</summary>
+    /// <summary>The primary failure without its separately carried context, or <see langword="null"/> if it succeeded.</summary>
     internal static ExitCase? FailureOf<T, E>(Outcome<T, E> outcome)
-        => outcome.Kind == OutcomeKind.Ok ? null : (ExitCase?)From(outcome);
+        => outcome.Kind switch
+        {
+            OutcomeKind.Ok => (ExitCase?)null,
+            OutcomeKind.Die => Die(outcome.Defect!),
+            _ => From(outcome),
+        };
 
     internal static Die ToDie<T, E>(Outcome<T, E> outcome)
         => new(outcome.Defect!.SourceException, outcome.Suppressed) { OmittedSuppressed = outcome.Omitted };
