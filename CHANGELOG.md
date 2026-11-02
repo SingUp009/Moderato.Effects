@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Keep AllErrors interrupted when a child is interrupted without caller cancellation, retaining completed errors as context.
+
 - Accept environment classes whose sole primary constructor parameter has the class's own type.
 
 - Preserve Interrupted when a Gen block rethrows an earlier interruption after catching later interrupted steps.
