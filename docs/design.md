@@ -353,7 +353,7 @@ Effect.Gen(async (Scope<AppError, R> scope) => { ...; return profile; });    // 
   scope.Defer(exit => exit is Succeeded ? Commit<R>(tx) : Rollback<R>(tx));   // 必ず実行される
   ```
 
-- Analyzer は、`finally` / `catch` の中の `scope.Run` を既定で Warning にし、`scope.Defer` を提案する（コードの見た目だけで確実に検出できる）。
+- Analyzer は、`finally` / `catch` の中の `scope.Run` を既定で Warning にし、`scope.Defer` を提案する。メソッド参照や、別の拡張メソッドへ解決した呼び出しは指摘しない。
 - 経緯：F1 で一度「その後の `Run` は普通に実行する」に変えたが、握りつぶしたときに副作用が起きる問題（F20）があり、戻した。握りつぶしは呼び出した先のメソッドの中でも起きうるので Analyzer では検出しきれないが、`finally` の中の `scope.Run` は確実に検出でき、正しい書き方（`Defer` / `Acquire`）も常に用意されているため。
 - `catch` の中で別の例外を投げ直した場合は、Die を優先し、最初の Err は付属情報にする（D7）。
 
