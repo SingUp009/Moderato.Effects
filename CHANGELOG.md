@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Keep pending scope steps unobserved after a premature synchronous read so Gen waits and releases acquired resources.
+
 - Widen nullable RestOf cases from their declared type to avoid ambiguous numeric conversions.
 
 - Preserve late scope errors through Task adapters and unreadable union values when draining unawaited steps.
