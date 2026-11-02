@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Exclude unevaluated nameof operands from clock-read, nested scope-use and catch scope-use diagnostics.
+
 - Avoid MEFF306 for user extensions, uninvoked wait methods and Result references inside nameof while retaining actual wait diagnostics.
 
 - Restrict scope-operation warnings to invoked library methods, excluding unrelated extensions and uninvoked method groups.
