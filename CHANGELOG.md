@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve Interrupted when a Gen block rethrows an earlier interruption after catching later interrupted steps.
+
 ## [0.1.0-preview.2] - 2026-11-02
 
 ### Fixed
