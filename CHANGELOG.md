@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.2] - 2026-11-02
+
 ### Fixed
 
 - Report MEFF301 when an unfiltered catch mixes rethrow with replacement throws or rethrows a nested catch exception.
@@ -141,14 +143,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Reuse the immutable `Interrupted` case when returning interrupted exits, avoiding per-result allocation after initialization.
 
-### Tests
-
-- Pin scoped composition laws for binding, mapping, queries, recovery, environment provision, validation, resource release, retry and repeat.
-
-- Verify recurrence execution-context isolation and pending exception boundaries without caller isolation.
-- Verify asynchronous Result failure classification without caller isolation.
-- Cover successful LINQ projection context through a later defect, including retained limits and pending steps.
-
 ## [0.1.0-preview.1] - 2026-10-27
 
 ### Added
@@ -168,5 +162,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 - Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...HEAD
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...HEAD
+[0.1.0-preview.2]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/SingUp009/Moderato.Effects/releases/tag/v0.1.0-preview.1
