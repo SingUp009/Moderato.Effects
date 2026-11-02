@@ -87,7 +87,7 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
     private static IMethodSymbol? PrimaryConstructor(INamedTypeSymbol type)
         => type.InstanceConstructors.FirstOrDefault(c =>
             c.DeclaringSyntaxReferences.Any(static r => r.GetSyntax() is TypeDeclarationSyntax { ParameterList: not null })
-            && !(c.Parameters.Length == 1 && SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, type)));
+            && !(type.IsRecord && type.TypeKind == TypeKind.Class && c.Parameters.Length == 1 && SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, type)));
 
     private static Model Failed(DiagnosticInfo diagnostic) => new(null, default, new[] { diagnostic }.ToEquatableArray());
 
