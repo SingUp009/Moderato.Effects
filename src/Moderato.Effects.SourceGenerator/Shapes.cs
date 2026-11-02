@@ -39,9 +39,13 @@ internal static class Shapes
     private static readonly SymbolDisplayFormat identity = SymbolDisplayFormat.FullyQualifiedFormat
         .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple);
 
-    public static string Name(ITypeSymbol type) => type.ToDisplayString(FullName);
+    public static string Name(ITypeSymbol type) => Display(type, FullName);
 
-    public static string Identity(ITypeSymbol type) => type.ToDisplayString(identity);
+    public static string Identity(ITypeSymbol type) => Display(type, identity);
+
+    private static string Display(ITypeSymbol type, SymbolDisplayFormat format)
+        => string.Concat(type.ToDisplayParts(format).Select(static part =>
+            part.Symbol is IDynamicTypeSymbol ? "object" : part.ToString()));
 
     // Source unions implement IUnion; unions from metadata also carry [Union].
     public static bool IsUnion(ITypeSymbol type)

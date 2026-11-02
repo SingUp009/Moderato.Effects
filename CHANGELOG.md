@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Emit dynamic environment services as object and report MEFF103 for equivalent dynamic/object service declarations.
+
 - Keep AllErrors interrupted when a child is interrupted without caller cancellation, retaining completed errors as context.
 
 - Accept environment classes whose sole primary constructor parameter has the class's own type.
