@@ -40,6 +40,12 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (model.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol method
+            && !SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, effect.OriginalDefinition))
+        {
+            return;
+        }
+
         var source = effect.TypeArguments[1];
         if (rest.AllInterfaces.Any(i => i.OriginalDefinition.ToDisplayString() == "Moderato.Effects.IUnionRest<TSelf, TSource, TCase>"
             && SymbolEqualityComparer.Default.Equals(i.TypeArguments[1], source)
