@@ -310,7 +310,7 @@ public sealed class Scope<E, R>
         {
             if (thrown is not null) outcome = Thrown<T>(thrown);
             else outcome = failures is { Failed: true } ? RecordedError<T>() : Outcome<T, E>.Ok(value);
-            steps = unobserved;
+            steps = unobserved?.FindAll(static step => !step.Observed);
             if (Volatile.Read(ref running) is { Observed: false } last) (steps ??= []).Add(last);
             // A step ended by now has its Err on the outcome already.
             endedWithBody = steps?.ConvertAll(static step => step.Completed);
@@ -362,9 +362,8 @@ public sealed class Scope<E, R>
             var step = steps[i];
             ValueTask<ExitCase?> done;
             lock (gate) done = step.Done;
-            // Adapters can read a late Err after the body has already chosen its outcome.
-            if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure
-                || (step.Observed && failure.Value is not Failed))
+            // Adapter reads after the snapshot cannot count as handling by the body.
+            if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure)
             {
                 continue;
             }
