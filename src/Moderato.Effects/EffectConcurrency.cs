@@ -149,7 +149,8 @@ public static partial class Effect
             }
 
             // Errors from a partial or canceled run would pass for a full validation, so they stay as context.
-            if (Interrupted(ends, context) || CanceledIntoErr(ends, context)) return InterruptedWithOthers<T, E, T[], E[]>(ends);
+            if (ends.Any(static end => !end.Ran || end.Outcome.Kind == OutcomeKind.Interrupted) || CanceledIntoErr(ends, context))
+                return InterruptedWithOthers<T, E, T[], E[]>(ends);
 
             var errorCount = 0;
             Outcome<T, E> origin = default;
@@ -258,7 +259,6 @@ public static partial class Effect
     private static bool CanceledIntoErr<T, E>(ChildEnd<T, E>[] ends, RunContext context)
         => context.CancellationToken.IsCancellationRequested && ends.Any(static end => end.Outcome.Kind == OutcomeKind.Err && end.Outcome.Consequential);
 
-    // The caller's cancellation decides, and the children's failures stay as context.
     private static Outcome<U, F> InterruptedWithOthers<T, E, U, F>(ChildEnd<T, E>[] ends)
     {
         var (suppressed, omitted) = Concurrent.Context(ends, null);
