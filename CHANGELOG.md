@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Report MEFF310 when an async Gen body returns a scope step as its result value instead of awaiting it.
+
 - Recognize immediately consumed scope steps through checked and unchecked expressions, null-forgiving expressions, identity casts and Task upcasts without accepting unrelated user awaiters.
 
 - Exclude once-only loop setup from resource-retention warnings while retaining warnings for regions that can repeat.
