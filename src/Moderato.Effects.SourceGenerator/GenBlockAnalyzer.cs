@@ -120,10 +120,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     continue;
                 case MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait" or "AsTask" or "Preserve", Parent: InvocationExpressionSyntax configured } access
                     when access.Expression == node
-                        && (access.Name.Identifier.ValueText == "ConfigureAwait"
-                            || model.GetSymbolInfo(configured).Symbol is IMethodSymbol { IsStatic: false, Parameters.Length: 0 } adapter
-                                && SymbolEqualityComparer.Default.Equals(adapter.ContainingType.OriginalDefinition,
-                                    model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1"))):
+                        && IsStepAdapter(model, configured, access.Name.Identifier.ValueText):
                     node = configured;
                     continue;
                 case ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse:
@@ -138,6 +135,17 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     return parent == function;
             }
         }
+    }
+
+    private static bool IsStepAdapter(SemanticModel model, InvocationExpressionSyntax invocation, string name)
+    {
+        if (model.GetSymbolInfo(invocation).Symbol is not IMethodSymbol method) return name == "ConfigureAwait";
+        if (method.IsStatic || method.ContainingType is not { } type) return false;
+        if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1")))
+            return name == "ConfigureAwait" || method.Parameters.Length == 0;
+
+        return name == "ConfigureAwait"
+            && SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1"));
     }
 
     // A finally block, or a catch that also catches ScopeFailure, runs after an Err too.
