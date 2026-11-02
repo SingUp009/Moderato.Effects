@@ -266,8 +266,9 @@ public sealed class Scope<E, R>
 
         internal ValueTask<T> Result => new(this, core.Version);
 
+        // Unwrapping a union here can hide the Err marker if its getter throws.
         internal void Finish(Outcome<T, E> outcome, bool recordedError, ObservedFailure? defect)
-            => Finish(ExitCases.FailureOf(outcome), defect, recordedError);
+            => Finish(outcome.Kind == OutcomeKind.Err ? (ExitCase)new Failed(outcome.Error) : ExitCases.FailureOf(outcome), defect, recordedError);
 
         internal void Succeed(T value) => core.SetResult(value);
 
@@ -357,7 +358,12 @@ public sealed class Scope<E, R>
             var step = steps[i];
             ValueTask<ExitCase?> done;
             lock (gate) done = step.Done;
-            if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure || step.Observed) continue;
+            // Adapters can read a late Err after the body has already chosen its outcome.
+            if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure
+                || (step.Observed && failure.Value is not Failed))
+            {
+                continue;
+            }
 
             lock (gate)
             {
@@ -370,7 +376,7 @@ public sealed class Scope<E, R>
                 else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
                     outcome = RecordedError<T>();
                 else
-                    AddSuppressed(new Suppressed(failure, Relation.Sequential));
+                    AddSuppressed(new Suppressed(failure.Value is Failed error ? ExitCases.Failed(error.Error) : failure, Relation.Sequential));
             }
         }
 
