@@ -74,7 +74,7 @@ public class ChildRetentionTests
         if (kind == "Err") expected.Add(new(new Failed("body error"), Relation.Consequence));
         if (kind is "Die" or "Consequential")
         {
-            expected.Add(new(new Die(bodyFailure, bodyOutcome.Suppressed) { OmittedSuppressed = 7 },
+            expected.Add(new(new Die(bodyFailure, []),
                 kind == "Die" ? Relation.Parallel : Relation.Consequence));
         }
         expected.AddRange(bodyContext);
