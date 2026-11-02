@@ -50,6 +50,8 @@ public sealed class ErrorGenerator : IIncrementalGenerator
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.AmbiguousCase, location, type.Name, Short(paths[0].Target), routes));
         }
 
+        if (cases.FirstOrDefault(static path => path.FileLocal is not null)?.FileLocal is { } hidden)
+            return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "Error", hidden));
         diagnostics.AddRange(Shapes.NullableCases(type, location));
         return new Model(Shapes.Declare(type, node), cases.ToEquatableArray(), diagnostics.ToEquatableArray());
     }

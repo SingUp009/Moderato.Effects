@@ -55,6 +55,11 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
 
             foreach (var serviceType in exposed)
             {
+                if (Shapes.FileLocalReference(serviceType) is { } hidden)
+                {
+                    diagnostics.Add(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, parameterLocation, "Environment", hidden.Name));
+                    continue;
+                }
                 if (!compilation.ClassifyCommonConversion(parameter.Type, serviceType).IsImplicit)
                 {
                     diagnostics.Add(DiagnosticInfo.Create(
