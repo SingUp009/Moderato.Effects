@@ -41,6 +41,8 @@ public class ChildRetentionTests
             "Ok" or "Wrapped" or "Overflow" => Outcome<int, object>.Ok(42),
             "Err" => Outcome<int, object>.Err(error, consequential: true),
             "Interrupted" => Outcome<int, object>.Interrupted(),
+            "First" => firstOutcome.WithTypes<int, object>(),
+            "Last" => lastOutcome.WithTypes<int, object>(),
             _ => Outcome<int, object>.Die(ExceptionDispatchInfo.Capture(bodyFailure), consequential: kind == "Consequential"),
         }).WithSuppressed([.. bodyContext], 7);
         var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

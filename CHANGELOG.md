@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Keep separate parent and child failures when they throw the same exception instance, while counting a joined child's failure only once.
+
 - Preserve step defects read by adapters after the Gen body snapshot without resurrecting failures the body already handled.
 
 - Report MEFF310 when an async Gen body returns a scope step as its result value instead of awaiting it.

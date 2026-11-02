@@ -127,7 +127,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var first = bodyFirst ? body.WithTypes<Unit, Never>() : defects[primary];
         if (!bodyFirst && defects.Count == 1
             && (body.Kind is OutcomeKind.Ok or OutcomeKind.Interrupted
-                || body.Kind == OutcomeKind.Die && ReferenceEquals(first.Defect!.SourceException, body.Defect!.SourceException)))
+                || body.Kind == OutcomeKind.Die && first.FailureOrder == body.FailureOrder))
         {
             return body.Suppressed.IsEmpty
                 ? first.WithTypes<T, E>().WithSuppressed(first.Suppressed, first.Omitted + body.Omitted)
@@ -155,7 +155,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             for (var i = 0; i < defects.Count; i++)
             {
                 var defect = defects[i];
-                if (!ReferenceEquals(defect.Defect!.SourceException, body.Defect!.SourceException)) continue;
+                if (defect.FailureOrder != body.FailureOrder) continue;
                 sameDefect = true;
                 break;
             }
