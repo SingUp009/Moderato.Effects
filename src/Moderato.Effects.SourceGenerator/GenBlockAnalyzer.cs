@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace Moderato.Effects.SourceGenerator;
 
@@ -216,7 +217,32 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 _ => receiverName?.StartsWith("System.Runtime.CompilerServices.", System.StringComparison.Ordinal) == true
                     && receiverName.Contains("Awaiter"),
             };
-            if (blocks) context.ReportDiagnostic(Diagnostic.Create(Diagnostics.BlockingWait, access.Name.GetLocation(), name));
+            if (!blocks) continue;
+            if (name == "Result")
+            {
+                if (access.Ancestors().OfType<InvocationExpressionSyntax>()
+                    .Any(invocation => model.GetOperation(invocation, context.CancellationToken) is INameOfOperation))
+                {
+                    continue;
+                }
+            }
+            else if (access.Parent is not InvocationExpressionSyntax invocation || invocation.Expression != access
+                || model.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol method && !DeclaredOnReceiver(receiver, method))
+            {
+                continue;
+            }
+
+            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.BlockingWait, access.Name.GetLocation(), name));
         }
+    }
+
+    private static bool DeclaredOnReceiver(ITypeSymbol? receiver, IMethodSymbol method)
+    {
+        if (method.ContainingType is not { } owner) return false;
+        for (var type = receiver as INamedTypeSymbol; type is not null; type = type.BaseType)
+            if (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, owner.OriginalDefinition)) return true;
+
+        return receiver is INamedTypeSymbol named && named.AllInterfaces.Any(type =>
+            SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, owner.OriginalDefinition));
     }
 }
