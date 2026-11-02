@@ -149,8 +149,8 @@ internal static class Shapes
     {
         if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
             type = nullable.TypeArguments[0];
-        return type.WithNullableAnnotation(NullableAnnotation.NotAnnotated)
-            .ToDisplayString(FullName.AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple));
+        return Display(type.WithNullableAnnotation(NullableAnnotation.NotAnnotated),
+            FullName.AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple));
     }
 
     /// <summary>The direct case a null value belongs to: the only one admitting null, else none.</summary>
