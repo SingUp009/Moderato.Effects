@@ -160,9 +160,18 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
+    // Setup runs once per loop entry, but an enclosing loop can repeat that entry.
     private static bool InLoop(SyntaxNode node, SyntaxNode function)
         => node.Ancestors().TakeWhile(a => a != function)
-            .Any(static a => a is ForStatementSyntax or ForEachStatementSyntax or ForEachVariableStatementSyntax or WhileStatementSyntax or DoStatementSyntax);
+            .Any(a => a switch
+            {
+                ForStatementSyntax loop => loop.Statement.Span.Contains(node.Span)
+                    || loop.Condition?.Span.Contains(node.Span) == true
+                    || loop.Incrementors.Any(increment => increment.Span.Contains(node.Span)),
+                CommonForEachStatementSyntax loop => !loop.Expression.Span.Contains(node.Span),
+                WhileStatementSyntax or DoStatementSyntax => true,
+                _ => false,
+            });
 
     // Passing the scope on is fine, but storing it where it can outlive the block is not.
     private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
