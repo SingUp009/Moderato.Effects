@@ -110,6 +110,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     // A step still running at the block's end races its releases, so it must be awaited or returned.
     private static bool AwaitedOrReturned(SemanticModel model, InvocationExpressionSyntax step, SyntaxNode function)
     {
+        // Gen awaits the callback's outer ValueTask, not an async callback's result value.
+        var canReturn = function is AnonymousFunctionExpressionSyntax anonymous && anonymous.AsyncKeyword.IsKind(SyntaxKind.None);
         var taskType = model.GetTypeInfo(step).Type?.ContainingAssembly?.GetTypeByMetadataName("System.Threading.Tasks.Task");
         SyntaxNode node = step;
         while (true)
@@ -141,10 +143,12 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 case SwitchExpressionArmSyntax arm when node == arm.Expression && arm.Parent is SwitchExpressionSyntax expression:
                     node = expression;
                     continue;
-                case AwaitExpressionSyntax or ReturnStatementSyntax:
+                case AwaitExpressionSyntax:
                     return true;
+                case ReturnStatementSyntax:
+                    return canReturn;
                 case var parent:
-                    return parent == function;
+                    return parent == function && canReturn;
             }
         }
     }
