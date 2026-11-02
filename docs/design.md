@@ -590,6 +590,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 
 - `catch (FormatException)` のような型を指定した `catch` の中の `scope.Run` は、Err の後には実行されないので指摘しない（その `catch` は ScopeFailure を捕まえないため）。
 - scope をヘルパーメソッドの引数に渡すことは、同じ流れの中で使う限り安全なので指摘しない。
+- MEFF310 は、標準の `ValueTask<T>` の `AsTask` / `Preserve` / `ConfigureAwait` と、`Task<T>` の `ConfigureAwait` を通した await も認識する。ユーザー定義の拡張メソッドは、同じ名前でも step を消費したとはみなさない。
 - ライブラリのテストでは、誤用しても実行時に安全側に倒れることを示すテストに限り、`#pragma warning disable` で抑止している。
 
 ### D14. 標準サービス
