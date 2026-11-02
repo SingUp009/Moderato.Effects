@@ -53,6 +53,7 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
     {
         if (!watched.TryGetValue(member, out var instead)) return;
         if (context.Operation.SemanticModel is not { } model || !InEffect(model, context.Operation.Syntax)) return;
+        if (GenBlockAnalyzer.IsNameOf(model, context.Operation.Syntax)) return;
 
         var shortName = string.Join(".", member.Split('.').Skip(member.Count(static c => c == '.') - 1));
         context.ReportDiagnostic(Diagnostic.Create(Diagnostics.SystemClock, context.Operation.Syntax.GetLocation(), shortName, instead));

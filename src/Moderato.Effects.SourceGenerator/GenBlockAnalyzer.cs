@@ -37,6 +37,9 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
 
     internal static bool IsFunction(SyntaxNode node) => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax;
 
+    internal static bool IsNameOf(SemanticModel model, SyntaxNode node)
+        => node.Ancestors().OfType<InvocationExpressionSyntax>().Any(invocation => model.GetOperation(invocation) is INameOfOperation);
+
     private static bool IsGenBlock(SemanticModel model, SyntaxNode node)
         => node is AnonymousFunctionExpressionSyntax function
             && model.GetSymbolInfo(function).Symbol is IMethodSymbol method
@@ -67,6 +70,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             {
                 continue;
             }
+
+            if (IsNameOf(context.SemanticModel, identifier)) continue;
 
             var owner = identifier.Ancestors().First(IsFunction);
             if (owner != function)
@@ -197,7 +202,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     // A nested Gen block catches its own ScopeFailure, so only this block's scope counts.
     private static bool UsesScope(SemanticModel model, SyntaxNode node, ImmutableArray<IParameterSymbol> scopes)
         => node.DescendantNodes().OfType<IdentifierNameSyntax>()
-            .Any(i => model.GetSymbolInfo(i).Symbol is IParameterSymbol p && scopes.Contains(p, SymbolEqualityComparer.Default));
+            .Any(i => model.GetSymbolInfo(i).Symbol is IParameterSymbol p && scopes.Contains(p, SymbolEqualityComparer.Default)
+                && !IsNameOf(model, i));
 
     private static void AnalyzeBlockingWaits(SyntaxNodeAnalysisContext context, SyntaxNode body)
     {
