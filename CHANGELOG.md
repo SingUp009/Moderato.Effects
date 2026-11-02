@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Avoid MEFF308 and MEFF309 for unrelated Catch extension methods that bind successfully.
+
 - Keep suppressed defects and omitted counts once when combining release, child and pending scope failures.
 
 - Preserve the original RunAsync defect when Exception.Data rejects metadata, reporting the attachment failure and its context through diagnostics.
