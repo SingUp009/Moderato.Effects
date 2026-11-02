@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Avoid MEFF306 for user extensions, uninvoked wait methods and Result references inside nameof while retaining actual wait diagnostics.
+
 - Restrict scope-operation warnings to invoked library methods, excluding unrelated extensions and uninvoked method groups.
 
 - Avoid MEFF308 and MEFF309 for unrelated Catch extension methods that bind successfully.
