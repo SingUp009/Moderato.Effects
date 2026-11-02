@@ -29,3 +29,11 @@ MEFF307 | Moderato.Effects | Info | Analyzers
 MEFF308 | Moderato.Effects | Error | Analyzers
 MEFF309 | Moderato.Effects | Error | Analyzers
 MEFF310 | Moderato.Effects | Warning | Analyzers
+
+## Release 0.1.0.2
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MEFF006 | Moderato.Effects | Error | Diagnostics
