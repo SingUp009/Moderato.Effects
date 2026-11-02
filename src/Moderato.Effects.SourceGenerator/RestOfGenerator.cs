@@ -137,7 +137,8 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         foreach (var rest in model.Rests)
         {
             sb.Append($"            case {rest.Pattern} other{i}:\n                caught = default!;\n");
-            sb.Append($"                rest = {Shapes.Widen(rest.Path, $"other{i}")};\n                return false;\n");
+            var value = rest.Case.EndsWith("?", StringComparison.Ordinal) ? $"({rest.Case})other{i}" : $"other{i}";
+            sb.Append($"                rest = {Shapes.Widen(rest.Path, value)};\n                return false;\n");
             i++;
         }
 
