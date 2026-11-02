@@ -82,7 +82,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepInCleanup, access.GetLocation(), access.ToString()));
                 if (resources.Contains(name) && InLoop(identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ResourceInLoop, access.GetLocation(), access.ToString()));
-                if (asyncSteps.Contains(name) && access.Parent is InvocationExpressionSyntax step && !AwaitedOrReturned(step, function))
+                if (asyncSteps.Contains(name) && access.Parent is InvocationExpressionSyntax step && !AwaitedOrReturned(context.SemanticModel, step, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepNotAwaited, step.GetLocation(), access.ToString()));
             }
             else if (Escapes(context.SemanticModel, identifier))
@@ -93,7 +93,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     }
 
     // A step still running at the block's end races its releases, so it must be awaited or returned.
-    private static bool AwaitedOrReturned(InvocationExpressionSyntax step, SyntaxNode function)
+    private static bool AwaitedOrReturned(SemanticModel model, InvocationExpressionSyntax step, SyntaxNode function)
     {
         SyntaxNode node = step;
         while (true)
@@ -103,8 +103,12 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 case ParenthesizedExpressionSyntax parenthesized:
                     node = parenthesized;
                     continue;
-                case MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait", Parent: InvocationExpressionSyntax configured } access
-                    when access.Expression == node:
+                case MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait" or "AsTask" or "Preserve", Parent: InvocationExpressionSyntax configured } access
+                    when access.Expression == node
+                        && (access.Name.Identifier.ValueText == "ConfigureAwait"
+                            || model.GetSymbolInfo(configured).Symbol is IMethodSymbol { IsStatic: false, Parameters.Length: 0 } adapter
+                                && SymbolEqualityComparer.Default.Equals(adapter.ContainingType.OriginalDefinition,
+                                    model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1"))):
                     node = configured;
                     continue;
                 case ConditionalExpressionSyntax conditional when node == conditional.WhenTrue || node == conditional.WhenFalse:

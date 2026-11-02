@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Avoid MEFF310 for immediately awaited or returned standard ValueTask AsTask and Preserve adapters.
+
 - Emit object type patterns for dynamic error cases in Error and RestOf generators.
 
 - Emit dynamic environment services as object and report MEFF103 for equivalent dynamic/object service declarations.
