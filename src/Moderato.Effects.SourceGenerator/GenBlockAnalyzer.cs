@@ -110,6 +110,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     // A step still running at the block's end races its releases, so it must be awaited or returned.
     private static bool AwaitedOrReturned(SemanticModel model, InvocationExpressionSyntax step, SyntaxNode function)
     {
+        var taskType = model.GetTypeInfo(step).Type?.ContainingAssembly?.GetTypeByMetadataName("System.Threading.Tasks.Task");
         SyntaxNode node = step;
         while (true)
         {
@@ -117,6 +118,17 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             {
                 case ParenthesizedExpressionSyntax parenthesized:
                     node = parenthesized;
+                    continue;
+                case CheckedExpressionSyntax checkedExpression:
+                    node = checkedExpression;
+                    continue;
+                case PostfixUnaryExpressionSyntax suppressed when suppressed.IsKind(SyntaxKind.SuppressNullableWarningExpression):
+                    node = suppressed;
+                    continue;
+                case CastExpressionSyntax cast when model.GetOperation(cast) is IConversionOperation conversion
+                    && (conversion.Conversion.IsIdentity || conversion.Conversion.IsReference
+                        && SymbolEqualityComparer.Default.Equals(conversion.Type, taskType)):
+                    node = cast;
                     continue;
                 case MemberAccessExpressionSyntax { Name.Identifier.ValueText: "ConfigureAwait" or "AsTask" or "Preserve", Parent: InvocationExpressionSyntax configured } access
                     when access.Expression == node
@@ -145,7 +157,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             return name == "ConfigureAwait" || method.Parameters.Length == 0;
 
         return name == "ConfigureAwait"
-            && SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1"));
+            && (SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1"))
+                || SymbolEqualityComparer.Default.Equals(type, model.Compilation.GetTypeByMetadataName("System.Threading.Tasks.Task")));
     }
 
     // A finally block, or a catch that also catches ScopeFailure, runs after an Err too.
