@@ -21,7 +21,6 @@ public sealed class Scope<E, R>
     private ImmutableArray<Suppressed>.Builder? suppressed;
     private int omitted;
     private FailureState? failures;
-    private OperationCanceledException? interruption;
     private int busy;
     private bool closed;
     private PendingStep? running;
@@ -200,17 +199,25 @@ public sealed class Scope<E, R>
         internal bool Failed;
         internal long ErrorOrder;
         internal bool ErrorConsequential;
-        internal ObservedDefect? Rethrown;
-        internal ConditionalWeakTable<Exception, ObservedDefect>? Origins;
+        internal ObservedFailure? Rethrown;
+        internal ConditionalWeakTable<Exception, ObservedFailure>? Origins;
 
-        internal ObservedDefect? Find(Exception exception)
-            => Rethrown is { } latest && ReferenceEquals(exception, latest.Dispatch.SourceException) ? latest
+        internal void Observe(ObservedFailure failure)
+        {
+            if (Rethrown is { } previous && !ReferenceEquals(previous.Exception, failure.Exception))
+                (Origins ??= new()).AddOrUpdate(previous.Exception, previous);
+            Rethrown = failure;
+        }
+
+        internal ObservedFailure? Find(Exception exception)
+            => Rethrown is { } latest && ReferenceEquals(exception, latest.Exception) ? latest
                 : Origins is { } origins && origins.TryGetValue(exception, out var previous) ? previous : null;
     }
 
-    private sealed class ObservedDefect(ExceptionDispatchInfo dispatch, long order, bool consequential)
+    private sealed class ObservedFailure(Exception exception, ExceptionDispatchInfo? dispatch = null, long order = 0, bool consequential = false)
     {
-        internal ExceptionDispatchInfo Dispatch { get; } = dispatch;
+        internal Exception Exception { get; } = exception;
+        internal ExceptionDispatchInfo? Dispatch { get; } = dispatch;
         internal long Order { get; } = order;
         internal bool Consequential { get; } = consequential;
     }
@@ -230,7 +237,7 @@ public sealed class Scope<E, R>
 
         internal bool Completed { get; private set; }
 
-        private ObservedDefect? defect;
+        private ObservedFailure? defect;
 
         internal ExceptionDispatchInfo? Defect => defect?.Dispatch;
 
@@ -243,7 +250,7 @@ public sealed class Scope<E, R>
 
         protected void Observe() => Volatile.Write(ref observed, 1);
 
-        protected void Finish(ExitCase? failure, ObservedDefect? defect, bool recordedError)
+        protected void Finish(ExitCase? failure, ObservedFailure? defect, bool recordedError)
         {
             this.defect = defect;
             RecordedError = recordedError;
@@ -259,7 +266,7 @@ public sealed class Scope<E, R>
 
         internal ValueTask<T> Result => new(this, core.Version);
 
-        internal void Finish(Outcome<T, E> outcome, bool recordedError, ObservedDefect? defect)
+        internal void Finish(Outcome<T, E> outcome, bool recordedError, ObservedFailure? defect)
             => Finish(ExitCases.FailureOf(outcome), defect, recordedError);
 
         internal void Succeed(T value) => core.SetResult(value);
@@ -324,12 +331,16 @@ public sealed class Scope<E, R>
 
         // A rethrown Die or inner interruption keeps its kind, whatever the token's state.
         Outcome<T, E> outcome;
-        if (failures?.Find(exception) is { } defect)
-            outcome = Outcome<T, E>.Die(defect.Dispatch, consequential: defect.Consequential, failureOrder: defect.Order);
-        else if (ReferenceEquals(exception, interruption))
-            outcome = Outcome<T, E>.Interrupted();
+        if (failures?.Find(exception) is { } observed)
+        {
+            outcome = observed.Dispatch is { } dispatch
+                ? Outcome<T, E>.Die(dispatch, consequential: observed.Consequential, failureOrder: observed.Order)
+                : Outcome<T, E>.Interrupted();
+        }
         else
+        {
             outcome = Defects.From<T, E>(exception, context);
+        }
         // An earlier Err stays as context for what replaced it.
         if (failures is { Failed: true } earlier) AddSuppressed(new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential));
         return outcome;
@@ -380,14 +391,12 @@ public sealed class Scope<E, R>
                 case OutcomeKind.Err:
                     throw Record(outcome.Error, outcome.FailureOrder, outcome.Consequential);
                 case OutcomeKind.Die:
-                    var state = failures ??= new();
-                    if (state.Rethrown is { } previous && !ReferenceEquals(previous.Dispatch.SourceException, outcome.Defect!.SourceException))
-                        (state.Origins ??= new()).AddOrUpdate(previous.Dispatch.SourceException, previous);
-                    state.Rethrown = new ObservedDefect(outcome.Defect!, outcome.FailureOrder, outcome.Consequential);
+                    (failures ??= new()).Observe(new ObservedFailure(outcome.Defect!.SourceException, outcome.Defect, outcome.FailureOrder, outcome.Consequential));
                     outcome.Defect!.Throw();
                     return default!;
                 default:
-                    interruption = new OperationCanceledException(context.CancellationToken);
+                    var interruption = new OperationCanceledException(context.CancellationToken);
+                    (failures ??= new()).Observe(new ObservedFailure(interruption));
                     throw interruption;
             }
         }
