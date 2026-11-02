@@ -57,7 +57,7 @@ public class SingleChildContextTests
             return bodyOutcome;
         }));
         List<Suppressed> expected = [.. childContext];
-        if (kind == "Die") expected.Add(new(new Die(bodyFailure, bodyOutcome.Suppressed) { OmittedSuppressed = 7 }, Relation.Parallel));
+        if (kind == "Die") expected.Add(new(new Die(bodyFailure, []), Relation.Parallel));
         if (kind == "Err") expected.Add(new(new Failed("body error"), Relation.Consequence));
         expected.AddRange(bodyContext);
 
