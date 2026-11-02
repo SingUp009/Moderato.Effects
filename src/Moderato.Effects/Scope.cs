@@ -276,6 +276,10 @@ public sealed class Scope<E, R>
 
         public T GetResult(short token)
         {
+            if (core.GetStatus(token) == ValueTaskSourceStatus.Pending)
+            {
+                throw new InvalidOperationException("The scope step has not completed.");
+            }
             Observe();
             return core.GetResult(token);
         }
