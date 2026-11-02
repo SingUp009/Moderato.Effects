@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Preserve step defects read by adapters after the Gen body snapshot without resurrecting failures the body already handled.
 
+- Report scope-owned resources retained by deconstructing foreach and await foreach loops.
+
 - Keep MEFF310 for user ConfigureAwait extensions that do not prove a scope step was awaited.
 
 - Exclude unevaluated nameof operands from clock-read, nested scope-use and catch scope-use diagnostics.
