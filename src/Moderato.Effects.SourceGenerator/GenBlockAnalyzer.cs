@@ -75,14 +75,23 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            if (identifier.Parent is MemberAccessExpressionSyntax access && access.Expression == identifier)
+            if (identifier.Parent is MemberAccessExpressionSyntax access && access.Expression == identifier
+                && access.Parent is InvocationExpressionSyntax step)
             {
+                if (context.SemanticModel.GetSymbolInfo(step, context.CancellationToken).Symbol is IMethodSymbol method
+                    && !SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, parameter.Type.OriginalDefinition)
+                    && !SymbolEqualityComparer.Default.Equals(method.ContainingType,
+                        parameter.Type.ContainingAssembly?.GetTypeByMetadataName("Moderato.Effects.ScopeExtensions")))
+                {
+                    continue;
+                }
+
                 var name = access.Name.Identifier.ValueText;
                 if (steps.Contains(name) && InCleanup(context.SemanticModel, identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepInCleanup, access.GetLocation(), access.ToString()));
                 if (resources.Contains(name) && InLoop(identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ResourceInLoop, access.GetLocation(), access.ToString()));
-                if (asyncSteps.Contains(name) && access.Parent is InvocationExpressionSyntax step && !AwaitedOrReturned(context.SemanticModel, step, function))
+                if (asyncSteps.Contains(name) && !AwaitedOrReturned(context.SemanticModel, step, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepNotAwaited, step.GetLocation(), access.ToString()));
             }
             else if (Escapes(context.SemanticModel, identifier))
