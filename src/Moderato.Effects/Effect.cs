@@ -155,8 +155,16 @@ public readonly partial struct Effect<T, E, R>
     // Overwritten, so a rethrown exception does not accumulate stale entries.
     private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed)
     {
-        if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);
-        else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
+        try
+        {
+            if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);
+            else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
+        }
+        catch (Exception metadataFailure)
+        {
+            // Metadata failures must not replace the exception being rethrown.
+            UnobservedFailures.Report(new Die(metadataFailure, suppressed));
+        }
     }
 
     /// <summary>The <see cref="Exception.Data"/> key holding a rethrown defect's suppressed failures.</summary>
