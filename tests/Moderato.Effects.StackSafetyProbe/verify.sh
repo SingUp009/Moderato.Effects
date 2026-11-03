@@ -15,6 +15,12 @@ for mode in sync pending; do
   done
 done
 
+if ! timeout 60s "$@" timeout-nest 4562 constant > "$log" 2>&1; then
+  head -c 6000 "$log"
+  exit 1
+fi
+cat "$log"
+
 # Control wrappers still recurse; keep their finite-depth coverage separate from the iterative core.
 for mode in sync pending; do
   for scenario in retry-nest timeout-nest; do
