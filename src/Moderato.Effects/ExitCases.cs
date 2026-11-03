@@ -29,13 +29,13 @@ public union ExitCase(Succeeded, Failed, Die, Interrupted);
 /// <summary>How a suppressed failure relates to the outcome that was kept.</summary>
 public enum Relation
 {
-    /// <summary>It happened afterwards, such as in a release action after the body.</summary>
+    /// <summary>It came from a sequential part of the computation, such as its body or release.</summary>
     Sequential,
 
-    /// <summary>It happened at the same time, such as in a parallel sibling.</summary>
+    /// <summary>It came from independent work, such as a parallel sibling.</summary>
     Parallel,
 
-    /// <summary>It happened because the work was canceled.</summary>
+    /// <summary>It was classified as a consequence of cancellation when observed.</summary>
     Consequence,
 }
 
