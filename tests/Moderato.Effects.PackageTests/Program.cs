@@ -18,6 +18,7 @@ var valueFailure = Effect<ValueClock>.FromResult<int, string>(Result.Err("failed
 AssertZeroAllocation(valueFailure.Retry(Schedule.Immediately.UpTo(7)), valueClock, Result.Err("failed"));
 AssertZeroAllocation(valueSuccess.Repeat(Schedule.Immediately.UpTo(7)), valueClock, Result.Ok(20));
 AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result.Ok(Unit.Value));
+await AssertZeroTimeout();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
@@ -39,6 +40,34 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertZeroTimeout()
+{
+    // Given
+    var calls = 0;
+    var source = Effect<ValueClock>.Sync(() => ++calls);
+    Effect<int, TimeoutError, ValueClock> existing = source;
+    Effect<int, AppError, ValueClock> union = source;
+    Effect<int, string, ValueClock> mapped = source;
+
+    // When
+    var directExit = await source.Timeout(TimeSpan.Zero).RunExitAsync(default(ValueClock));
+    var existingExit = await existing.Timeout(TimeSpan.Zero).RunExitAsync(default(ValueClock));
+    var unionExit = await union.Timeout(TimeSpan.Zero).RunExitAsync(default(ValueClock));
+    var mappedExit = await mapped.Timeout(TimeSpan.Zero, static _ => "expired").RunExitAsync(default(ValueClock));
+    var resultExit = await source.TimeoutResult(TimeSpan.Zero).RunExitAsync(default(ValueClock));
+
+    // Then
+    if (calls != 0
+        || directExit.Value is not Err<TimeoutError> directError || directError.Error.After != TimeSpan.Zero
+        || existingExit.Value is not Err<TimeoutError> existingError || existingError.Error.After != TimeSpan.Zero
+        || unionExit.Value is not Err<AppError> unionError || unionError.Error.Value is not TimeoutError { After: var after } || after != TimeSpan.Zero
+        || mappedExit.Value is not Err<string> { Error: "expired" }
+        || resultExit.Value is not Ok<Result<int, TimeoutError>> result || result.Value.Value is not Err<TimeoutError> resultError || resultError.Error.After != TimeSpan.Zero)
+    {
+        throw new InvalidOperationException("A zero timeout must expire without running its body.");
+    }
+}
 
 static void AssertZeroAllocation<T, E, R>(Effect<T, E, R> effect, R environment, Result<T, E> expected)
 {

@@ -211,6 +211,7 @@ public sealed record Interrupted;
   3. `TimeoutResult(ts)`：`Effect<Result<T, TimeoutError>, E, R>`。値の側で表す（UniTask の `TimeoutWithoutException` に相当）。
 - いずれも `where R : IHas<TimeProvider>` を要求する（D14）。
 - `Sleep` の待ち時間と `Timeout` の制限時間は、0 以上で、タイマーが扱える最大（`uint.MaxValue - 1` ミリ秒、約 49.7 日）以下とする。`Timeout.InfiniteTimeSpan` は例外として受け付ける。範囲外は作るときに `ArgumentOutOfRangeException` を投げる（Issue #24）。実行時の Die にしないため。`Schedule` は計算した待ち時間を同じ最大で切る（D15）。
+- `Timeout(TimeSpan.Zero)` は、実行を開始した時点ですでに期限切れとする。本体・リソースの取得・タイマーを開始せず、通常のタイムアウト結果を返す。定数の `Succeed` も例外にしない。`TimeoutResult` なら `Ok(Err(TimeoutError))`、`onTimeout` を指定した場合は実行ごとにその関数を一度呼ぶ。関数の例外は通常どおり Die として扱う。呼び出し側がすでにキャンセル済みなら Interrupted を優先し、関数も呼ばない。Effect を作る前に評価した式の副作用まで取り消すものではない。残り時間を0に丸めた呼び出しが、タイマーの実行順序次第で本体を開始してしまうのを防ぐためである。`Sleep(TimeSpan.Zero)` は待たずに成功し、`Timeout.InfiniteTimeSpan` は期限なしのままとする。
 - 時間切れのときは、内側のキャンセルが**終わるまで待つ**（finalizer が終わってから戻る）。
 - **Timeout は協調的なタイムアウト（cooperative timeout）**。キャンセルに応じない処理では、時間の上限として働かない（F9）。ドキュメントに次の表を載せる（G4）。
 
