@@ -494,7 +494,7 @@ public partial union AppError(NotFound, Forbidden, TimeoutError);
   - `Effect<T, E, R>.Widen<F>() where F : IUnionCase<F, E>`：LINQ やコンビネータで明示的に広げる。LINQ では、合成した結果をどの union にするかを C# が決められないので、自動では広げられない。
   - `CatchCase((TCase c) => ...)`：`TryGet` を使って1つの case だけ処理する（E は変わらない）。インスタンスメソッドではクラスの型パラメータ E に制約を付けられない（CS0699）ため、拡張メソッドにし、TCase はラムダの引数の型から推論させる（S1 で確認）。拡張メソッドでは E もメソッドの型パラメータになり、ハンドラが `Effect<T, Never, R>` を返すと推論がぶつかるので、ハンドラが Never の Effect を返す版のオーバーロードも用意する。
 - .NET 11 RC2 で確認済み：`partial union` を書ける。union に static abstract メンバーを持つインターフェースを実装できる。汎用の拡張メソッドで型推論が効く。間違った case を渡すとコンパイルエラーになる。
-- union は Roslyn のプレビュー API ではなく、**`System.Runtime.CompilerServices.IUnion` を実装していること**（または `[Union]` 属性が付いていること）と、引数1つの public コンストラクタ＝case であることで検出する。S2 で確認した事実：
+- union は Roslyn のプレビュー API ではなく、**ソースの宣言キーワードが `union` であること、または `[Union]` 属性が付いていること**と、引数1つの public コンストラクタ＝case であることで検出する。`IUnion` の実装だけでは通常のクラスや struct に union のパターン照合は有効にならないため、そのような型は内部を探索しない1つの case として扱う。これは[コンパイラが union と認識する条件](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/union)に合わせる。S2 で確認した事実：
   - コンパイル中のソースの union には、`[Union]` 属性が**見えない**（コンパイラが出力時に付ける）。`IUnion` の実装と、case ごとのコンストラクタ、`Value` プロパティは見える。
   - 参照しているアセンブリ（メタデータ）の union には、`[Union]` 属性と `IUnion` の両方が見える。
   - 手で書いた union（`[Union]` 属性を付けた struct）は、ソースでも属性が見える。
