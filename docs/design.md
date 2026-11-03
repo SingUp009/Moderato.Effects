@@ -577,6 +577,9 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、ある union の中で null を許す case がちょうど1つなら、その union の null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。入れ子の union の case でも同じで、途中の union までは型で狭め、最後の union の値が null かを調べる（Issue #48）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
 - C# の union は値を `object? Value` の1つしか持たないので、null を許す case に null が入った union と、初期化されていない `default` の union は区別できない（`Equals` も true になる）。そのため、null を許す case がちょうど1つの union では、`default` もその case の null として扱われ、「`default` は無効」という方針をこの union には当てはめられない。null を許す case には警告（MEFF005）を出し、record で包むことを勧める（Issue #51）。警告を抑えた場合の動きは上のとおりで、変わらない。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
+- union の到達可能な case は、構築された型の同一性で循環を判定する。ジェネリック型の定義が同じという理由だけで探索を打ち切らない。たとえば `Chain<T>(T, Chain<int>)` の `Chain<string>` からは `int` にも到達できる。
+- 生成器と `Catch` の解析は、1回の解析で調べる case の経路長の合計を4,096まで、個々の型式のノード数を256までに制限する。経路長は対象から case までの段数で、型式は配列要素・型引数・包含型も数える。上限を超えたら MEFF007 を返し、その生成器の対象コードは一切生成しない。有限な型でも上限に達するため、診断は無限再帰とは断定しない。これは実行時の Effect の深さ制限ではなく、コンパイラや IDE を停止させないための解析資源の制限である。型を簡素化するか、属性を外して必要なインターフェースを手動実装できる。再帰的な型の解析に上限を設けて診断を返す方針は、[TypeScript の再帰的条件型](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-1.html#recursive-conditional-types)でも採られている。
+- `[RestOf<E>]` が丸ごと取り除く case の内部は探索しない。生成する変換が参照しない case の展開だけを理由に拒否しない。
 - file-local 型は、生成ファイルの宣言と同じ型にならないため、3つの生成器すべてで拒否する（MEFF006）。生成コードが参照する case・変換経路・RestOf の参照元・公開サービス型についても、配列要素・型引数・包含型に file-local 型があれば拒否し、その生成器の対象コードは生成しない。生成コードが参照しない union の内部 case は、この検査だけを理由に拒否しない。
 - 入れ子の型（クラスの中で宣言した union や環境）とジェネリックな型は、最初は対象にしない（MEFF004 / MEFF002）。
 - `[RestOf<E>]` の `TrySplit` は、`default`（初期化されていない）の E を受け取ったら `InvalidOperationException` を投げる。ただし、E に null を許す case がちょうど1つあるときは、上のとおり `default` をその case の null として扱い、例外は投げない（Issue #51）。
@@ -590,6 +593,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF004 | Error | 入れ子の型には未対応 |
 | MEFF005 | Warning | union の case が null を許す（null の値と、初期化されていない `default` の union を区別できない） |
 | MEFF006 | Error | file-local 型には生成できない（Error・Environment・RestOf 共通） |
+| MEFF007 | Error | union の生成または Catch の解析が解析量の上限を超えた |
 | MEFF101 | Error | `[Environment]` の対象が partial ではない |
 | MEFF102 | Error | `[Environment]` の対象にプライマリコンストラクタがない |
 | MEFF103 | Error | 同じ型のサービスを2つの引数が公開している |
