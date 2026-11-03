@@ -47,9 +47,9 @@ internal static class Shapes
         => string.Concat(type.ToDisplayParts(format).Select(static part =>
             part.Symbol is IDynamicTypeSymbol ? "object" : part.ToString()));
 
-    // Source unions implement IUnion; unions from metadata also carry [Union].
+    // The compiler adds [Union] at emit; IUnion alone does not enable union patterns.
     public static bool IsUnion(ITypeSymbol type)
-        => type.AllInterfaces.Any(static i => i.ToDisplayString() == "System.Runtime.CompilerServices.IUnion")
+        => type.DeclaringSyntaxReferences.Any(static reference => reference.GetSyntax() is TypeDeclarationSyntax { Keyword.Text: "union" })
             || type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute");
 
     /// <summary>A union's case types = the parameter types of its public one-parameter constructors.</summary>
