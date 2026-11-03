@@ -373,7 +373,7 @@ Effect.Gen(async (Scope<AppError, R> scope) => { ...; return profile; });    // 
 
 **Err が出たら即座に巻き戻る。後始末は `Defer` で書く**（F1 → F20）
 
-- scope は最初の Err を覚えておき、Gen の結果は必ずその Err になる。ラムダが普通に `return` しても、Ok にはならない。
+- scope は最初の Err を保持し、ラムダが普通に `return` しても Ok には変えない。ほかの失敗と重なった場合の主となる結果は D18 の優先順位で決める。
 - **その後の `Run` / `Get` / `Acquire` / `Fork` は、同じ Err で即座に巻き戻る**。`catch (Exception)` で `ScopeFailure` を握りつぶしても、その後に書いた `scope.Run(Commit<R>(tx))` などは実行されない。結果の安全性（Ok に化けない）に加えて、制御フローの安全性（失敗の後に副作用が起きない）も保つ（G6）。
 - そのため、`finally` の中に書いた `scope.Run(Rollback<R>(tx))` も実行されない。**後始末は `scope.Defer` か `Acquire` の解放処理で書く**。どちらも Gen の終わりに逆順で、ExitCase を受け取って確実に実行される（D9）。
 
