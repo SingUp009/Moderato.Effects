@@ -91,6 +91,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Tests
 
+- Check throwing binders, recovery handlers and environment builders across direct/iterative execution and synchronous/pending completion, including retained failure context and skipped inner execution.
+
 - Check pure error-map identity/composition and independent success/error-map commutation across four outcomes, synchronous/pending completion and shallow/iterative execution with padding outside each compared expression, including retained failure context and error-mapper evaluation order/count.
 
 - Cover Resource error widening and jittered schedule limits through public Use and Retry calls, including ownership, zero/negative limits and cap ordering.
