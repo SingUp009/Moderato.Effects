@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -104,13 +105,18 @@ internal static class Shapes
         return null;
     }
 
-    /// <summary>A conversion from a case at the end of <paramref name="path"/> up to the union at its start.</summary>
-    public static string Widen(CasePath path, string value)
+    /// <summary>Statements converting a case through the unions on its path.</summary>
+    public static string Widen(CasePath path, string value, string destination, string indent)
     {
-        // Casting through each middle union, innermost first, reaches the outermost case.
-        var expression = value;
-        for (var i = path.Steps.Length - 2; i >= 0; i--) expression = $"({path.Steps.Items[i]}){expression}";
-        return expression;
+        var statements = new StringBuilder();
+        // Typed assignments select union creation; explicit casts can unbox or downcast the leaf.
+        for (var i = path.Steps.Length - 2; i >= 0; i--)
+        {
+            var next = $"widen{i}";
+            statements.Append($"{indent}{path.Steps.Items[i]} {next} = {value};\n");
+            value = next;
+        }
+        return statements.Append($"{indent}{destination} {value};\n").ToString();
     }
 
     /// <summary>The type as a pattern names it, without the outer <c>?</c>.</summary>

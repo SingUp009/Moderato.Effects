@@ -150,16 +150,19 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         }
         else if (model.Rests.FirstOrDefault(r => r.Case == model.NullCase) is { } nullRest)
         {
-            sb.Append($"            case null:\n                caught = default!;\n                rest = {Shapes.Widen(nullRest.Path, $"({nullRest.Path.Target})null")};\n                return false;\n");
+            sb.Append("            case null:\n            {\n                caught = default!;\n");
+            sb.Append(Shapes.Widen(nullRest.Path, $"({nullRest.Path.Target})null", "rest =", "                "));
+            sb.Append("                return false;\n            }\n");
         }
 
         sb.Append($"            case {model.CaughtPattern} found:\n                caught = found;\n                rest = default!;\n                return true;\n");
         var i = 0;
         foreach (var rest in model.Rests)
         {
-            sb.Append($"            case {rest.Pattern} other{i}:\n                caught = default!;\n");
+            sb.Append($"            case {rest.Pattern} other{i}:\n            {{\n                caught = default!;\n");
             var value = rest.Case.EndsWith("?", StringComparison.Ordinal) ? $"({rest.Case})other{i}" : $"other{i}";
-            sb.Append($"                rest = {Shapes.Widen(rest.Path, value)};\n                return false;\n");
+            sb.Append(Shapes.Widen(rest.Path, value, "rest =", "                "));
+            sb.Append("                return false;\n            }\n");
             i++;
         }
 

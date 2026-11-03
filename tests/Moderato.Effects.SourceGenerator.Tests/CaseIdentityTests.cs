@@ -70,7 +70,7 @@ public class CaseIdentityTests
 
         // Then
         Assert.Empty(build.Errors);
-        Assert.Contains("(global::App.Group)other", build.Generated["App.Rest.RestOf.g.cs"]);
+        Assert.Contains("global::App.Group widen0 = other", build.Generated["App.Rest.RestOf.g.cs"]);
     }
 
     [Fact]
