@@ -271,6 +271,25 @@ public class ForkTests
     }
 
     [Fact]
+    public async Task Join_FiberCompletedBeforeItsScopeEnded_PreservesSuccessForAnUncanceledCaller()
+    {
+        // Given
+        Fiber<int, Never, EmptyEnvironment>? kept = null;
+        await Effect<EmptyEnvironment>.Succeed(42).Fork().Use(fiber =>
+        {
+            kept = fiber;
+            return fiber.Join();
+        }).RunAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // When
+        var exit = await kept!.Join().RunExitAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Ok<int> success));
+        Assert.Equal(42, success.Value);
+    }
+
+    [Fact]
     public async Task Join_FiberKeptAfterItsScopeEnded_RunAsyncThrowsCanceled()
     {
         // Given
