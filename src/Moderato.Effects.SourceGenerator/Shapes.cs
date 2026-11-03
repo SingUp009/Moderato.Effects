@@ -53,12 +53,22 @@ internal static class Shapes
         => type.DeclaringSyntaxReferences.Any(static reference => reference.GetSyntax() is TypeDeclarationSyntax { Keyword.Text: "union" })
             || type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute");
 
-    /// <summary>A union's case types = the parameter types of its public one-parameter constructors.</summary>
+    /// <summary>The parameter types of a union's constructors or provider factories.</summary>
     public static ImmutableArray<ITypeSymbol> Cases(INamedTypeSymbol union)
-        => [.. union.InstanceConstructors
-            .Where(c => c.DeclaredAccessibility == Accessibility.Public && c.Parameters.Length == 1
-                && !SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, union))
-            .Select(static c => c.Parameters[0].Type)];
+    {
+        var provider = union.GetTypeMembers("IUnionMembers", 0).FirstOrDefault(static type => type.TypeKind == TypeKind.Interface);
+        var members = provider is null
+            ? union.InstanceConstructors
+            : provider.GetMembers("Create").OfType<IMethodSymbol>()
+                .Concat(provider.AllInterfaces.SelectMany(static type => type.GetMembers("Create").OfType<IMethodSymbol>()))
+                .Where(method => method.IsStatic && method.Arity == 0 && SymbolEqualityComparer.Default.Equals(method.ReturnType, union));
+        var cases = members
+            .Where(method => method.DeclaredAccessibility == Accessibility.Public && method.Parameters.Length == 1
+                && method.Parameters[0].RefKind is RefKind.None or RefKind.In
+                && (provider is not null || !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, union)))
+            .Select(static method => method.Parameters[0].Type);
+        return [.. provider is null ? cases : cases.Distinct<ITypeSymbol>(SymbolEqualityComparer.Default)];
+    }
 
     public static bool IsPartial(TypeDeclarationSyntax node) => node.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword));
 
