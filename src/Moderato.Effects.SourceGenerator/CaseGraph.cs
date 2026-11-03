@@ -26,9 +26,18 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
     internal bool TryCases(INamedTypeSymbol union, out ImmutableArray<ITypeSymbol> cases, int pathLength = 1)
     {
         cases = Shapes.Cases(union);
+        if (!CheckTypeShape(union)) return false;
+        var provider = Shapes.MemberProvider(union) is not null;
+        var retained = ImmutableArray.CreateBuilder<ITypeSymbol>();
         foreach (var type in cases)
+        {
+            if (!CheckTypeShape(type)) return false;
+            if (!provider && Identity(type) == Identity(union)) continue;
             if (!Inspect(type, pathLength)) return false;
-        if (Shapes.MemberProvider(union) is not null)
+            retained.Add(type);
+        }
+        cases = retained.ToImmutable();
+        if (provider)
             cases = [.. cases.GroupBy(Identity).Select(static group => group.FirstOrDefault(Shapes.AdmitsNull) ?? group.First())];
         return true;
     }
@@ -169,7 +178,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
         found = new Dictionary<string, List<CasePath>>(StringComparer.Ordinal);
         if (!CheckTypeShape(union)) return false;
         if (!TryCases(union, out var initial)) return false;
-        var onPath = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { union };
+        var onPath = new HashSet<string>(StringComparer.Ordinal) { Identity(union) };
         var pending = new Stack<Frame>();
         pending.Push(new Frame(union, initial, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
         while (pending.Count > 0)
@@ -179,7 +188,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
             if (frame.Index == frame.Cases.Length)
             {
                 pending.Pop();
-                onPath.Remove(frame.Type);
+                onPath.Remove(Identity(frame.Type));
                 continue;
             }
 
@@ -199,7 +208,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
             var hidden = frame.FileLocal ?? Shapes.FileLocalReference(@case)?.Name;
             paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && Shapes.AdmitsNull(@case), hidden));
 
-            if (@case is INamedTypeSymbol nested && Shapes.IsUnion(nested) && onPath.Add(nested))
+            if (@case is INamedTypeSymbol nested && Shapes.IsUnion(nested) && onPath.Add(Identity(nested)))
             {
                 if (!TryCases(nested, out var nestedCases, steps.Length + 1))
                 {

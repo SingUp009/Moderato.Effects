@@ -21,6 +21,7 @@ AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result
 await AssertZeroTimeout();
 await AssertUnionMemberProvider();
 await AssertEquivalentCatchSource();
+await AssertRecursiveUnionIdentity();
 await AssertInterruptedRelease(useResource: false);
 await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
@@ -46,6 +47,29 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertRecursiveUnionIdentity()
+{
+    // Given
+    var payload = new RecursivePayload<object>(new object());
+    var pair = new RecursivePayload<(int Left, int Right)>((1, 2));
+    Effect<int, RecursivePayload<object>, EmptyEnvironment> objectFailure = Effect<EmptyEnvironment>.Fail(payload);
+    Effect<int, RecursivePayload<(int Left, int Right)>, EmptyEnvironment> tupleFailure = Effect<EmptyEnvironment>.Fail(pair);
+
+    // When
+    var recoveredObject = await objectFailure.Widen<RecursiveObjectError>()
+        .CatchCase((RecursivePayload<object> value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(value, payload) ? 42 : -1))
+        .RunAsync(CancellationToken.None);
+    var recoveredTuple = await tupleFailure.Widen<RecursiveTupleError>()
+        .CatchCase((RecursivePayload<(int Left, int Right)> value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(value, pair) && value.Value == (1, 2) ? 42 : -1))
+        .RunAsync(CancellationToken.None);
+
+    // Then
+    if (recoveredObject.Value is not Ok<int> { Value: 42 } || recoveredTuple.Value is not Ok<int> { Value: 42 })
+    {
+        throw new InvalidOperationException("Equivalent recursive union types must preserve their reachable payloads.");
+    }
+}
 
 static async Task AssertEquivalentCatchSource()
 {
@@ -346,6 +370,12 @@ public partial union ProviderAliasError(ProviderAlias<object?>);
 
 [Error, RestOf<ProviderOutcome<string>>]
 public partial union ProviderRemaining(string);
+
+public sealed record RecursivePayload<T>(T Value);
+public union RecursiveObject<T>(RecursivePayload<T>, RecursiveObject<dynamic>);
+public union RecursiveTuple<T>(RecursivePayload<T>, RecursiveTuple<(int, int)>);
+[Error] public partial union RecursiveObjectError(RecursiveObject<object>);
+[Error] public partial union RecursiveTupleError(RecursiveTuple<(int Left, int Right)>);
 
 [Error]
 public partial union AppError(NotFound, TimeoutError);
