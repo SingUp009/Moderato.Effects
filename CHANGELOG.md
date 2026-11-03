@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- Distinguish same-named types from different assemblies and report MEFF009 when generated code cannot reference a required type by its global name, instead of emitting invalid references or false duplicate-path warnings.
+- Distinguish same-named types from different assemblies and report MEFF009 when generated code cannot reference a required type by its global name, instead of emitting invalid references or false duplicate-path warnings. This includes the reference to Moderato.Effects itself.
 
 - Preserve reachable conversions through recursive unions whose equivalent constructed types use different object/dynamic or tuple-name spellings.
 

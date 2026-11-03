@@ -56,6 +56,11 @@ public static class Compiler
             buildReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
+        return Build(compilation);
+    }
+
+    public static Build Build(CSharpCompilation compilation)
+    {
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new ErrorGenerator().AsSourceGenerator(), new EnvironmentGenerator().AsSourceGenerator(), new RestOfGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
