@@ -246,7 +246,7 @@ var conn = await scope.Acquire(OpenConn<R>());
 - 暗黙の Scope（実行時の文脈にする案）は採用しない。閉じ忘れを型で防げず、長く動く処理でリソースがたまり続けるため。
 - **内部の取得経路（E2）**：取得は、既存の引数だった R と解放先 Releases を内部の ResourceEnvironment に束ね、Effect の実行器で進める。公開の R に Scope の要求は足さない。Resource の AndThen・LINQ は従来の async メソッドと同じ隔離境界を持ち、同期完了でも外側の実行コンテキストを復元する。解放の登録・逆順実行・終了理由の確定は既存の Releases を使う。
 - `IHas<Scope>` として環境に値を入れる案も採用しない（CancellationToken を環境に入れる案と同じ問題があるため）。
-- `IDisposable` なものは `await using` で十分。終わり方を見てロールバックしたいときや、解放処理が R を使うときに `Acquire` / `Resource` を使う。
+- 単に解放するだけなら、`IDisposable` には `using`、`IAsyncDisposable` には `await using` を使う。終わり方を見てロールバックしたいときや、解放処理が R を使うときに `Acquire` / `Resource` を使う。
 - `Use` の中からリソースを外に返すことは型では防げない（region types がないため）。
 - 意味の規則：
   - 解放は、取得し終えた順の**逆順**で行う。並列に取得したものも同じ。
@@ -785,7 +785,7 @@ PollStatus<R>(jobId).Repeat(Schedule.Spaced(TimeSpan.FromSeconds(1)).During(Time
 
 - `UpTo` も `During` も付けない Schedule は、制限なしに続ける（Effect-TS と同じ）。
 - 試行が終わって policy を呼ぶ前と、policy が「続ける」と決めて次の試行を始める前に、呼び出し側の ct を確かめる。キャンセル済みなら Interrupted で終わる（Issue #15）。policy の中でキャンセルされても、policy が「止める」と決めたなら最後の結果で終わる（それ以上の処理は始めていないため）。トークンを見ない処理と、すぐ終わる policy の組み合わせでも止まるようにするため。ただし、ループは待たずに同期で回り続けることがあり、そのあいだスレッドを占有する（`Task.Yield` は入れない。普通の Retry が遅くなるため）。
-- `During(total)` は、最初の試行を始めてからの経過時間を、次を試すかどうか決める時点で測る。経過時間が total 以上なら止める。その後の待ち時間は total で切らないので、`Spaced(1時間).During(5秒)` は最初の失敗の後に1時間待つことがある。全体の時間に厳密な上限が欲しいときは `effect.Retry(s).Timeout(total)` を使う（Issue #5）。
+- `During(total)` は、最初の試行を始めてからの経過時間を、次を試すかどうか決める時点で測る。経過時間が total 以上なら止める。その後の待ち時間は total で切らないので、`Spaced(1時間).During(5秒)` は最初の失敗の後に1時間待つことがある。全体の期限でキャンセルを要求したいときは `effect.Retry(s).Timeout(total)` を使う（Issue #5）。D8 のとおり処理と解放の完了まで待つため、呼び出し元へ戻る時刻の上限は保証しない。
 - `.Jittered()` は、待ち時間に 0.8〜1.2 倍のばらつきを加える（Effect-TS の既定と同じ）。`WithMaxDelay` の上限は、ばらつきを加えた後にかける。
 - `RetryContext<E>.Attempt` は、失敗した試行を含めて、それまでに実行した回数（最初の失敗の後は 1）。`RepeatContext<T>.Repetition` も同じ数え方。
 - 方針（段2）が Die や Interrupted で終わったら（待っている間のキャンセルなど）、それが結果になる。最後の試行の Err は付属情報（Sequential）に残す。
@@ -911,7 +911,7 @@ public enum Relation
 }
 ```
 
-- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は実行時の文脈（内部の型）で、CancellationToken、キャンセルの理由、診断用ハンドラー、追跡（Q11）の差し込み口を持つ。
+- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は内部の実行文脈として `CancellationToken` を持つ。キャンセルの理由は各操作の `Cancellation` が保持し、診断は共通の `EffectDiagnostics.UnobservedFailureHandler` へ報告する。追跡（Q11）は未実装の拡張候補であり、現在の文脈のフィールドには含めない。
 - 付属情報に `Relation` を付けておくのは、将来 `Cause` の木（Sequential / Parallel）に広げるため。
 - `Relation` は合成上の関係を表し、主失敗を基準とした時刻を表さない。本体の Err の後に解放が Die で終わると、先に起きた Err が後の主失敗 Die の `Sequential` な付属情報になる。`Parallel` も観測時刻の一致を保証しない。`Consequence` は以下の観測時の規則で分類し、利用者コード内部の実際の因果関係を解析するものではない。
 
