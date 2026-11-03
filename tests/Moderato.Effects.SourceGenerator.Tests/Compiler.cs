@@ -36,12 +36,24 @@ public static class Compiler
         global using Moderato.Results;
         """;
 
-    public static Build Build(string source)
+    public static Build Build(string source, string? referencedSource = null)
     {
+        var buildReferences = references;
+        if (referencedSource is not null)
+        {
+            var dependency = CSharpCompilation.Create("UserDependency",
+                [CSharpSyntaxTree.ParseText(USINGS, parseOptions), CSharpSyntaxTree.ParseText(referencedSource, parseOptions)],
+                references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+            using var image = new MemoryStream();
+            var emitted = dependency.Emit(image);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            buildReferences = buildReferences.Add(MetadataReference.CreateFromImage(image.ToArray()));
+        }
+
         var compilation = CSharpCompilation.Create(
             "UserCode",
             [CSharpSyntaxTree.ParseText(USINGS, parseOptions), CSharpSyntaxTree.ParseText(source, parseOptions)],
-            references,
+            buildReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
