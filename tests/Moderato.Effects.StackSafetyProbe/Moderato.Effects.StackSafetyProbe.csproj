@@ -3,8 +3,10 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>false</IsTestProject>
+    <PublishAot Condition="'$(ModeratoEffectsVersion)' != ''">true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Moderato.Effects/Moderato.Effects.csproj" />
+    <ProjectReference Include="../../src/Moderato.Effects/Moderato.Effects.csproj" Condition="'$(ModeratoEffectsVersion)' == ''" />
+    <PackageReference Include="Moderato.Effects" Version="$(ModeratoEffectsVersion)" Condition="'$(ModeratoEffectsVersion)' != ''" />
   </ItemGroup>
 </Project>

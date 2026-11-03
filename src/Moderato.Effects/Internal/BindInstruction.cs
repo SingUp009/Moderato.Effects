@@ -15,10 +15,10 @@ internal readonly struct EffectSelection<C, D, T, E, R>
     internal EffectSelection(Outcome<T, E> output) => Output = output;
 }
 
-internal sealed class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<T, E, R>
+internal class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<T, E, R>
 {
-    private readonly Effect<A, B, R> source;
-    private readonly TState state;
+    private protected readonly Effect<A, B, R> source;
+    private protected readonly TState state;
     private readonly Func<Outcome<A, B>, TState, EffectSelection<C, D, T, E, R>> select;
     private readonly Func<Outcome<C, D>, Outcome<A, B>, RunContext, TState, Outcome<T, E>> project;
     private readonly bool isolate;

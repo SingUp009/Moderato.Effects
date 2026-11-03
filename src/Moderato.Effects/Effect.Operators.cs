@@ -33,9 +33,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return Bind<U, E, U, E, Func<T, Effect<U, E, R>>>(binder, static (outcome, bind) => outcome.Kind == OutcomeKind.Ok
-            ? new(bind(outcome.Value)) : new(outcome.WithValueType<U>()),
-            static (next, previous, _, _) => next.After(previous));
+        return new(new AndThenInstruction<T, U, E, R>(Validate(), binder));
     }
 
     /// <summary>Runs a check on the value and keeps the value if the check succeeds.</summary>
