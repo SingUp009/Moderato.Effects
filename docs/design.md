@@ -566,7 +566,7 @@ Source Generator の処理：
 2. 取り除く case X は、「E の case のうち F に含まれないもの」として決まる。ちょうど1つでなければ診断を出す（`Catch` は1つの case を取り除く操作のため）。E の残りの case は、すべて F に含まれている必要がある（推移的に含まれる場合も数える）。逆に、F は E の残りの case（とその内側の case）以外を持ってはいけない（MEFF203。Issue #4）。`[RestOf<E>]` は「E から1つ除いたもの」だけを表す。F が E の case をまとめるために自分で足した union は、その中身で判断する。
 3. **X に指定できるのは E の直接の case だけ**とする（F16）。入れ子の union の内側の case（`DbError` の中の `ConnFailed` など）は、最初は対象にしない。
 4. `TrySplit` は、E に対する `switch` として生成する。X なら `caught` に、それ以外の case なら F に広げて `rest` に入れる。
-5. 条件を満たさない F を指定すると、コンパイルエラー（CS0315）になる。そのままではメッセージが分かりにくいので、Analyzer が「AccessError には AppError の case のうち Forbidden が足りない」のように言い換える。
+5. 条件を満たさない F を指定すると、コンパイルエラー（CS0315）になる。そのままではメッセージが分かりにくいので、Analyzer が「AccessError には AppError の case のうち Forbidden が足りない」のように言い換える。コンパイラが正しく束縛できる呼び出しには、この補助診断を出さない。失敗した呼び出しの source・case は、型式の解析量を検査した上で C# の型の同一性で照合し、tuple の要素名や object / dynamic の表記差だけでは拒否しない。手動の IUnionRest 実装も同じ規則で扱い、handler の型など別の原因によるコンパイルエラーはそのまま残す。生成器の実行前も、F が除く case と要求した case が一致するなら MEFF309 は出さない。
 6. 実装は Incremental Generator で行う。`ForAttributeWithMetadataName` で属性を付けた union を集め、`Collect` してから組み合わせを求める。キャッシュが効くよう、中間のモデルは等価比較できる値（型名の文字列など）にする。
 
 RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消える。NotFound 以外の case（Forbidden）は AccessError に入って残る。足りない case がある union を指定すると CS0315 になる。
