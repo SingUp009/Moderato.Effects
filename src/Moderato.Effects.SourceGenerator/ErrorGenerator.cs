@@ -17,7 +17,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
             "Moderato.Effects.ErrorAttribute",
             static (node, _) => node is TypeDeclarationSyntax,
-            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, token));
+            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, ctx.SemanticModel.Compilation, token));
 
         context.RegisterSourceOutput(models, static (spc, model) =>
         {
@@ -27,16 +27,16 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         });
     }
 
-    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, CancellationToken cancellationToken)
+    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, Compilation compilation, CancellationToken cancellationToken)
     {
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "Error", type.Name));
         if (Shapes.Unsupported("Error", type, location) is { } unsupported) return Failed(unsupported);
 
-        var graph = new CaseGraph(cancellationToken);
+        var graph = new CaseGraph(compilation, cancellationToken);
         if (!graph.TryReachable(type, out var reachable))
-            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+            return Failed(graph.Failure(location, type.Name));
 
         var cases = new System.Collections.Generic.List<CasePath>();
         var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();

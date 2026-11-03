@@ -11,7 +11,7 @@ namespace Moderato.Effects.SourceGenerator;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CatchAnalyzer : DiagnosticAnalyzer
 {
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Diagnostics.NotRestOf, Diagnostics.RestLeavesOutAnother, Diagnostics.CaseGraphTooComplex];
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Diagnostics.NotRestOf, Diagnostics.RestLeavesOutAnother, Diagnostics.CaseGraphTooComplex, Diagnostics.OverlappingCases];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -65,18 +65,18 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         }
 
         if (source is not INamedTypeSymbol sourceUnion) return;
-        var graph = new CaseGraph(context.CancellationToken);
-        if (!graph.TryReachable(rest, out var held))
+        var graph = new CaseGraph(model.Compilation, context.CancellationToken);
+        if (!graph.CheckTypeShape(sourceUnion) || !graph.TryReachable(rest, out var held))
         {
-            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CaseGraphTooComplex, location, rest.Name, graph.Limit));
+            context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
             return;
         }
 
         var cases = Shapes.Cases(sourceUnion);
-        foreach (var @case in cases)
+        for (var index = 0; index < cases.Length; index++)
         {
-            if (graph.Inspect(@case)) continue;
-            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CaseGraphTooComplex, location, rest.Name, graph.Limit));
+            if (graph.InspectCase(sourceUnion, cases, index)) continue;
+            context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
             return;
         }
 

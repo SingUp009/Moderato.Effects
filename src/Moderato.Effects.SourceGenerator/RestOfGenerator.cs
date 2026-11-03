@@ -22,7 +22,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
             "Moderato.Effects.RestOfAttribute`1",
             static (node, _) => node is TypeDeclarationSyntax,
-            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, ctx.Attributes[0], token));
+            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, ctx.Attributes[0], ctx.SemanticModel.Compilation, token));
 
         context.RegisterSourceOutput(models, static (spc, model) =>
         {
@@ -34,16 +34,16 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         });
     }
 
-    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, AttributeData attribute, CancellationToken cancellationToken)
+    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, AttributeData attribute, Compilation compilation, CancellationToken cancellationToken)
     {
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "RestOf", type.Name));
         if (Shapes.Unsupported("RestOf", type, location) is { } unsupported) return Failed(unsupported);
-        var graph = new CaseGraph(cancellationToken);
+        var graph = new CaseGraph(compilation, cancellationToken);
         var sourceType = attribute.AttributeClass?.TypeArguments.FirstOrDefault();
         if (sourceType is not null && !graph.CheckTypeShape(sourceType))
-            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+            return Failed(graph.Failure(location, type.Name));
         if (sourceType is not INamedTypeSymbol source || !Shapes.IsUnion(source))
         {
             var name = sourceType?.ToDisplayString() ?? "?";
@@ -55,12 +55,12 @@ public sealed class RestOfGenerator : IIncrementalGenerator
 
         // F16: only a direct case of the source can be left out.
         if (!graph.TryReachable(type, out var held))
-            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+            return Failed(graph.Failure(location, type.Name));
         var sourceCases = Shapes.Cases(source);
         foreach (var @case in sourceCases)
         {
             if (!graph.Inspect(@case))
-                return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+                return Failed(graph.Failure(location, type.Name));
         }
         var missing = sourceCases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (missing.Count != 1)
@@ -68,6 +68,9 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             var leftOut = missing.Count == 0 ? "none" : string.Join(", ", missing.Select(c => Short(Shapes.Name(c))));
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfWrongCases, location, type.Name, source.Name, leftOut));
         }
+
+        for (var index = 0; index < sourceCases.Length; index++)
+            if (!graph.CheckOverlap(source, sourceCases, index)) return Failed(graph.Failure(location, type.Name));
 
         var caughtKey = Shapes.Identity(missing[0]);
         var allowed = new HashSet<string>(StringComparer.Ordinal);
@@ -77,7 +80,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             if (@case is INamedTypeSymbol union && Shapes.IsUnion(union))
             {
                 if (!graph.TryReachable(union, out var reachable))
-                    return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+                    return Failed(graph.Failure(location, type.Name));
                 allowed.UnionWith(reachable.Keys);
             }
         }
