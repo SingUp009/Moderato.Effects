@@ -57,6 +57,8 @@ public sealed class ErrorGenerator : IIncrementalGenerator
 
         if (cases.FirstOrDefault(static path => path.FileLocal is not null)?.FileLocal is { } hidden)
             return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "Error", hidden));
+        if (cases.FirstOrDefault(static path => path.GlobalNameFailure is not null)?.GlobalNameFailure is { } globalNameFailure)
+            return Failed(DiagnosticInfo.Create(Diagnostics.GlobalNameNotAvailable, location, "Error", globalNameFailure));
         diagnostics.AddRange(Shapes.NullableCases(type, location));
         return new Model(Shapes.Declare(type, node), cases.ToEquatableArray(), diagnostics.ToEquatableArray());
     }
