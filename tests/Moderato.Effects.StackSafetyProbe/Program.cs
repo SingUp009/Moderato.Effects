@@ -2,17 +2,18 @@ using Moderato.Effects;
 using Moderato.Results;
 
 if (args.Length != 3 || !int.TryParse(args[1], out var depth) || depth < 0
-    || args[2] is not ("sync" or "pending")
+    || args[2] is not ("sync" or "pending" or "constant")
+    || args[2] == "constant" && args[0] != "timeout-nest"
     || args[0] is not ("map" or "bind" or "recursive-bind" or "provide" or "query" or "recover" or "conversions"
         or "resource" or "resource-map" or "resource-query" or "recursive-resource" or "resource-conversions" or "scope" or "retention"
         or "retry-nest" or "timeout-nest"))
 {
-    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|query|recover|conversions|resource|resource-map|resource-query|recursive-resource|resource-conversions|scope|retention|retry-nest|timeout-nest> <nonnegative-depth> <sync|pending>");
+    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|query|recover|conversions|resource|resource-map|resource-query|recursive-resource|resource-conversions|scope|retention|retry-nest|timeout-nest> <nonnegative-depth> <sync|pending|constant (timeout-nest only)>");
     return 2;
 }
 
 if (args[0] == "retention") return RetentionProbe.Run(depth, args[2] == "pending");
-if (args[0] is "retry-nest" or "timeout-nest") return await ControlNestingProbe.Run(args[0], depth, args[2] == "pending");
+if (args[0] is "retry-nest" or "timeout-nest") return await ControlNestingProbe.Run(args[0], depth, args[2] == "pending", args[2] == "constant");
 
 // Given
 var pending = args[2] == "pending";
