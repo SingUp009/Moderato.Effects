@@ -20,7 +20,7 @@ public class ExecutionContextTests
             local.Value = "acquired";
             return 1;
         }), (_, _) => Effect<EmptyEnvironment>.Succeed(Unit.Value));
-        var effect = first.AndThen(value =>
+        var resource = first.AndThen(value =>
             {
                 seen.Add(local.Value);
                 local.Value = "binder";
@@ -30,14 +30,13 @@ public class ExecutionContextTests
             {
                 seen.Add(local.Value);
                 return value;
-            })
-            .Use(value => Effect<EmptyEnvironment>.Sync(() =>
+            });
+        for (var i = 0; i < padding; i++) resource = resource.Map(static value => value);
+        var effect = resource.Use(value => Effect<EmptyEnvironment>.Sync(() =>
             {
                 seen.Add(local.Value);
                 return value;
             }));
-
-        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
 
         // When
         var running = effect.RunAsync(CancellationToken.None);
@@ -244,7 +243,7 @@ public class ExecutionContextTests
                 local.Value = "source";
                 return 1;
             });
-        var effect = Resource.Make(source, (_, _) => Effect<EmptyEnvironment>.Sync(() =>
+        var resource = Resource.Make(source, (_, _) => Effect<EmptyEnvironment>.Sync(() =>
             {
                 seen.Add(local.Value);
                 return Unit.Value;
@@ -254,8 +253,9 @@ public class ExecutionContextTests
                 seen.Add(local.Value);
                 local.Value = "mapped";
                 return value;
-            })
-            .Use(value => Effect<EmptyEnvironment>.Sync(() =>
+            });
+        for (var i = 0; i < padding; i++) resource = resource.Map(static value => value);
+        var effect = resource.Use(value => Effect<EmptyEnvironment>.Sync(() =>
             {
                 seen.Add(local.Value);
                 local.Value = "used";

@@ -81,6 +81,7 @@ internal static class EffectExecutor
             if (!captures) continue;
             frame.HasAwaitContext = true;
             frame.AwaitContext = context;
+            if (frame.Suspend()) context = ExecutionContext.Capture();
         }
     }
 
@@ -139,7 +140,7 @@ internal readonly struct ExecutionScope(ExecutionContext context, bool suppresse
         return new(context, suppressed, SynchronizationContext.Current);
     }
 
-    private void Restore()
+    internal void Restore()
     {
         ExecutionContext.Restore(context);
         if (suppressed) ExecutionContext.SuppressFlow();
@@ -162,6 +163,7 @@ internal abstract class EffectFrame(EffectFrame? parent)
     internal bool HasAwaitContext { get; set; }
     internal ExecutionContext? AwaitContext { get; set; }
     internal virtual bool CapturesContext => false;
+    internal virtual bool Suspend() => false;
     internal abstract EffectFrame? Step();
     internal abstract ValueTask WaitAsync();
 
