@@ -25,7 +25,7 @@ internal sealed record Declaration(string Namespace, string Keyword, string Name
 }
 
 /// <summary>The cases from a union down to one type; <paramref name="HoldsNull"/> means a null in the last union belongs to it.</summary>
-internal sealed record CasePath(EquatableArray<string> Steps, EquatableArray<string> Patterns, bool HoldsNull = false, string? FileLocal = null)
+internal sealed record CasePath(EquatableArray<string> Steps, EquatableArray<string> Patterns, bool HoldsNull = false, string? FileLocal = null, string? GlobalNameFailure = null)
 {
     public string Target => Steps.Items[Steps.Length - 1];
 
@@ -42,7 +42,13 @@ internal static class Shapes
 
     public static string Name(ITypeSymbol type) => Display(type, FullName);
 
-    public static string Identity(ITypeSymbol type) => Display(type, identity);
+    public static string Identity(ITypeSymbol type)
+        => string.Concat(type.ToDisplayParts(identity).Select(static part => part.Symbol switch
+        {
+            IDynamicTypeSymbol => "object",
+            INamedTypeSymbol { SpecialType: SpecialType.None } named => $"{part}@{named.ContainingAssembly?.Identity}",
+            _ => part.ToString(),
+        }));
 
     private static string Display(ITypeSymbol type, SymbolDisplayFormat format)
         => string.Concat(type.ToDisplayParts(format).Select(static part =>
@@ -72,6 +78,25 @@ internal static class Shapes
             .Select(static method => method.Parameters[0].Type)];
     }
 
+    public static string? GlobalNameFailure(ITypeSymbol type, Compilation compilation)
+    {
+        foreach (var named in NamedTypes(type))
+        {
+            var original = (named.TupleUnderlyingType ?? named).OriginalDefinition;
+            if (original.TypeKind != TypeKind.Error && !SymbolEqualityComparer.Default.Equals(original.ContainingAssembly, compilation.Assembly))
+            {
+                var metadataName = original.MetadataName;
+                for (var outer = original.ContainingType; outer is not null; outer = outer.ContainingType)
+                    metadataName = outer.MetadataName + "+" + metadataName;
+                if (!original.ContainingNamespace.IsGlobalNamespace)
+                    metadataName = original.ContainingNamespace.ToDisplayString(unescapedNamespace) + "." + metadataName;
+                if (!SymbolEqualityComparer.Default.Equals(original, compilation.GetTypeByMetadataName(metadataName)))
+                    return $"{Name(named)} ({original.ContainingAssembly?.Name})";
+            }
+        }
+        return null;
+    }
+
     public static bool IsPartial(TypeDeclarationSyntax node) => node.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword));
 
     public static Declaration Declare(INamedTypeSymbol type, TypeDeclarationSyntax node)
@@ -94,15 +119,22 @@ internal static class Shapes
 
     /// <summary>The file-local type contained in a type reference, if any.</summary>
     public static INamedTypeSymbol? FileLocalReference(ITypeSymbol type)
+        => NamedTypes(type).FirstOrDefault(static named => named.IsFileLocal);
+
+    private static IEnumerable<INamedTypeSymbol> NamedTypes(ITypeSymbol type)
     {
-        if (type is IArrayTypeSymbol array) return FileLocalReference(array.ElementType);
-        if (type is IPointerTypeSymbol pointer) return FileLocalReference(pointer.PointedAtType);
-        if (type is not INamedTypeSymbol named) return null;
-        if (named.IsFileLocal) return named;
-        if (named.ContainingType is { } containing && FileLocalReference(containing) is { } outer) return outer;
-        foreach (var argument in named.TypeArguments)
-            if (FileLocalReference(argument) is { } hidden) return hidden;
-        return null;
+        var pending = new Stack<ITypeSymbol>();
+        pending.Push(type);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (current is IArrayTypeSymbol array) pending.Push(array.ElementType);
+            if (current is IPointerTypeSymbol pointer) pending.Push(pointer.PointedAtType);
+            if (current is not INamedTypeSymbol named) continue;
+            yield return named;
+            for (var index = named.TypeArguments.Length - 1; index >= 0; index--) pending.Push(named.TypeArguments[index]);
+            if (named.ContainingType is { } containing) pending.Push(containing);
+        }
     }
 
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>

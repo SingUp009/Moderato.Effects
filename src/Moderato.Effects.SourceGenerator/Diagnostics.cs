@@ -42,6 +42,11 @@ internal static class Diagnostics
         "Cases '{1}' and '{2}' in '{0}' may match the same value; wrap them in distinct record types",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor GlobalNameNotAvailable = new(
+        "MEFF009", "Type cannot be referenced by its global name",
+        "[{0}] cannot reference type '{1}' by its global name; use a globally accessible wrapper or implement the required interfaces manually",
+        CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NeedsPartialType = new(
         "MEFF101", "Needs a partial type", "'{0}' must be partial to use [Environment]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);

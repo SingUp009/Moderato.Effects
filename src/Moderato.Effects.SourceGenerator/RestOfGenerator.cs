@@ -53,6 +53,9 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         if (Shapes.FileLocalReference(source) is { } hiddenSource)
             return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", hiddenSource.Name));
 
+        if (Shapes.GlobalNameFailure(source, compilation) is { } sourceNameFailure)
+            return Failed(DiagnosticInfo.Create(Diagnostics.GlobalNameNotAvailable, location, "RestOf", sourceNameFailure));
+
         // F16: only a direct case of the source can be left out.
         if (!graph.TryReachable(type, out var held))
             return Failed(graph.Failure(location, type.Name));
@@ -93,6 +96,10 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             ?? rests.Items.Select(static rest => rest.Path.FileLocal).FirstOrDefault(static name => name is not null);
         if (hidden is not null)
             return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", hidden));
+        var globalNameFailure = Shapes.GlobalNameFailure(missing[0], compilation)
+            ?? rests.Items.Select(static rest => rest.Path.GlobalNameFailure).FirstOrDefault(static name => name is not null);
+        if (globalNameFailure is not null)
+            return Failed(DiagnosticInfo.Create(Diagnostics.GlobalNameNotAvailable, location, "RestOf", globalNameFailure));
         // An [Error] union reports its nullable cases itself.
         var isError = type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "Moderato.Effects.ErrorAttribute");
         var nullable = isError ? default : Shapes.NullableCases(type, location).ToEquatableArray();
