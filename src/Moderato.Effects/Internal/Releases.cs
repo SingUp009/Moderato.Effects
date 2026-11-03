@@ -97,6 +97,9 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
                 released = Defects.From<Unit, Never>(exception, context);
             }
 
+            if (released.Kind == OutcomeKind.Interrupted)
+                released = Defects.From<Unit, Never>(new InvalidOperationException("A resource release was interrupted before completing."), context).After(released);
+
             if (released.Kind == OutcomeKind.Die)
             {
                 (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(
