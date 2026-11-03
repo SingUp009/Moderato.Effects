@@ -125,7 +125,7 @@ public readonly partial struct Effect<T, E, R>
 
     /// <summary>Makes the error a value to match on instead of short-circuiting.</summary>
     /// <returns>An effect that cannot fail, whose value is the result.</returns>
-    public Effect<Result<T, E>, Never, R> Attempt() => Then<Result<T, E>, Never>(static (outcome, _, _) => new(outcome.Kind switch
+    public Effect<Result<T, E>, Never, R> Attempt() => Then<Result<T, E>, Never, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.Kind switch
     {
         OutcomeKind.Ok => Outcome<Result<T, E>, Never>.Ok(new Result<T, E>(new Ok<T>(outcome.Value))).After(outcome),
         OutcomeKind.Err => Handled(outcome, new Result<T, E>(new Err<E>(outcome.Error))),
@@ -207,62 +207,6 @@ public readonly partial struct Effect<T, E, R>
                 return Defects.From<T, E>(exception, context);
             }
         })));
-    }
-
-    /// <summary>Continues with this effect's outcome; exceptions from <paramref name="next"/> are defects.</summary>
-    internal Effect<U, F, R> Then<U, F>(Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next)
-    {
-        var effect = Validate();
-        return new((env, context) =>
-        {
-            var task = effect.Run(env, context);
-            return task.IsCompletedSuccessfully ? Continue(next, task.Result, env, context) : Await(task, next, env, context);
-        });
-
-        static async ValueTask<Outcome<U, F>> Await(
-            ValueTask<Outcome<T, E>> task, Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next, R env, RunContext context)
-            => await Continue(next, await task.ConfigureAwait(false), env, context).ConfigureAwait(false);
-
-        static ValueTask<Outcome<U, F>> Continue(
-            Func<Outcome<T, E>, R, RunContext, ValueTask<Outcome<U, F>>> next, Outcome<T, E> outcome, R env, RunContext context)
-        {
-            try
-            {
-                return next(outcome, env, context);
-            }
-            catch (Exception exception)
-            {
-                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
-            }
-        }
-    }
-
-    /// <summary>Continues with query-owned state.</summary>
-    internal Effect<U, F, R> Then<U, F, TState>(TState state,
-        Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next)
-    {
-        var effect = Validate();
-        return new((env, context) =>
-        {
-            var task = effect.Run(env, context);
-            return task.IsCompletedSuccessfully ? Continue(task.Result, env, context) : Await(task, env, context);
-        });
-
-        // The query owns state, so a suspended run needs only a reference to it.
-        async ValueTask<Outcome<U, F>> Await(ValueTask<Outcome<T, E>> task, R env, RunContext context)
-            => await Continue(await task.ConfigureAwait(false), env, context).ConfigureAwait(false);
-
-        ValueTask<Outcome<U, F>> Continue(Outcome<T, E> outcome, R env, RunContext context)
-        {
-            try
-            {
-                return next(outcome, env, context, state);
-            }
-            catch (Exception exception)
-            {
-                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
-            }
-        }
     }
 
     private static Outcome<T, Never> Recover<TState>(Outcome<T, E> outcome, Func<TState, E, T> fallback, TState state) => outcome.Kind switch

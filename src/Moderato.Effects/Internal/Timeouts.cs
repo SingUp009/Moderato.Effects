@@ -100,8 +100,7 @@ internal static class Timeouts
             foreach (var failure in inner.Suppressed.AsSpan())
             {
                 if (failure.Case is Interrupted) continue;
-                if (suppressed.Count < SuppressedLimit.MAX) suppressed.Add(failure);
-                else omitted++;
+                omitted += SuppressedContext.Append(suppressed, failure);
             }
             return inner.WithSuppressed(suppressed.DrainToImmutable(), omitted).WithTypes<U, F>();
         }
@@ -125,8 +124,7 @@ internal static class Timeouts
         if (inner.Kind is not (OutcomeKind.Die or OutcomeKind.Err)) return timeout.After(inner);
 
         var failure = inner.Kind == OutcomeKind.Die ? ExitCases.Die(inner.Defect!) : ExitCases.Failed(inner.Error);
-        var retained = Math.Min(inner.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return timeout.After([new Suppressed(failure, Relation.Consequence), .. inner.Suppressed.AsSpan()[..retained]],
-            inner.Omitted + inner.Suppressed.Length - retained);
+        var (suppressed, omitted) = SuppressedContext.Prepend(new Suppressed(failure, Relation.Consequence), inner.Suppressed, inner.Omitted);
+        return timeout.After(suppressed, omitted);
     }
 }

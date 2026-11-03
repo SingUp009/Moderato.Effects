@@ -456,13 +456,14 @@ public sealed class Scope<E, R>
     private void AddSuppressed(Suppressed failure)
     {
         suppressed ??= ImmutableArray.CreateBuilder<Suppressed>();
-        if (suppressed.Count < SuppressedLimit.MAX) suppressed.Add(failure);
-        else omitted++;
+        omitted += SuppressedContext.Append(suppressed, failure);
     }
 
     private void AddSuppressed(ImmutableArray<Suppressed> failures)
     {
-        foreach (var failure in failures) AddSuppressed(failure);
+        if (failures.IsEmpty) return;
+        suppressed ??= ImmutableArray.CreateBuilder<Suppressed>();
+        omitted += SuppressedContext.Append(suppressed, failures.AsSpan());
     }
 }
 
