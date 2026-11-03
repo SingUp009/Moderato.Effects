@@ -20,6 +20,7 @@ AssertZeroAllocation(valueSuccess.Repeat(Schedule.Immediately.UpTo(7)), valueClo
 AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result.Ok(Unit.Value));
 await AssertZeroTimeout();
 await AssertUnionMemberProvider();
+await AssertEquivalentCatchSource();
 await AssertInterruptedRelease(useResource: false);
 await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
@@ -45,6 +46,27 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertEquivalentCatchSource()
+{
+    // Given
+    Effect<int, CatchAliasSource<(int Left, int Right)>, EmptyEnvironment> tupleFailure
+        = Effect<EmptyEnvironment>.Fail<CatchAliasSource<(int Left, int Right)>>((1, 2));
+    var payload = new List<object> { new object() };
+    Effect<int, CatchAliasSource<List<dynamic>>, EmptyEnvironment> listFailure
+        = Effect<EmptyEnvironment>.Fail<CatchAliasSource<List<dynamic>>>(payload);
+
+    // When
+    var tuple = await tupleFailure.Catch<Guid, TupleRemaining>(_ => Effect<EmptyEnvironment>.Succeed(0)).RunAsync(CancellationToken.None);
+    var list = await listFailure.Catch<Guid, ObjectListRemaining>(_ => Effect<EmptyEnvironment>.Succeed(0)).RunAsync(CancellationToken.None);
+
+    // Then
+    if (tuple.Value is not Err<TupleRemaining> tupleError || tupleError.Error is not ValueTuple<int, int> pair || pair != (1, 2)
+        || list.Value is not Err<ObjectListRemaining> listError || listError.Error is not List<object> kept || !ReferenceEquals(payload, kept))
+    {
+        throw new InvalidOperationException("Equivalent source types must retain their tuple or object-list payloads through Catch.");
+    }
+}
 
 static async Task AssertImplicitUnionWidening()
 {
@@ -253,6 +275,10 @@ public readonly struct ValueClock : IHas<TimeProvider>
 }
 
 public record NotFound(int Id);
+
+public union CatchAliasSource<T>(T, Guid);
+[RestOf<CatchAliasSource<(int, int)>>] public partial union TupleRemaining((int, int));
+[RestOf<CatchAliasSource<List<object>>>] public partial union ObjectListRemaining(List<object>);
 
 public union ObjectCarrier(object?);
 [Error] public partial union ObjectError(ObjectCarrier);
