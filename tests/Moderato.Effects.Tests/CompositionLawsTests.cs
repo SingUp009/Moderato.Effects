@@ -154,6 +154,172 @@ public class CompositionLawsTests
     }
 
     [Theory]
+    [InlineData("ok", false, 0)]
+    [InlineData("ok", false, 128)]
+    [InlineData("ok", true, 0)]
+    [InlineData("ok", true, 128)]
+    [InlineData("err", false, 0)]
+    [InlineData("err", false, 128)]
+    [InlineData("err", true, 0)]
+    [InlineData("err", true, 128)]
+    [InlineData("die", false, 0)]
+    [InlineData("die", false, 128)]
+    [InlineData("die", true, 0)]
+    [InlineData("die", true, 128)]
+    [InlineData("interrupted", false, 0)]
+    [InlineData("interrupted", false, 128)]
+    [InlineData("interrupted", true, 0)]
+    [InlineData("interrupted", true, 128)]
+    public async Task MapErr_TotalFunctions_IdentityAndCompositionPreservePublicExit(string kind, bool pending, int padding)
+    {
+        // Given
+        // A common failing observer also exposes context retained by successful and expected-error outcomes.
+        var defect = new IOException("source");
+        var observer = new IOException("observer");
+        var outcome = ResultOf(kind, 5, defect);
+        var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
+        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
+        static int F(string error) => error?.Length ?? 0;
+        static string G(int error) => "code:" + error.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        // When
+        var original = source.RunExitAsync(CancellationToken.None);
+        var identity = source.MapErr(static error => error).RunExitAsync(CancellationToken.None);
+        var sequential = source.MapErr(F).MapErr(G).RunExitAsync(CancellationToken.None);
+        var composed = source.MapErr(error => G(F(error))).RunExitAsync(CancellationToken.None);
+        var originalObserved = source.Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        var identityObserved = source.MapErr(static error => error)
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        var sequentialObserved = source.MapErr(F).MapErr(G)
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        var composedObserved = source.MapErr(error => G(F(error)))
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        bool[] completed = [original.IsCompleted, identity.IsCompleted, sequential.IsCompleted, composed.IsCompleted,
+            originalObserved.IsCompleted, identityObserved.IsCompleted, sequentialObserved.IsCompleted, composedObserved.IsCompleted];
+        gate.SetResult(outcome);
+        var exits = await Task.WhenAll(original.AsTask(), identity.AsTask(), sequential.AsTask(), composed.AsTask(),
+            originalObserved.AsTask(), identityObserved.AsTask(), sequentialObserved.AsTask(), composedObserved.AsTask())
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.All(completed, value => Assert.Equal(!pending, value));
+        SameExit(exits[0], exits[1]);
+        SameExit(exits[2], exits[3]);
+        SameExit(exits[4], exits[5]);
+        SameExit(exits[6], exits[7]);
+        if (kind == "err") Assert.Equal<Exit<int, string>>(new Err<string>("code:5"), exits[3]);
+        if (kind == "ok") Assert.Equal<Exit<int, string>>(new Ok<int>(5), exits[3]);
+        if (kind != "interrupted")
+        {
+            var observed = Assert.IsType<Die>(exits[7].Value);
+            Assert.Same(kind == "die" ? defect : observer, observed.Exception);
+            var context = Context("source", 2);
+            Assert.Equal(kind == "err" ? [new Suppressed(new Failed("code:5"), Relation.Sequential), .. context] : context, observed.Suppressed);
+            Assert.Equal(3, observed.OmittedSuppressed);
+        }
+    }
+
+    [Theory]
+    [InlineData("ok", false, 0)]
+    [InlineData("ok", false, 128)]
+    [InlineData("ok", true, 0)]
+    [InlineData("ok", true, 128)]
+    [InlineData("err", false, 0)]
+    [InlineData("err", false, 128)]
+    [InlineData("err", true, 0)]
+    [InlineData("err", true, 128)]
+    [InlineData("die", false, 0)]
+    [InlineData("die", false, 128)]
+    [InlineData("die", true, 0)]
+    [InlineData("die", true, 128)]
+    [InlineData("interrupted", false, 0)]
+    [InlineData("interrupted", false, 128)]
+    [InlineData("interrupted", true, 0)]
+    [InlineData("interrupted", true, 128)]
+    public async Task MapAndMapErr_TotalIndependentFunctions_CommutePublicExitAndContext(string kind, bool pending, int padding)
+    {
+        // Given
+        var defect = new IOException("source");
+        var observer = new IOException("observer");
+        var outcome = ResultOf(kind, 5, defect);
+        var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
+        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
+        static long F(int value) => (long)value + 7;
+        static int G(string error) => error?.Length ?? 0;
+
+        // When
+        var successFirst = source.Map(F).MapErr(G).RunExitAsync(CancellationToken.None);
+        var errorFirst = source.MapErr(G).Map(F).RunExitAsync(CancellationToken.None);
+        var successFirstObserved = source.Map(F).MapErr(G)
+            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        var errorFirstObserved = source.MapErr(G).Map(F)
+            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer).RunExitAsync(CancellationToken.None);
+        bool[] completed = [successFirst.IsCompleted, errorFirst.IsCompleted, successFirstObserved.IsCompleted, errorFirstObserved.IsCompleted];
+        gate.SetResult(outcome);
+        var exits = await Task.WhenAll(successFirst.AsTask(), errorFirst.AsTask(), successFirstObserved.AsTask(), errorFirstObserved.AsTask())
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.All(completed, value => Assert.Equal(!pending, value));
+        SameExit(exits[0], exits[1]);
+        SameExit(exits[2], exits[3]);
+        if (kind == "ok") Assert.Equal<Exit<long, int>>(new Ok<long>(12), exits[0]);
+        if (kind == "err") Assert.Equal<Exit<long, int>>(new Err<int>(5), exits[0]);
+        if (kind != "interrupted")
+        {
+            var observed = Assert.IsType<Die>(exits[3].Value);
+            Assert.Same(kind == "die" ? defect : observer, observed.Exception);
+            var context = Context("source", 2);
+            Assert.Equal(kind == "err" ? [new Suppressed(new Failed(5), Relation.Sequential), .. context] : context, observed.Suppressed);
+            Assert.Equal(3, observed.OmittedSuppressed);
+        }
+    }
+
+    [Theory]
+    [InlineData("ok", false, 0)]
+    [InlineData("ok", false, 128)]
+    [InlineData("ok", true, 0)]
+    [InlineData("ok", true, 128)]
+    [InlineData("err", false, 0)]
+    [InlineData("err", false, 128)]
+    [InlineData("err", true, 0)]
+    [InlineData("err", true, 128)]
+    [InlineData("die", false, 0)]
+    [InlineData("die", false, 128)]
+    [InlineData("die", true, 0)]
+    [InlineData("die", true, 128)]
+    [InlineData("interrupted", false, 0)]
+    [InlineData("interrupted", false, 128)]
+    [InlineData("interrupted", true, 0)]
+    [InlineData("interrupted", true, 128)]
+    public async Task MapErr_SequentialMappers_RunsOnceInOrderOnlyForErr(string kind, bool pending, int padding)
+    {
+        // Given
+        var calls = new List<(string Mapper, object? Value)>();
+        var outcome = ResultOf(kind, 5, new IOException("source"));
+        var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
+        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
+        int First(string error) { calls.Add(("first", error)); return error?.Length ?? 0; }
+        string Second(int error) { calls.Add(("second", error)); return error.ToString(System.Globalization.CultureInfo.InvariantCulture); }
+        var effect = source.MapErr(First).MapErr(Second);
+        Assert.Empty(calls);
+
+        // When
+        var running = effect.RunExitAsync(CancellationToken.None);
+        var completed = running.IsCompleted;
+        gate.SetResult(outcome);
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(!pending, completed);
+        Assert.Equal(kind == "err" ? [("first", (object?)"error"), ("second", 5)] : [], calls);
+        if (kind == "err") Assert.Equal<Exit<int, string>>(new Err<string>("5"), exit);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -299,7 +465,7 @@ public class CompositionLawsTests
         _ => Outcome<int, string>.Interrupted(),
     }).WithSuppressed(Context("source", 2), 3);
 
-    private static void SameExit(Exit<int, string> expected, Exit<int, string> actual)
+    private static void SameExit<T, E>(Exit<T, E> expected, Exit<T, E> actual)
     {
         if (((IUnion)expected).Value is Die left)
         {

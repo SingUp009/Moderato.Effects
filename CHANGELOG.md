@@ -91,6 +91,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Tests
 
+- Check pure error-map identity/composition and independent success/error-map commutation across four outcomes, synchronous/pending completion and shallow/iterative execution, including retained failure context and error-mapper evaluation order/count.
+
 - Cover Resource error widening and jittered schedule limits through public Use and Retry calls, including ownership, zero/negative limits and cap ordering.
 
 - Require deep core-composition and control-wrapper probes under JIT and packed Native AOT in CI.
