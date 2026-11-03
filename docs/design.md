@@ -903,14 +903,15 @@ internal readonly struct Outcome<T, E>
 public sealed record Suppressed(ExitCase Case, Relation Relation);   // ExitCase（D9）を使い回す。Succeeded は入らない
 public enum Relation
 {
-    Sequential,    // 後から起きた（本体の後の解放処理など）
-    Parallel,      // 同時に起きた（並列の兄弟）
-    Consequence,   // キャンセルされた結果として起きた
+    Sequential,    // 逐次処理の失敗（本体・解放など）
+    Parallel,      // 独立した処理の失敗（並列の兄弟など）
+    Consequence,   // キャンセルの結果として分類された失敗
 }
 ```
 
 - 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は実行時の文脈（内部の型）で、CancellationToken、キャンセルの理由、診断用ハンドラー、追跡（Q11）の差し込み口を持つ。
 - 付属情報に `Relation` を付けておくのは、将来 `Cause` の木（Sequential / Parallel）に広げるため。
+- `Relation` は合成上の関係を表し、主失敗を基準とした時刻を表さない。本体の Err の後に解放が Die で終わると、先に起きた Err が後の主失敗 Die の `Sequential` な付属情報になる。`Parallel` も観測時刻の一致を保証しない。`Consequence` は以下の観測時の規則で分類し、利用者コード内部の実際の因果関係を解析するものではない。
 
 **キャンセルの理由**
 
