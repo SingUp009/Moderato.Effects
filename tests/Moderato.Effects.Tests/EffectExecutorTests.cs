@@ -351,7 +351,8 @@ public class EffectExecutorTests
         {
             var local = new AsyncLocal<string?> { Value = "caller" };
             var seen = new List<string?>();
-            var first = new PendingValue<int>();
+            // Finish arming the child await chain before the driver completes its input.
+            var first = new PendingValue<int>(runContinuationsAsynchronously: false);
             var second = new PendingValue<int>();
             var effect = Effect<EmptyEnvironment>.Async<int>(_ => first.Task)
                 .Map(value =>
@@ -401,7 +402,7 @@ public class EffectExecutorTests
             callerValues.Add(scenario.local.Value);
             await scenario.first.Registered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             scenario.first.Complete(2);
-            await scenario.second.Registered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(scenario.second.Registered.IsCompleted);
             scenario.second.Complete(3);
             results.Add(await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         }
