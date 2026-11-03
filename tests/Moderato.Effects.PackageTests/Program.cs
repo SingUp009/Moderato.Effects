@@ -19,6 +19,9 @@ AssertZeroAllocation(valueFailure.Retry(Schedule.Immediately.UpTo(7)), valueCloc
 AssertZeroAllocation(valueSuccess.Repeat(Schedule.Immediately.UpTo(7)), valueClock, Result.Ok(20));
 AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result.Ok(Unit.Value));
 await AssertZeroTimeout();
+await AssertInterruptedRelease(useResource: false);
+await AssertInterruptedRelease(useResource: true);
+await AssertSnapshotTransfer();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
@@ -40,6 +43,79 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertInterruptedRelease(bool useResource)
+{
+    // Given
+    Fiber<Unit, Never, DefaultEnvironment>? kept = null;
+    await Effect.Sleep<DefaultEnvironment>(Timeout.InfiniteTimeSpan).Fork().Use(fiber =>
+    {
+        kept = fiber;
+        return Effect<DefaultEnvironment>.Succeed(Unit.Value);
+    }).RunAsync();
+    var closed = await kept!.Join().RunExitAsync();
+    if (closed.Value is not Interrupted)
+        throw new InvalidOperationException("The release input must be an interrupted child.");
+    var remaining = 0;
+    Effect<Unit, Never, DefaultEnvironment> finish = Effect<DefaultEnvironment>.Sync(() => { remaining++; return Unit.Value; });
+    Effect<int, Never, DefaultEnvironment> effect;
+    if (useResource)
+    {
+        var outer = Resource.Make(Effect<DefaultEnvironment>.Succeed(Unit.Value), (_, _) => finish);
+        var inner = Resource.Make(Effect<DefaultEnvironment>.Succeed(42), (_, _) => kept!.Join());
+        effect = outer.AndThen(_ => inner).Use(static value => Effect<DefaultEnvironment>.Succeed(value));
+    }
+    else
+    {
+        effect = Scope<Never, DefaultEnvironment>.Gen<int>(scope =>
+        {
+            scope.Defer(_ => finish);
+            scope.Defer(_ => kept!.Join());
+            return new(42);
+        });
+    }
+
+    // When
+    var exit = await effect.RunExitAsync();
+
+    // Then
+    if (remaining != 1 || exit.Value is not Die { Exception: InvalidOperationException })
+        throw new InvalidOperationException("Interrupted cleanup must become a defect after every remaining release runs.");
+}
+
+static async Task AssertSnapshotTransfer()
+{
+    // Given
+    var completion = new TaskCompletionSource<Result<int, string>>();
+    var defect = new InvalidOperationException("after snapshot");
+    Task<int>? transferred = null;
+    CancellationTokenRegistration registration = default;
+    var effect = Scope<string, EmptyEnvironment>.Gen<int>(scope =>
+    {
+        scope.Defer(_ => Effect<EmptyEnvironment>.Sync(() => { registration.Dispose(); return Unit.Value; }));
+#pragma warning disable MEFF310
+        var step = scope.Run(Effect<EmptyEnvironment>.FromResultAsync<int, string>(_ => new(completion.Task)));
+#pragma warning restore MEFF310
+        transferred = step.AsTask();
+        registration = scope.CancellationToken.Register(() => completion.SetException(defect));
+        return new(42);
+    });
+
+    // When
+    var exit = await effect.RunExitAsync();
+
+    // Then
+    if (exit.Value is not Die die || !ReferenceEquals(defect, die.Exception) || transferred is not { IsFaulted: true })
+        throw new InvalidOperationException("An adapter read after the body snapshot must not erase the captured defect.");
+    try
+    {
+        await transferred;
+        throw new InvalidOperationException("The transferred Task must retain its defect too.");
+    }
+    catch (InvalidOperationException exception) when (ReferenceEquals(defect, exception))
+    {
+    }
+}
 
 static async Task AssertZeroTimeout()
 {
