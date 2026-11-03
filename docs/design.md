@@ -624,6 +624,8 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 
 ここでいう消費は、step の `IValueTaskSource.GetResult` が呼ばれたことを指し、利用者が catch したことまで意味しない。直接の await だけでなく、標準の `AsTask` / `Preserve` も結果を消費して、生成した Task に値や例外を移す。その後その Task が await されたかはソースへ通知されない（[.NET の実装](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/ValueTask.cs)、[Preserve の契約](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.valuetask.preserve)）。本体の終了前に adapter がソースを消費した場合、以後の例外の処理は返された Task を使う側の責任となる。Task を捨てれば、Gen が Ok でもその Task は faulted のままになり、Gen の診断用ハンドラーには報告されない場合がある。消費済みの失敗まで一律に復活させると、本体が正しく await/catch した失敗も戻してしまうため、その動作は採らない。
 
+この Task が例外を観測されずに最終化される場合、標準の `TaskScheduler.UnobservedTaskException` に通知される。これは GC に依存した遅い診断経路であり、確実な例外処理の代わりにしない（[.NET の所有権と寿命の説明](https://learn.microsoft.com/en-us/dotnet/standard/asynchronous-programming-patterns/keep-async-methods-alive)）。MEFF310 の既定は Warning であり、ビルドで拒否したいアプリケーションは `.editorconfig` で Error に上げるか、`TreatWarningsAsErrors` を使う。
+
 従って、実行時の後片付けは「await の書き忘れをすべて検出する」保証ではない。step と adapter の結果は必ずその場で await する（MEFF310）。本体が await/catch した step は、以前の未消費リストに入っていても結果へ復活させない。Err はこれとは別に scope へ記録するため、adapter が消費済みでも Gen が Err を Ok に変えない保証は維持する。
 
 - `catch (FormatException)` のような型を指定した `catch` の中の `scope.Run` は、Err の後には実行されないので指摘しない（その `catch` は ScopeFailure を捕まえないため）。
