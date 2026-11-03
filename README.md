@@ -6,8 +6,7 @@ Effect System for C#
 // async / await
 async Task<Profile> GetUserProfileAsync(int id)
 {
-    // Which errors can this throw? Which services does it touch?
-    // Can it be canceled? Is it safe to retry?
+    // Which expected failures should the caller handle? Which services does it touch?
     // The signature cannot tell you.
 }
 ```
@@ -30,7 +29,7 @@ var result = await GetUserProfile<AppEnv>(id)
     .RunAsync(env, cancellationToken);
 ```
 
-`Effect<Profile, AppError, R>` is a description of work: it succeeds with a `Profile`, fails with an `AppError`, and needs an environment `R` that provides the listed services. Nothing runs until `RunAsync`, and every run starts over, which is what makes `Timeout`, `Retry` and `Effect.All` composable.
+`Effect<Profile, AppError, R>` is a description of work: it succeeds with a `Profile`, has expected errors of type `AppError`, and needs an environment `R` that provides the listed services. The described work runs through `RunAsync` or `RunExitAsync`, and every run starts over, which is what makes `Timeout`, `Retry` and `Effect.All` composable.
 
 ```csharp
 var message = result switch
