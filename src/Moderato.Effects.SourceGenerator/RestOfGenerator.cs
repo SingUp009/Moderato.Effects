@@ -39,7 +39,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "RestOf", type.Name));
-        if (Shapes.Unsupported("RestOf", type, location) is { } unsupported) return Failed(unsupported);
+        if (Shapes.Unsupported("RestOf", type, location, compilation) is { } unsupported) return Failed(unsupported);
         var graph = new CaseGraph(compilation, cancellationToken);
         var sourceType = attribute.AttributeClass?.TypeArguments.FirstOrDefault();
         if (sourceType is not null && !graph.CheckTypeShape(sourceType))

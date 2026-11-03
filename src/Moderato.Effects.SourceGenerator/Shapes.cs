@@ -138,7 +138,7 @@ internal static class Shapes
     }
 
     /// <summary>The diagnostic for a target the generators cannot handle yet, if any.</summary>
-    public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location)
+    public static DiagnosticInfo? Unsupported(string attribute, INamedTypeSymbol type, Location location, Compilation compilation)
     {
         if (FileLocalReference(type) is { } hidden)
             return DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, attribute, hidden.Name);
@@ -146,6 +146,25 @@ internal static class Shapes
             return DiagnosticInfo.Create(Diagnostics.NestedNotSupported, location, attribute, type.Name, outer.Name);
         if (type.IsGenericType)
             return DiagnosticInfo.Create(Diagnostics.GenericNotSupported, location, attribute, type.Name);
+        var protocolName = attribute switch
+        {
+            "Error" => "Moderato.Effects.IUnionCase`2",
+            "Environment" => "Moderato.Effects.IHas`1",
+            _ => "Moderato.Effects.IUnionRest`3",
+        };
+        var markerName = attribute + (attribute == "RestOf" ? "Attribute`1" : "Attribute");
+        foreach (var data in type.GetAttributes())
+        {
+            var marker = data.AttributeClass?.OriginalDefinition;
+            if (marker?.MetadataName != markerName || marker.ContainingType is not null
+                || marker.ContainingNamespace.ToDisplayString() != "Moderato.Effects")
+            {
+                continue;
+            }
+            var protocol = marker.ContainingAssembly.GetTypeByMetadataName(protocolName);
+            if (protocol is not null && GlobalNameFailure(protocol, compilation) is { } globalNameFailure)
+                return DiagnosticInfo.Create(Diagnostics.GlobalNameNotAvailable, location, attribute, globalNameFailure);
+        }
         return null;
     }
 
