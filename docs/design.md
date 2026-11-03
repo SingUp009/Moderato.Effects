@@ -930,7 +930,7 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 
 `AllErrors` は、原因を問わず未実行・Interrupted の子が残れば、Die の優先規則に該当しない限り Interrupted にする。`E[]` では未完了の検証を表せないため、部分的な値やエラー配列を検証全体の結果として返さない。全件の結果が確定していて解放だけを待っていた場合は、その結果を保持する。
 
-`AllSettled` は、呼び出し側がキャンセルしていなければ、子の Interrupted も `Exit[]` の要素として返す。呼び出し側のキャンセルで未実行・Interrupted の子が残る場合は、集約全体を Interrupted にする。すべての子がキャンセルを Err に変えた場合は、その Err を配列に集める（D10）。
+`AllSettled` は、呼び出し側がキャンセルしていなければ、子の Interrupted も `Exit[]` の要素として返す。子の Die も配列の要素にし、それだけでは集約全体を Die にしない。呼び出し側のキャンセルで未実行・Interrupted の子が残る場合は、集約全体を Interrupted にする。そのとき子の Die は付属情報として保持し、集約が Interrupted のまま `RunAsync` / `RunExitAsync` の公開結果になる場合は D10 の診断用ハンドラーへ報告する。すべての子がキャンセルを Err に変えた場合は、その Err を配列に集める（D10）。
 
 この順位で、各場面の結果は次のようになる。
 
