@@ -29,6 +29,22 @@ internal static class Timeouts
         ThrowIfInvalid(after);
         effect = effect.Validate();
         var error = new TimeoutError(after);
+        if (after == TimeSpan.Zero)
+        {
+            return new((_, context) =>
+            {
+                try
+                {
+                    return new(context.CancellationToken.IsCancellationRequested
+                        ? Outcome<U, F>.Interrupted()
+                        : timedOut(error, FailureSequence.Next()));
+                }
+                catch (Exception exception)
+                {
+                    return new(Defects.From<U, F>(exception, context));
+                }
+            });
+        }
         return new((env, context) => RunAsync(effect, env, context, after, error, passthrough, timedOut));
     }
 
