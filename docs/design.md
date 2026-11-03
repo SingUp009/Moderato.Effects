@@ -505,6 +505,7 @@ public partial union AppError(NotFound, Forbidden, TimeoutError);
 **入れ子の union**
 
 - 推移的な case も生成する。たとえば `union AppError(DbError, NotFound)` で `DbError(ConnFailed, QueryFailed)` なら、`IUnionCase<AppError, ConnFailed>` も実装する。
+- case から外側の union へは、中間の union ごとに型付きローカル変数へ暗黙代入する。`object` や interface からの明示キャストは、union を作らず unboxing や参照のダウンキャストになる場合があるため使わない。
 - 同じ case に届く道が2本あるとき（DbError と NetError の両方に Timeout があるときなど）は、推移的な実装を生成せず、警告を出す。
 
 **`IHas<T>` は不変にする**

@@ -76,7 +76,8 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         foreach (var path in cases)
         {
             var iface = $"global::Moderato.Effects.IUnionCase<{self}, {path.Target}>";
-            sb.Append($"    static {self} {iface}.From({path.Target} value) => {Shapes.Widen(path, "value")};\n\n");
+            sb.Append($"    static {self} {iface}.From({path.Target} value)\n    {{\n");
+            sb.Append(Shapes.Widen(path, "value", "return", "        ")).Append("    }\n\n");
             sb.Append($"    static bool {iface}.TryGet({self} self, out {path.Target} value)\n    {{\n");
             sb.Append($"        if ({Shapes.Narrow(path, "self", "found")})\n        {{\n            value = found;\n            return true;\n        }}\n\n");
             if (path.HoldsNull)
