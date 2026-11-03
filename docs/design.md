@@ -577,6 +577,8 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 - null を許す case（`string?`、`int?`）は、型パターンでは外側の `?` を外して `is string found` と書く。型パターンは null に一致しないので、ある union の中で null を許す case がちょうど1つなら、その union の null の値はその case とみなす（`TryGet` と `TrySplit` で `is null` / `case null` を別に調べる）。入れ子の union の case でも同じで、途中の union までは型で狭め、最後の union の値が null かを調べる（Issue #48）。null を許す case がないか2つ以上なら、null の値はどの case にも一致しない（Issue #33）。
 - C# の union は値を `object? Value` の1つしか持たないので、null を許す case に null が入った union と、初期化されていない `default` の union は区別できない（`Equals` も true になる）。そのため、null を許す case がちょうど1つの union では、`default` もその case の null として扱われ、「`default` は無効」という方針をこの union には当てはめられない。null を許す case には警告（MEFF005）を出し、record で包むことを勧める（Issue #51）。警告を抑えた場合の動きは上のとおりで、変わらない。
 - 同じ型に届く道が2本以上あるときは、警告（MEFF003）を出し、入れ子の道の実装は生成しない。直接の case でもあるなら、直接の case の実装だけは生成する。
+- 同じ union の異なる直接 case が、null 以外の同じ値に一致し得る場合は MEFF008 を出し、その生成器の対象コードは一切生成しない。C# union はコンストラクタの選択を保存しないため、case の順番で優先度を付けず、互いに区別できる case だけを自動生成する。基底型と派生型、実装型と interface、`object` と他の型、`T` と `T?`、分散・配列の互換性による交差を含む。interface 同士と、interface を実装できる未封印のクラスとの組み合わせも保守的に拒否する。現在知られている実装型の列挙では、別のアセンブリや派生型から値が渡されても交差しないことを保証できないためである。独立した record で各 case を包めば区別できる。別々の wrapper union の内部にある型の重なりだけでは拒否しない。型が同じ case への重複経路は従来どおり MEFF003、複数の nullable case の null の扱いは MEFF005 の規則に従う。
+- 配列の重なりは C# の変換だけでは判定しない。CLI の配列要素互換性では、同じ reduced type を持つ整数型・enum の配列も同じ値に一致し得る（例：`int[]` と `uint[]`、enum の配列と基底整数型の配列）。`bool` と `byte`、`char` と `ushort` はこの関係には含めない。根拠は [ECMA-335 I.8.7](https://ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf)。
 - union の到達可能な case は、構築された型の同一性で循環を判定する。ジェネリック型の定義が同じという理由だけで探索を打ち切らない。たとえば `Chain<T>(T, Chain<int>)` の `Chain<string>` からは `int` にも到達できる。
 - 生成器と `Catch` の解析は、1回の解析で調べる case の経路長の合計を4,096まで、個々の型式のノード数を256までに制限する。経路長は対象から case までの段数で、型式は配列要素・型引数・包含型も数える。上限を超えたら MEFF007 を返し、その生成器の対象コードは一切生成しない。有限な型でも上限に達するため、診断は無限再帰とは断定しない。これは実行時の Effect の深さ制限ではなく、コンパイラや IDE を停止させないための解析資源の制限である。 分岐のない1本の経路で90個の case を順に辿るだけでも合計は `1 + … + 90 = 4,095` となり、91個なら4,186で上限を超える。他の枝や複数の経路も合計に含むため、実際の型によってはもっと浅い段階で上限に達する。型を簡素化するか、属性を外して必要なインターフェースを手動実装できる。再帰的な型の解析に上限を設けて診断を返す方針は、[TypeScript の再帰的条件型](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-1.html#recursive-conditional-types)でも採られている。
 - `[RestOf<E>]` が丸ごと取り除く case の内部は探索しない。生成する変換が参照しない case の展開だけを理由に拒否しない。
@@ -594,6 +596,7 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF005 | Warning | union の case が null を許す（null の値と、初期化されていない `default` の union を区別できない） |
 | MEFF006 | Error | file-local 型には生成できない（Error・Environment・RestOf 共通） |
 | MEFF007 | Error | union の生成または Catch の解析が解析量の上限を超えた |
+| MEFF008 | Error | union の異なる case が同じ値に一致し得る |
 | MEFF101 | Error | `[Environment]` の対象が partial ではない |
 | MEFF102 | Error | `[Environment]` の対象にプライマリコンストラクタがない |
 | MEFF103 | Error | 同じ型のサービスを2つの引数が公開している |
