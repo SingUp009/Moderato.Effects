@@ -620,9 +620,11 @@ RC2 での確認：`Catch<NotFound, AccessError>` で NotFound が型から消�
 | MEFF308 | Error | `Catch<TCase, F>` で、F が `[RestOf<E>]` ではない（CS0315 の言い換え） | '{0}' is not declared [RestOf<{1}>] |
 | MEFF309 | Error | `Catch<TCase, F>` で、F が除いた case と TCase が違う（CS0315 の言い換え） | '{0}' leaves out '{1}', not '{2}' |
 
-実行時にも守る（Issue #36、#52）：await しなかった step（MEFF310）は、Gen の本体が終わったときにまとめて片付ける。まだ動いているものはトークンをキャンセルし、終わるまで待ってから解放処理を始めるので、後から確保されたリソースもほかと一緒に解放される。キャンセルに応じない step があると、ブロックはそれが終わるまで終わらない（構造化並行性のため、意図した動き）。本体が結果を読まなかった step の失敗（Interrupted 以外）は、本体が成功していればブロックの結果になり、すでに失敗していれば Sequential の付属情報になる。本体が await して自分で catch した失敗は、本体が処理したものとして扱う（本体の結果を決める時点で、step の ValueTask の結果が読まれていたかどうかで区別する）。
+実行時にも守る（Issue #36、#52）：Gen の本体が終わるときに、ValueTask のソースがまだ消費されていない step を確定する。まだ動いているものはトークンをキャンセルし、終わるまで待ってから解放処理を始めるので、後から確保されたリソースもほかと一緒に解放される。キャンセルに応じない step があると、ブロックはそれが終わるまで終わらない（構造化並行性のため、意図した動き）。この集合に入った step の失敗（Interrupted 以外）は、本体が成功していればブロックの結果になり、すでに失敗していれば Sequential の付属情報になる。その後の adapter による読み取りで、この集合から外さない。
 
-本体が終わるときに、結果を読まれていない step を確定する。その後の adapter による読み取りで、この集合から外さない。本体が読み取って処理した step は、過去に未観測のリストへ入っていても対象から外す。
+ここでいう消費は、step の `IValueTaskSource.GetResult` が呼ばれたことを指し、利用者が catch したことまで意味しない。直接の await だけでなく、標準の `AsTask` / `Preserve` も結果を消費して、生成した Task に値や例外を移す。その後その Task が await されたかはソースへ通知されない（[.NET の実装](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/Threading/Tasks/ValueTask.cs)、[Preserve の契約](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.valuetask.preserve)）。本体の終了前に adapter がソースを消費した場合、以後の例外の処理は返された Task を使う側の責任となる。Task を捨てれば、Gen が Ok でもその Task は faulted のままになり、Gen の診断用ハンドラーには報告されない場合がある。消費済みの失敗まで一律に復活させると、本体が正しく await/catch した失敗も戻してしまうため、その動作は採らない。
+
+従って、実行時の後片付けは「await の書き忘れをすべて検出する」保証ではない。step と adapter の結果は必ずその場で await する（MEFF310）。本体が await/catch した step は、以前の未消費リストに入っていても結果へ復活させない。Err はこれとは別に scope へ記録するため、adapter が消費済みでも Gen が Err を Ok に変えない保証は維持する。
 
 - `catch (FormatException)` のような型を指定した `catch` の中の `scope.Run` は、Err の後には実行されないので指摘しない（その `catch` は ScopeFailure を捕まえないため）。
 - scope をヘルパーメソッドの引数に渡すことは、同じ流れの中で使う限り安全なので指摘しない。
