@@ -400,7 +400,7 @@ public class FailureProvenanceTests
         var contextFailure = new IOException("context");
         if (contextCount > 0)
         {
-            child = child.Then<int, Never>((outcome, _, _) => new(outcome.WithSuppressed(
+            child = child.Then<int, Never, Unit>(Unit.Value, (outcome, _, _, _) => new(outcome.WithSuppressed(
                 [.. Enumerable.Range(0, contextCount).Select(_ => new Suppressed(new Die(contextFailure, []), Relation.Sequential))], 7)));
         }
         var core = Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
