@@ -83,6 +83,32 @@ public class ScheduleTests
     }
 
     [Fact]
+    public void During_JitteredAndNegativeTotal_Throws()
+    {
+        // Given
+        var schedule = Schedule.Spaced(TimeSpan.FromSeconds(1)).Jittered();
+
+        // When
+        void Act() => schedule.During(TimeSpan.FromTicks(-1));
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
+    public void WithMaxDelay_JitteredAndNegativeMax_Throws()
+    {
+        // Given
+        var schedule = Schedule.Spaced(TimeSpan.FromSeconds(1)).Jittered();
+
+        // When
+        void Act() => schedule.WithMaxDelay(TimeSpan.FromTicks(-1));
+
+        // Then
+        Assert.Throws<ArgumentOutOfRangeException>(Act);
+    }
+
+    [Fact]
     public void Exponential_FactorIsNaN_Throws()
     {
         // Given
@@ -284,6 +310,69 @@ public class RetryTests
         Assert.All(firstClock.Waits, wait => Assert.InRange(wait, TimeSpan.FromSeconds(0.8), TimeSpan.FromSeconds(1.2)));
         Assert.True(firstClock.Waits.Distinct().Count() > 1);
         Assert.Equal(firstClock.Waits, secondClock.Waits);
+    }
+
+    [Fact]
+    public async Task Retry_JitteredDuringShorterThanTheDelay_WaitsTheFullDelayOnce()
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter());
+        // Bound the test if During stops enforcing its budget.
+        var schedule = Schedule.Spaced(TimeSpan.FromHours(1)).Jittered().During(TimeSpan.FromSeconds(5)).UpTo(4);
+
+        // When
+        var result = await broken.Retry(schedule).RunAsync(new RetryEnvironment(clock, new Random(11)), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(2)), result);
+        var wait = Assert.Single(clock.Waits);
+        Assert.InRange(wait, TimeSpan.FromMinutes(48), TimeSpan.FromMinutes(72));
+        Assert.NotEqual(TimeSpan.FromHours(1), wait);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Retry_JitteredDelayCap_AppliesAfterJitterInEitherBuilderOrder(bool capBeforeJitter)
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter());
+        var cap = TimeSpan.FromMilliseconds(1100);
+        var schedule = capBeforeJitter
+            ? Schedule.Spaced(oneSecond).WithMaxDelay(cap).Jittered().UpTo(40)
+            : Schedule.Spaced(oneSecond).Jittered().WithMaxDelay(cap).UpTo(40);
+
+        // When
+        var result = await broken.Retry(schedule).RunAsync(new RetryEnvironment(clock, new Random(11)), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(41)), result);
+        Assert.Equal(40, clock.Waits.Count);
+        Assert.All(clock.Waits, wait => Assert.InRange(wait, TimeSpan.FromMilliseconds(800), cap));
+        Assert.Contains(cap, clock.Waits);
+        Assert.Contains(clock.Waits, wait => wait < oneSecond);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Retry_JitteredZeroLimit_PreservesAttemptCountWithoutWaiting(bool duration)
+    {
+        // Given
+        var clock = new RecordingClock();
+        var broken = SucceedsOnAttempt<RetryEnvironment>(int.MaxValue, new Counter());
+        var schedule = duration
+            ? Schedule.Spaced(oneSecond).Jittered().During(TimeSpan.Zero).UpTo(3)
+            : Schedule.Spaced(oneSecond).Jittered().WithMaxDelay(TimeSpan.Zero).UpTo(3);
+
+        // When
+        var result = await broken.Retry(schedule).RunAsync(new RetryEnvironment(clock, new Random(42)), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal<Result<int, AppError>>(Result.Err<AppError>(new NotFound(duration ? 1 : 4)), result);
+        Assert.Empty(clock.Waits);
     }
 
     [Fact]
