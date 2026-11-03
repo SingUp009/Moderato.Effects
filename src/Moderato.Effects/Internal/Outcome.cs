@@ -11,12 +11,6 @@ internal enum OutcomeKind : byte
     Interrupted = 4,
 }
 
-internal static class SuppressedLimit
-{
-    /// <summary>The most suppressed failures one outcome keeps; the rest are only counted.</summary>
-    internal const int MAX = 100;
-}
-
 internal static class FailureSequence
 {
     private static long sequence;
@@ -61,10 +55,10 @@ internal readonly struct Outcome<T, E>
         Consequential = consequential;
         FailureOrder = failureOrder;
         if (suppressed.IsDefault) suppressed = [];
-        if (suppressed.Length > SuppressedLimit.MAX)
+        if (suppressed.Length > SuppressedContext.MAX)
         {
-            omitted += suppressed.Length - SuppressedLimit.MAX;
-            suppressed = suppressed[..SuppressedLimit.MAX];
+            omitted += suppressed.Length - SuppressedContext.MAX;
+            suppressed = suppressed[..SuppressedContext.MAX];
         }
 
         Suppressed = suppressed;
@@ -105,16 +99,9 @@ internal readonly struct Outcome<T, E>
     internal Outcome<T, E> After(ImmutableArray<Suppressed> earlier, int earlierOmitted = 0)
     {
         if (earlier.IsDefaultOrEmpty && earlierOmitted == 0) return this;
-        if (!earlier.IsDefault && earlier.Length >= SuppressedLimit.MAX)
-            return new(Kind, Value, Error, Defect, Consequential, earlier, Omitted + earlierOmitted + Suppressed.Length, FailureOrder);
-        if (!earlier.IsDefault && earlier.Length + Suppressed.Length > SuppressedLimit.MAX)
-        {
-            var retained = SuppressedLimit.MAX - earlier.Length;
-            return new(Kind, Value, Error, Defect, Consequential, earlier.AddRange(Suppressed.AsSpan()[..retained]),
-                Omitted + earlierOmitted + Suppressed.Length - retained, FailureOrder);
-        }
-
-        return new(Kind, Value, Error, Defect, Consequential, earlier.IsDefault ? Suppressed : earlier.AddRange(Suppressed), Omitted + earlierOmitted, FailureOrder);
+        var (suppressed, omitted) = SuppressedContext.Concat(earlier, earlierOmitted, Suppressed, Omitted);
+        // Direct construction avoids a measured slowdown through WithSuppressed on this hot path.
+        return new(Kind, Value, Error, Defect, Consequential, suppressed, omitted, FailureOrder);
     }
 
     /// <summary>Puts the failures suppressed by an earlier outcome in front of this outcome's own.</summary>
@@ -125,8 +112,8 @@ internal readonly struct Outcome<T, E>
     {
         if (earlier.Kind != OutcomeKind.Err) return After(earlier);
         var failure = new Suppressed(ExitCases.Failed(earlier.Error), Relation.Sequential);
-        var retained = Math.Min(earlier.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return After([failure, .. earlier.Suppressed.AsSpan()[..retained]], earlier.Omitted + earlier.Suppressed.Length - retained);
+        var (suppressed, omitted) = SuppressedContext.Prepend(failure, earlier.Suppressed, earlier.Omitted);
+        return After(suppressed, omitted);
     }
 
     /// <summary>This outcome with its suppressed failures replaced.</summary>

@@ -105,10 +105,9 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             else
             {
                 // A successful release may still carry failures, such as a dead Race loser.
-                var retained = Math.Min(released.Suppressed.Length, SuppressedLimit.MAX - (carried?.Count ?? 0));
-                if (retained > 0)
-                    (carried ??= ImmutableArray.CreateBuilder<Suppressed>()).AddRange(released.Suppressed.AsSpan()[..retained]);
-                carriedOmitted += released.Omitted + released.Suppressed.Length - retained;
+                if (!released.Suppressed.IsEmpty)
+                    carriedOmitted += SuppressedContext.Append(carried ??= ImmutableArray.CreateBuilder<Suppressed>(), released.Suppressed.AsSpan());
+                carriedOmitted += released.Omitted;
             }
         }
 
@@ -141,11 +140,11 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             var other = defects[i];
             if (bodyFirst || i != primary)
             {
-                if (suppressed.Count < SuppressedLimit.MAX)
+                if (suppressed.Count < SuppressedContext.MAX)
                     suppressed.Add(new Suppressed(ExitCases.Die(other.Defect!), Relation.Parallel));
                 else discarded++;
             }
-            discarded += AddContext(suppressed, other.Suppressed);
+            discarded += SuppressedContext.Append(suppressed, other.Suppressed.AsSpan());
         }
 
         // A joined child's defect also reached the body, so it is not counted twice.
@@ -163,11 +162,11 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
 
         if (!bodyFirst && !sameDefect && ExitCases.FailureOf(body) is { } bodyFailure && body.Kind != OutcomeKind.Interrupted)
         {
-            if (suppressed.Count < SuppressedLimit.MAX)
+            if (suppressed.Count < SuppressedContext.MAX)
                 suppressed.Add(new Suppressed(bodyFailure, !body.Consequential ? Relation.Parallel : Relation.Consequence));
             else discarded++;
         }
-        discarded += AddContext(suppressed, body.Suppressed);
+        discarded += SuppressedContext.Append(suppressed, body.Suppressed.AsSpan());
         var omitted = 0;
         for (var i = 0; i < defects.Count; i++) omitted = checked(omitted + defects[i].Omitted);
         return first.WithTypes<T, E>().WithSuppressed(suppressed.DrainToImmutable(), body.Omitted + omitted + discarded);
@@ -190,7 +189,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         if (body.Kind == OutcomeKind.Die && !body.Consequential
             && !FailureSequence.Before(defects[primaryIndex].FailureOrder, body.FailureOrder))
         {
-            omitted += AddContext(suppressed, body.Suppressed);
+            omitted += SuppressedContext.Append(suppressed, body.Suppressed.AsSpan());
             omitted += AddReleaseFailures(suppressed, defects, null);
             return body.WithSuppressed(suppressed.DrainToImmutable(), omitted);
         }
@@ -199,7 +198,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         var primary = defects[primaryIndex];
         if (ExitCases.FailureOf(body) is { } bodyFailure)
             suppressed.Add(new Suppressed(bodyFailure, body.Consequential ? Relation.Consequence : Relation.Sequential));
-        omitted += AddContext(suppressed, body.Suppressed);
+        omitted += SuppressedContext.Append(suppressed, body.Suppressed.AsSpan());
         omitted += AddReleaseFailures(suppressed, defects, primaryIndex);
         return primary.WithTypes<T, E>().WithSuppressed(suppressed.DrainToImmutable(), omitted);
     }
@@ -212,11 +211,11 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             var defect = defects[i];
             if (i != primary)
             {
-                if (suppressed.Count < SuppressedLimit.MAX)
+                if (suppressed.Count < SuppressedContext.MAX)
                     suppressed.Add(new Suppressed(ExitCases.Die(defect.Defect!), Relation.Sequential));
                 else omitted++;
             }
-            omitted += AddContext(suppressed, defect.Suppressed);
+            omitted += SuppressedContext.Append(suppressed, defect.Suppressed.AsSpan());
         }
 
         return omitted;
@@ -229,59 +228,4 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             if (FailureSequence.Before(defects[i].FailureOrder, defects[first].FailureOrder)) first = i;
         return first;
     }
-
-    private static int AddContext(ImmutableArray<Suppressed>.Builder suppressed, ImmutableArray<Suppressed> context)
-    {
-        var retained = Math.Min(context.Length, SuppressedLimit.MAX - suppressed.Count);
-        suppressed.AddRange(context.AsSpan()[..retained]);
-        return context.Length - retained;
-    }
-}
-
-/// <summary>Builds <see cref="ExitCase"/> values from outcomes.</summary>
-internal static class ExitCases
-{
-    private static readonly Succeeded succeeded = new();
-    private static readonly Interrupted interrupted = new();
-
-    internal static ExitCase From<T, E>(Outcome<T, E> outcome) => outcome.Kind switch
-    {
-        OutcomeKind.Ok => succeeded,
-        OutcomeKind.Err => Failed(outcome.Error),
-        OutcomeKind.Die => ToDie(outcome),
-        _ => interrupted,
-    };
-
-    /// <summary>The primary failure without its separately carried context, or <see langword="null"/> if it succeeded.</summary>
-    internal static ExitCase? FailureOf<T, E>(Outcome<T, E> outcome)
-        => outcome.Kind switch
-        {
-            OutcomeKind.Ok => (ExitCase?)null,
-            OutcomeKind.Die => Die(outcome.Defect!),
-            _ => From(outcome),
-        };
-
-    internal static Die ToDie<T, E>(Outcome<T, E> outcome)
-        => new(outcome.Defect!.SourceException, outcome.Suppressed) { OmittedSuppressed = outcome.Omitted };
-
-    internal static ExitCase Die(ExceptionDispatchInfo defect) => new Die(defect.SourceException, []);
-
-    /// <summary>A failure holding the error, a union unwrapped to its case so <c>Failed(NotFound n)</c> matches.</summary>
-    /// <returns>The failure, or a <see cref="Die"/> with the error as context when a union's value throws.</returns>
-    internal static ExitCase Failed(object? error)
-    {
-        try
-        {
-            while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;
-        }
-        catch (Exception exception)
-        {
-            // The union whose value threw is kept as it is, so nothing reads that value again.
-            return new Die(exception, [new Suppressed(new Failed(error), Relation.Sequential)]);
-        }
-
-        return new Failed(error);
-    }
-
-    internal static Interrupted Interrupted => interrupted;
 }

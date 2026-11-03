@@ -124,9 +124,9 @@ internal class Cancellation : CancellationTokenSource
     internal Outcome<T, E> WithCallbackFailure<T, E>(Outcome<T, E> outcome)
     {
         if (TakeCallbackFailure() is not { } failure) return outcome;
-        var retained = Math.Min(outcome.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return outcome.WithSuppressed([new Suppressed(ExitCases.Die(failure.Dispatch), Relation.Consequence), .. outcome.Suppressed.AsSpan()[..retained]],
-            outcome.Omitted + outcome.Suppressed.Length - retained);
+        var (suppressed, omitted) = SuppressedContext.Prepend(
+            new Suppressed(ExitCases.Die(failure.Dispatch), Relation.Consequence), outcome.Suppressed, outcome.Omitted);
+        return outcome.WithSuppressed(suppressed, omitted);
     }
 
     /// <summary>Marks the work finished; false if a reason won first.</summary>

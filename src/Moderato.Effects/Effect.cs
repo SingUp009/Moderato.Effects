@@ -24,6 +24,34 @@ public readonly partial struct Effect<T, E, R>
         => constant.HasValue ? new(Steps.FromResult(constant, context))
             : (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
 
+    /// <summary>Continues with the outcome and construction-time state; thrown callbacks become defects.</summary>
+    internal Effect<U, F, R> Then<U, F, TState>(TState state,
+        Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next)
+    {
+        var effect = Validate();
+        return new((env, context) =>
+        {
+            var task = effect.Run(env, context);
+            return task.IsCompletedSuccessfully ? Continue(task.Result, env, context) : Await(task, env, context);
+        });
+
+        // The effect owns state, so a suspended run needs only a reference to it.
+        async ValueTask<Outcome<U, F>> Await(ValueTask<Outcome<T, E>> task, R env, RunContext context)
+            => await Continue(await task.ConfigureAwait(false), env, context).ConfigureAwait(false);
+
+        ValueTask<Outcome<U, F>> Continue(Outcome<T, E> outcome, R env, RunContext context)
+        {
+            try
+            {
+                return next(outcome, env, context, state);
+            }
+            catch (Exception exception)
+            {
+                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
+            }
+        }
+    }
+
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
     {

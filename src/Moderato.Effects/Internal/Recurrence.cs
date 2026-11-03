@@ -132,12 +132,12 @@ internal static class Recurrence
         }
 
         var lastFailure = ExitCases.FailureOf(last);
-        if (failure.Suppressed.Length == SuppressedLimit.MAX)
+        if (failure.Suppressed.Length == SuppressedContext.MAX)
             return failure.WithSuppressed(failure.Suppressed, failure.Omitted + last.Omitted + last.Suppressed.Length + (lastFailure is null ? 0 : 1));
 
         if (lastFailure is { } retainedFailure)
         {
-            var retained = Math.Min(last.Suppressed.Length, SuppressedLimit.MAX - failure.Suppressed.Length - 1);
+            var retained = Math.Min(last.Suppressed.Length, SuppressedContext.MAX - failure.Suppressed.Length - 1);
             return failure.WithSuppressed([.. failure.Suppressed, new Suppressed(retainedFailure, Relation.Sequential), .. last.Suppressed.AsSpan()[..retained]],
                 failure.Omitted + last.Omitted + last.Suppressed.Length - retained);
         }

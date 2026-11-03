@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Share bounded failure-context operations across outcomes, scopes, concurrency, cancellation, fibers and timeouts, and use one continuation implementation for effect operators.
+
 ### Fixed
 
 - Keep separate parent and child failures when they throw the same exception instance, while counting a joined child's failure only once.
