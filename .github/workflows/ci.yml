@@ -47,6 +47,11 @@ jobs:
 
       - run: dotnet test -c Release
 
+      - name: Verify deep composition in isolated processes
+        run: |
+          dotnet build tests/Moderato.Effects.StackSafetyProbe -c Release
+          bash tests/Moderato.Effects.StackSafetyProbe/verify.sh dotnet tests/Moderato.Effects.StackSafetyProbe/bin/Release/net11.0/Moderato.Effects.StackSafetyProbe.dll
+
       - name: Run the samples
         run: dotnet run --project samples/Moderato.Effects.Samples -c Release
 
@@ -110,6 +115,11 @@ jobs:
         run: |
           dotnet publish tests/Moderato.Effects.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot
           ./aot/Moderato.Effects.PackageTests
+
+      - name: Verify deep composition in the native package consumer
+        run: |
+          dotnet publish tests/Moderato.Effects.StackSafetyProbe -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-probe
+          bash tests/Moderato.Effects.StackSafetyProbe/verify.sh ./aot-probe/Moderato.Effects.StackSafetyProbe
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
