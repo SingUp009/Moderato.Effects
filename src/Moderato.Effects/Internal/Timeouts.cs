@@ -88,6 +88,13 @@ internal static class Timeouts
             return Defects.From<U, F>(exception, context);
         }
 
+        return Finish(inner, timedOutFirst, timeoutOrder, context, error, passthrough, timedOut);
+    }
+
+    // Finish after the nested run returns, keeping outcome-projection locals off the descent's stack.
+    private static Outcome<U, F> Finish<T, E, U, F>(in Outcome<T, E> inner, bool timedOutFirst, long timeoutOrder,
+        RunContext context, TimeoutError error, Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut)
+    {
         // F12: the caller's cancellation outranks the timer.
         if (!timedOutFirst || context.CancellationToken.IsCancellationRequested) return passthrough(inner);
 
