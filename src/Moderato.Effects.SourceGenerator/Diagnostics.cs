@@ -37,6 +37,11 @@ internal static class Diagnostics
         "'{0}' exceeds the union generation limit of {1}; simplify the union or implement its interfaces manually",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor OverlappingCases = new(
+        "MEFF008", "Union cases may overlap",
+        "Cases '{1}' and '{2}' in '{0}' may match the same value; wrap them in distinct record types",
+        CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NeedsPartialType = new(
         "MEFF101", "Needs a partial type", "'{0}' must be partial to use [Environment]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);

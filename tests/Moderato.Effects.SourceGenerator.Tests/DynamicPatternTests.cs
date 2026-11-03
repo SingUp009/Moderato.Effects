@@ -3,10 +3,6 @@ namespace Moderato.Effects.SourceGenerator.Tests;
 public class DynamicPatternTests
 {
     [Theory]
-    [InlineData("object", "object")]
-    [InlineData("object?", "object")]
-    [InlineData("dynamic", "object")]
-    [InlineData("dynamic?", "object")]
     [InlineData("dynamic[]", "object[]")]
     [InlineData("System.Collections.Generic.List<dynamic>", "global::System.Collections.Generic.List<object>")]
     [InlineData("(dynamic Value, int Code)", "global::System.ValueTuple<object, int>")]
@@ -28,10 +24,6 @@ public class DynamicPatternTests
     }
 
     [Theory]
-    [InlineData("object", "object")]
-    [InlineData("object?", "object")]
-    [InlineData("dynamic", "object")]
-    [InlineData("dynamic?", "object")]
     [InlineData("dynamic[]", "object[]")]
     [InlineData("System.Collections.Generic.List<dynamic>", "global::System.Collections.Generic.List<object>")]
     [InlineData("(dynamic Value, int Code)", "global::System.ValueTuple<object, int>")]
@@ -61,7 +53,7 @@ public class DynamicPatternTests
         // Given
         var source = $$"""
             namespace App;
-            public union Detail({{caseType}}, string);
+            public union Detail({{caseType}});
             [Error] public partial union Problem(Detail, bool);
             """;
         Assert.Empty(Compiler.Build(source.Replace("[Error]", "")).Errors);

@@ -4,16 +4,113 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Moderato.Effects.SourceGenerator;
 
-internal sealed class CaseGraph(CancellationToken cancellationToken)
+internal sealed class CaseGraph(Compilation compilation, CancellationToken cancellationToken)
 {
     internal const int MAX_CASE_WORK = 4096;
     internal const int MAX_TYPE_SHAPE_NODES = 256;
     private int caseWork;
+    private string[]? overlappingCases;
+    private readonly Dictionary<ITypeSymbol, string> identities = new(SymbolEqualityComparer.Default);
 
     internal string Limit { get; private set; } = "";
+
+    internal DiagnosticInfo Failure(Location location, string target)
+        => overlappingCases is { } cases
+            ? DiagnosticInfo.Create(Diagnostics.OverlappingCases, location, cases)
+            : DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, target, Limit);
+
+    internal bool InspectCase(INamedTypeSymbol union, ImmutableArray<ITypeSymbol> cases, int index, int pathLength = 1)
+    {
+        return Inspect(cases[index], pathLength) && CheckOverlap(union, cases, index);
+    }
+
+    internal bool CheckOverlap(INamedTypeSymbol union, ImmutableArray<ITypeSymbol> cases, int index)
+    {
+        var current = cases[index];
+        var identity = Identity(current);
+        for (var previous = 0; previous < index; previous++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Identity(cases[previous]) == identity || !MayOverlap(cases[previous], current)) continue;
+            overlappingCases = [Shapes.Name(union), Shapes.Name(cases[previous]), Shapes.Name(current)];
+            return false;
+        }
+
+        return true;
+    }
+
+    private string Identity(ITypeSymbol type)
+    {
+        if (!identities.TryGetValue(type, out var identity)) identities.Add(type, identity = Shapes.Identity(type));
+        return identity;
+    }
+
+    private bool MayOverlap(ITypeSymbol first, ITypeSymbol second)
+    {
+        first = PatternType(first);
+        second = PatternType(second);
+        if (SymbolEqualityComparer.Default.Equals(first, second)) return true;
+        if (first is IArrayTypeSymbol firstArray && second is IArrayTypeSymbol secondArray)
+        {
+            return firstArray.Rank == secondArray.Rank && ArrayElementsMayOverlap(firstArray.ElementType, secondArray.ElementType);
+        }
+        var compiler = (CSharpCompilation)compilation;
+        var forward = compiler.ClassifyConversion(first, second);
+        var backward = compiler.ClassifyConversion(second, first);
+        if (forward.IsImplicit && (forward.IsReference || forward.IsBoxing)
+            || backward.IsImplicit && (backward.IsReference || backward.IsBoxing))
+        {
+            return true;
+        }
+
+        if (first.TypeKind == TypeKind.Interface && second.TypeKind == TypeKind.Interface) return true;
+        if (first.TypeKind == TypeKind.Interface) return CanImplement(second, first, forward, backward);
+        if (second.TypeKind == TypeKind.Interface) return CanImplement(first, second, forward, backward);
+        return forward.IsReference || backward.IsReference;
+    }
+
+    private bool CanImplement(ITypeSymbol type, ITypeSymbol contract, Conversion forward, Conversion backward)
+    {
+        if (type is not IArrayTypeSymbol array) return !type.IsValueType && !type.IsSealed;
+        if (forward.IsReference || backward.IsReference) return true;
+        return array.IsSZArray && contract is INamedTypeSymbol { TypeArguments.Length: 1 } named
+            && named.OriginalDefinition.SpecialType is SpecialType.System_Collections_Generic_IEnumerable_T
+                or SpecialType.System_Collections_Generic_ICollection_T or SpecialType.System_Collections_Generic_IList_T
+                or SpecialType.System_Collections_Generic_IReadOnlyCollection_T or SpecialType.System_Collections_Generic_IReadOnlyList_T
+            && ArrayElementsMayOverlap(array.ElementType, named.TypeArguments[0]);
+    }
+
+    // CLR array casts use reduced element types, unlike scalar or generic variance casts.
+    private bool ArrayElementsMayOverlap(ITypeSymbol first, ITypeSymbol second)
+    {
+        if (!first.IsValueType && !second.IsValueType) return MayOverlap(first, second);
+        if (!first.IsValueType || !second.IsValueType) return false;
+        return SymbolEqualityComparer.Default.Equals(first, second)
+            || ReducedType(first) is { } reduced && reduced == ReducedType(second);
+    }
+
+    private static SpecialType? ReducedType(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol { EnumUnderlyingType: { } underlying }) type = underlying;
+        return type.SpecialType switch
+        {
+            SpecialType.System_SByte or SpecialType.System_Byte => SpecialType.System_SByte,
+            SpecialType.System_Int16 or SpecialType.System_UInt16 => SpecialType.System_Int16,
+            SpecialType.System_Int32 or SpecialType.System_UInt32 => SpecialType.System_Int32,
+            SpecialType.System_Int64 or SpecialType.System_UInt64 => SpecialType.System_Int64,
+            SpecialType.System_IntPtr or SpecialType.System_UIntPtr => SpecialType.System_IntPtr,
+            _ => null,
+        };
+    }
+
+    private ITypeSymbol PatternType(ITypeSymbol type)
+        => type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+            ? nullable.TypeArguments[0]
+            : type.TypeKind == TypeKind.Dynamic ? compilation.GetSpecialType(SpecialType.System_Object) : type;
 
     internal bool Inspect(ITypeSymbol type, int pathLength = 1)
     {
@@ -80,8 +177,9 @@ internal sealed class CaseGraph(CancellationToken cancellationToken)
                 continue;
             }
 
-            var @case = frame.Cases[frame.Index++];
-            if (!Inspect(@case, frame.Path.Length + 1))
+            var index = frame.Index++;
+            var @case = frame.Cases[index];
+            if (!InspectCase(frame.Type, frame.Cases, index, frame.Path.Length + 1))
             {
                 found.Clear();
                 return false;
@@ -90,7 +188,7 @@ internal sealed class CaseGraph(CancellationToken cancellationToken)
             var name = Shapes.Name(@case);
             var steps = frame.Path.Add(name);
             var patterns = frame.Patterns.Add(Shapes.PatternType(@case));
-            var key = Shapes.Identity(@case);
+            var key = Identity(@case);
             if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
             var hidden = frame.FileLocal ?? Shapes.FileLocalReference(@case)?.Name;
             paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && AdmitsNull(@case), hidden));
