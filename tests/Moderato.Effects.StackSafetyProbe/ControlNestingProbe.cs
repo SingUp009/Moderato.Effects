@@ -3,7 +3,7 @@ using Moderato.Results;
 
 internal static class ControlNestingProbe
 {
-    internal static async Task<int> Run(string scenario, int depth, bool pending)
+    internal static async Task<int> Run(string scenario, int depth, bool pending, bool constant)
     {
         // Given
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -14,6 +14,7 @@ internal static class ControlNestingProbe
             await completion.Task.ConfigureAwait(false);
             return 0;
         });
+        if (constant) effect = Effect<DefaultEnvironment>.Succeed(0);
         for (var i = 0; i < depth; i++)
         {
             effect = scenario == "retry-nest"
@@ -30,9 +31,9 @@ internal static class ControlNestingProbe
         var rerun = await effect.RunExitAsync(DefaultEnvironment.Value, CancellationToken.None).ConfigureAwait(false);
 
         // Then
-        if (completed == pending || exit.Value is not Ok<int>(0) || rerun.Value is not Ok<int>(0) || entries != 2)
+        if (completed == pending || exit.Value is not Ok<int>(0) || rerun.Value is not Ok<int>(0) || entries != (constant ? 0 : 2))
             throw new InvalidOperationException("Control nesting changed completion or rerun behavior.");
-        Console.WriteLine($"PASS {scenario} depth={depth} {(pending ? "pending" : "sync")}");
+        Console.WriteLine($"PASS {scenario} depth={depth} {(constant ? "constant" : pending ? "pending" : "sync")}");
         return 0;
     }
 }
