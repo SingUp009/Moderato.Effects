@@ -22,6 +22,7 @@ await AssertZeroTimeout();
 await AssertInterruptedRelease(useResource: false);
 await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
+await AssertImplicitUnionWidening();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
@@ -43,6 +44,52 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertImplicitUnionWidening()
+{
+    foreach (var payload in new object?[] { null, new object() })
+    {
+        // Given
+        Effect<int, object?, EmptyEnvironment> source = Effect<EmptyEnvironment>.Fail<object?>(payload);
+
+        // When
+        var valueUnion = await source.Widen<ObjectError>()
+            .CatchCase((object? value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(payload, value) ? 42 : -1)).RunAsync(CancellationToken.None);
+        var referenceUnion = await source.Widen<ObjectClassError>()
+            .CatchCase((object? value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(payload, value) ? 42 : -1)).RunAsync(CancellationToken.None);
+
+        // Then
+        if (valueUnion.Value is not Ok<int> { Value: 42 } || referenceUnion.Value is not Ok<int> { Value: 42 })
+            throw new InvalidOperationException("Object cases must create intermediate unions and retain null or the original payload.");
+    }
+
+    // Given
+    ILeaf payloadLeaf = new LeafPayload();
+    Effect<int, ILeaf, EmptyEnvironment> failed = Effect<EmptyEnvironment>.Fail(payloadLeaf);
+    ValueType boxedValue = 42;
+    Effect<int, ValueType, EmptyEnvironment> valueFailure = Effect<EmptyEnvironment>.Fail(boxedValue);
+    System.Runtime.CompilerServices.IUnion boxedUnion = new ObjectCarrier("payload");
+    Effect<int, System.Runtime.CompilerServices.IUnion, EmptyEnvironment> unionFailure = Effect<EmptyEnvironment>.Fail(boxedUnion);
+
+    // When
+    var widened = await failed.Widen<InterfaceError>()
+        .CatchCase((ILeaf value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(payloadLeaf, value) ? 42 : -1)).RunAsync(CancellationToken.None);
+    var remaining = await failed.Widen<InterfaceSource>()
+        .Catch<Guid, InterfaceRemaining>(_ => Effect<EmptyEnvironment>.Succeed(0)).RunAsync(CancellationToken.None);
+    var valueCase = await valueFailure.Widen<ValueTypeError>()
+        .CatchCase((ValueType value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(boxedValue, value) ? 42 : -1)).RunAsync(CancellationToken.None);
+    var unionCase = await unionFailure.Widen<UnionInterfaceError>()
+        .CatchCase((System.Runtime.CompilerServices.IUnion value) => Effect<EmptyEnvironment>.Succeed(ReferenceEquals(boxedUnion, value) ? 42 : -1)).RunAsync(CancellationToken.None);
+
+    // Then
+    if (widened.Value is not Ok<int> { Value: 42 }
+        || valueCase.Value is not Ok<int> { Value: 42 } || unionCase.Value is not Ok<int> { Value: 42 }
+        || remaining.Value is not Err<InterfaceRemaining> error || error.Error is not LeafCarrier carrier
+        || carrier is not ILeaf leaf || !ReferenceEquals(payloadLeaf, leaf))
+    {
+        throw new InvalidOperationException("Interface cases must create intermediate unions in both widening and splitting.");
+    }
+}
 
 static async Task AssertInterruptedRelease(bool useResource)
 {
@@ -176,6 +223,31 @@ public readonly struct ValueClock : IHas<TimeProvider>
 }
 
 public record NotFound(int Id);
+
+public union ObjectCarrier(object?);
+[Error] public partial union ObjectError(ObjectCarrier);
+public union ValueTypeCarrier(ValueType);
+[Error] public partial union ValueTypeError(ValueTypeCarrier);
+public union UnionInterfaceCarrier(System.Runtime.CompilerServices.IUnion);
+[Error] public partial union UnionInterfaceError(UnionInterfaceCarrier);
+
+[System.Runtime.CompilerServices.Union]
+public sealed class ObjectClassCarrier(object? value)
+{
+    public object? Value => value;
+}
+[Error] public partial union ObjectClassError(ObjectClassCarrier);
+
+public interface ILeaf;
+public sealed class LeafPayload : ILeaf;
+[System.Runtime.CompilerServices.Union]
+public readonly struct LeafCarrier(ILeaf value) : ILeaf
+{
+    public object? Value => value;
+}
+[Error] public partial union InterfaceError(LeafCarrier);
+[Error] public partial union InterfaceSource(ILeaf, Guid);
+[Error, RestOf<InterfaceSource>] public partial union InterfaceRemaining(LeafCarrier);
 
 [Error]
 public partial union AppError(NotFound, TimeoutError);
