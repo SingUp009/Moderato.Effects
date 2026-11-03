@@ -249,6 +249,156 @@ public class UnionMemberProviderTests
         Assert.DoesNotContain("MEFF003", build.Warnings);
     }
 
+    [Theory]
+    [InlineData(false, "object", "dynamic")]
+    [InlineData(true, "object", "dynamic")]
+    [InlineData(false, "(int X, int Y)", "(int A, int B)")]
+    [InlineData(true, "(int X, int Y)", "(int A, int B)")]
+    [InlineData(false, "System.Collections.Generic.List<object>", "System.Collections.Generic.List<dynamic>")]
+    [InlineData(true, "System.Collections.Generic.List<object>", "System.Collections.Generic.List<dynamic>")]
+    [InlineData(false, "object[]", "dynamic[]")]
+    [InlineData(true, "object[]", "dynamic[]")]
+    [InlineData(false, "string?", "string")]
+    [InlineData(true, "string?", "string")]
+    [InlineData(false, "string", "string?")]
+    [InlineData(true, "string", "string?")]
+    public void Error_ProviderFactoriesHaveIdenticalCaseTypes_DoesNotInventDuplicatePath(bool metadata, string original, string alias)
+    {
+        // Given
+        var admitsNull = original.EndsWith('?') || alias.EndsWith('?');
+        var initial = admitsNull ? "default(string)" : $"default({original})!";
+        var dependency = $$"""
+            namespace App;
+            [System.Runtime.CompilerServices.Union]
+            public struct Box<T> : Box<T>.IUnionMembers
+            {
+                private readonly object? value;
+                private Box(object? value) => this.value = value;
+                public interface Factory { static Box<T> Create(T value) => new(value); }
+                public interface IUnionMembers : Factory
+                {
+                    static Box<T> Create({{alias}} value) => new(value);
+                    object? Value { get; }
+                }
+                object? IUnionMembers.Value => value;
+            }
+            """;
+        var target = $$"""
+            namespace App;
+            [Error] public partial union Top(Box<{{original}}>);
+            public static class Use
+            {
+                public static Effect<Never, Top, EmptyEnvironment> Widen()
+                    => Effect<EmptyEnvironment>.Fail<{{original}}>(default!).Widen<Top>();
+            }
+            """;
+        var native = $$"""
+            public partial union Top(Box<{{original}}>);
+            public static class Use
+            {
+                public static bool Native()
+                {
+                    Box<{{original}}> inner = {{initial}};
+                    Top top = inner;
+                    return top is Box<{{original}}>;
+                }
+            }
+            """;
+        var nativeBuild = Compiler.Build(dependency + native);
+        Assert.Empty(nativeBuild.Errors);
+
+        // When
+        var build = Compiler.Build(metadata ? target : dependency + target.Replace("namespace App;", ""), metadata ? dependency : null);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.DoesNotContain("MEFF003", build.Warnings);
+        if (admitsNull)
+        {
+            Assert.Contains("is null)", build.Generated["App.Top.Error.g.cs"]);
+            Assert.Equal(nativeBuild.Warnings.Contains("CS8604"), build.Warnings.Contains("CS8604"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "(int X, int Y)", "(int A, int B)")]
+    [InlineData(true, "(int X, int Y)", "(int A, int B)")]
+    [InlineData(false, "System.Collections.Generic.List<object>", "System.Collections.Generic.List<dynamic>")]
+    [InlineData(true, "System.Collections.Generic.List<object>", "System.Collections.Generic.List<dynamic>")]
+    public void RestOf_ProviderFactoriesHaveIdenticalCaseTypes_EmitsOneSplitCase(bool metadata, string original, string alias)
+    {
+        // Given
+        var sourceArgument = original.StartsWith('(') ? "(int, int)" : original;
+        var dependency = $$"""
+            namespace App;
+            [System.Runtime.CompilerServices.Union]
+            public struct Box<T> : Box<T>.IUnionMembers
+            {
+                private readonly object? value;
+                private Box(object? value) => this.value = value;
+                public interface Factory { static Box<T> Create(T value) => new(value); }
+                public interface IUnionMembers : Factory
+                {
+                    static Box<T> Create({{alias}} value) => new(value);
+                    static Box<T> Create(Exception value) => new(value);
+                    object? Value { get; }
+                }
+                object? IUnionMembers.Value => value;
+            }
+            """;
+        var target = $$"""
+            namespace App;
+            [Error, RestOf<Box<{{sourceArgument}}>>] public partial union Remaining({{original}});
+            public static class Use
+            {
+                public static Effect<int, Remaining, EmptyEnvironment> Catch(Effect<int, Box<{{sourceArgument}}>, EmptyEnvironment> effect)
+                    => effect.Catch<Exception, Remaining>(_ => Effect<EmptyEnvironment>.Succeed(42));
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(metadata ? target : dependency + target.Replace("namespace App;", ""), metadata ? dependency : null);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.DoesNotContain("MEFF003", build.Warnings);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Error_ConstructorUnionWithAmbiguousCreation_PreservesDiagnostic(bool metadata)
+    {
+        // Given
+        const string DEPENDENCY = """
+            namespace App;
+            [System.Runtime.CompilerServices.Union]
+            public readonly struct Box
+            {
+                public Box(string value) => Value = value;
+                public Box(in string value) => Value = value;
+                public object? Value { get; }
+            }
+            """;
+        const string TARGET = """
+            namespace App;
+            [Error] public partial union Top(Box);
+            public static class Use
+            {
+                public static bool Native() => new Box("hello") is string;
+            }
+            """;
+        Assert.Empty(Compiler.Build(DEPENDENCY + TARGET.Replace("namespace App;", "").Replace("[Error]", "")).Errors);
+
+        // When
+        var build = Compiler.Build(metadata ? TARGET : DEPENDENCY + TARGET.Replace("namespace App;", ""), metadata ? DEPENDENCY : null);
+
+        // Then
+        Assert.Empty(build.Errors);
+        build.Single("MEFF003");
+        Assert.DoesNotContain("IUnionCase<Top, string>", build.Generated["App.Top.Error.g.cs"]);
+    }
+
     private static string Provider(bool referenceType, bool inherited)
         => $$"""
             namespace App;

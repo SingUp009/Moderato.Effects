@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Discover C# union member-provider factories, including inherited and equivalent case types, while preserving nullable cases and bounded analysis.
+
 - Create intermediate error unions with implicit assignments so object and interface cases are not unboxed or downcast during Widen or nested RestOf conversion.
 
 - Treat an interrupted release as `Die(InvalidOperationException)`, run every remaining release, and aggregate failures using the existing priority rules.
