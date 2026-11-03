@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -21,7 +22,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
             "Moderato.Effects.RestOfAttribute`1",
             static (node, _) => node is TypeDeclarationSyntax,
-            static (ctx, _) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, ctx.Attributes[0]));
+            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, ctx.Attributes[0], token));
 
         context.RegisterSourceOutput(models, static (spc, model) =>
         {
@@ -33,15 +34,19 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         });
     }
 
-    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, AttributeData attribute)
+    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, AttributeData attribute, CancellationToken cancellationToken)
     {
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "RestOf", type.Name));
         if (Shapes.Unsupported("RestOf", type, location) is { } unsupported) return Failed(unsupported);
-        if (attribute.AttributeClass?.TypeArguments.FirstOrDefault() is not INamedTypeSymbol source || !Shapes.IsUnion(source))
+        var graph = new CaseGraph(cancellationToken);
+        var sourceType = attribute.AttributeClass?.TypeArguments.FirstOrDefault();
+        if (sourceType is not null && !graph.CheckTypeShape(sourceType))
+            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+        if (sourceType is not INamedTypeSymbol source || !Shapes.IsUnion(source))
         {
-            var name = attribute.AttributeClass?.TypeArguments.FirstOrDefault()?.ToDisplayString() ?? "?";
+            var name = sourceType?.ToDisplayString() ?? "?";
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfNotUnion, location, name));
         }
 
@@ -49,8 +54,14 @@ public sealed class RestOfGenerator : IIncrementalGenerator
             return Failed(DiagnosticInfo.Create(Diagnostics.FileLocalNotSupported, location, "RestOf", hiddenSource.Name));
 
         // F16: only a direct case of the source can be left out.
-        var held = Shapes.Reachable(type);
+        if (!graph.TryReachable(type, out var held))
+            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
         var sourceCases = Shapes.Cases(source);
+        foreach (var @case in sourceCases)
+        {
+            if (!graph.Inspect(@case))
+                return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+        }
         var missing = sourceCases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (missing.Count != 1)
         {
@@ -63,10 +74,15 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         foreach (var @case in sourceCases.Where(c => Shapes.Identity(c) != caughtKey))
         {
             allowed.Add(Shapes.Identity(@case));
-            if (@case is INamedTypeSymbol union && Shapes.IsUnion(union)) allowed.UnionWith(Shapes.Reachable(union).Keys);
+            if (@case is INamedTypeSymbol union && Shapes.IsUnion(union))
+            {
+                if (!graph.TryReachable(union, out var reachable))
+                    return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+                allowed.UnionWith(reachable.Keys);
+            }
         }
 
-        var extras = Extras(type, allowed);
+        var extras = Extras(type, allowed, cancellationToken);
         if (extras.Count > 0)
             return Failed(DiagnosticInfo.Create(Diagnostics.RestOfExtraCases, location, type.Name, source.Name, string.Join(", ", extras.Select(Short))));
 
@@ -85,7 +101,7 @@ public sealed class RestOfGenerator : IIncrementalGenerator
     }
 
     // A rest case ∉ E's cases is extra, unless it is a union grouping E's cases.
-    private static List<string> Extras(INamedTypeSymbol rest, HashSet<string> allowed)
+    private static List<string> Extras(INamedTypeSymbol rest, HashSet<string> allowed, CancellationToken cancellationToken)
     {
         var extras = new List<string>();
         var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { rest };
@@ -94,8 +110,10 @@ public sealed class RestOfGenerator : IIncrementalGenerator
 
         void Visit(INamedTypeSymbol current)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var @case in Shapes.Cases(current))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var name = Shapes.Name(@case);
                 if (allowed.Contains(Shapes.Identity(@case))) continue;
                 if (@case is INamedTypeSymbol union && Shapes.IsUnion(union))

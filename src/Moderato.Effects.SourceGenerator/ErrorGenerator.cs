@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -16,7 +17,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
             "Moderato.Effects.ErrorAttribute",
             static (node, _) => node is TypeDeclarationSyntax,
-            static (ctx, _) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode));
+            static (ctx, token) => Describe((INamedTypeSymbol)ctx.TargetSymbol, (TypeDeclarationSyntax)ctx.TargetNode, token));
 
         context.RegisterSourceOutput(models, static (spc, model) =>
         {
@@ -26,16 +27,20 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         });
     }
 
-    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node)
+    private static Model Describe(INamedTypeSymbol type, TypeDeclarationSyntax node, CancellationToken cancellationToken)
     {
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "Error", type.Name));
         if (Shapes.Unsupported("Error", type, location) is { } unsupported) return Failed(unsupported);
 
+        var graph = new CaseGraph(cancellationToken);
+        if (!graph.TryReachable(type, out var reachable))
+            return Failed(DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, type.Name, graph.Limit));
+
         var cases = new System.Collections.Generic.List<CasePath>();
         var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
-        foreach (var entry in Shapes.Reachable(type).OrderBy(static e => e.Key, System.StringComparer.Ordinal))
+        foreach (var entry in reachable.OrderBy(static e => e.Key, System.StringComparer.Ordinal))
         {
             var paths = entry.Value;
             if (paths.Count == 1)

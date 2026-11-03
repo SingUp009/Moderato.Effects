@@ -11,7 +11,7 @@ namespace Moderato.Effects.SourceGenerator;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CatchAnalyzer : DiagnosticAnalyzer
 {
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Diagnostics.NotRestOf, Diagnostics.RestLeavesOutAnother];
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Diagnostics.NotRestOf, Diagnostics.RestLeavesOutAnother, Diagnostics.CaseGraphTooComplex];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -34,8 +34,8 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         var model = context.SemanticModel;
         if (model.GetTypeInfo(access.Expression, context.CancellationToken).Type is not INamedTypeSymbol effect
             || effect.OriginalDefinition.ToDisplayString() != "Moderato.Effects.Effect<T, E, R>"
-            || model.GetTypeInfo(name.TypeArgumentList.Arguments[0]).Type is not { } caught
-            || model.GetTypeInfo(name.TypeArgumentList.Arguments[1]).Type is not INamedTypeSymbol rest)
+            || model.GetTypeInfo(name.TypeArgumentList.Arguments[0], context.CancellationToken).Type is not { } caught
+            || model.GetTypeInfo(name.TypeArgumentList.Arguments[1], context.CancellationToken).Type is not INamedTypeSymbol rest)
         {
             return;
         }
@@ -65,8 +65,22 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         }
 
         if (source is not INamedTypeSymbol sourceUnion) return;
-        var held = Shapes.Reachable(rest);
-        var leftOut = Shapes.Cases(sourceUnion).Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
+        var graph = new CaseGraph(context.CancellationToken);
+        if (!graph.TryReachable(rest, out var held))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CaseGraphTooComplex, location, rest.Name, graph.Limit));
+            return;
+        }
+
+        var cases = Shapes.Cases(sourceUnion);
+        foreach (var @case in cases)
+        {
+            if (graph.Inspect(@case)) continue;
+            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CaseGraphTooComplex, location, rest.Name, graph.Limit));
+            return;
+        }
+
+        var leftOut = cases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (leftOut.Count == 1)
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.RestLeavesOutAnother, location, rest.Name, leftOut[0].Name, caught.Name));
     }
