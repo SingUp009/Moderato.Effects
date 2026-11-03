@@ -84,9 +84,9 @@ public sealed class Fiber<T, E, R>
 
         var failure = Outcome<Unit, Never>.Die(callbackFailure.Dispatch, failureOrder: callbackFailure.Order);
         if (released.Kind != OutcomeKind.Die) return failure;
-        var retained = Math.Min(released.Suppressed.Length, SuppressedLimit.MAX - 1);
-        return failure.WithSuppressed([new Suppressed(ExitCases.Die(released.Defect!), Relation.Sequential), .. released.Suppressed.AsSpan()[..retained]],
-            released.Omitted + released.Suppressed.Length - retained);
+        var (suppressed, omitted) = SuppressedContext.Prepend(
+            new Suppressed(ExitCases.Die(released.Defect!), Relation.Sequential), released.Suppressed, released.Omitted);
+        return failure.WithSuppressed(suppressed, omitted);
     }
 
     private Outcome<Unit, Never> Observe(Outcome<T, E> outcome)
