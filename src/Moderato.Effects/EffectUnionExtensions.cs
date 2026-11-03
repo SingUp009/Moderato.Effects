@@ -25,22 +25,22 @@ public static class EffectUnionExtensions
         where E : IUnionCase<E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return effect.Then<T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, env, context, handle) =>
+        return effect.Bind<T, Never, T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return Steps.Then(recovery.Run(env, context), static end => end.WithErrorType<E>());
-        });
+            return new(recovery);
+        }, static (next, _, _, _) => next.WithErrorType<E>());
     }
 
     private static Effect<T, E, R> Catch<T, E, R, TCase>(Effect<T, E, R> effect, Func<TCase, Effect<T, E, R>> handler)
         where E : IUnionCase<E, TCase>
-        => effect.Then<T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, env, context, handle) =>
+        => effect.Bind<T, E, T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return recovery.Run(env, context);
-        });
+            return new(recovery);
+        }, static (next, _, _, _) => next);
 }
