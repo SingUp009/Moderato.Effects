@@ -926,7 +926,11 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 3. **キャンセルのきっかけが決めた結果**：Timeout なら `Err(TimeoutError)`、All なら最初に独立して起きた失敗、Race なら勝った側。
 4. **通常の Ok / Err**。
 
-`All`・`Race`・`RaceFirst` は、すでに観測した独立した Err を、後始末を待つ間の呼び出し側キャンセルで Interrupted に置き換えない。キャンセル後に観測した Err はこの対象ではない。`AllErrors`・`AllSettled` は全件の結果が必要なため、キャンセルで未実行・中断の子が残れば Interrupted にする。`AllErrors` は、全件の結果が確定していて解放だけを待っていた場合、その結果を保持する。
+`All`・`Race`・`RaceFirst` は、すでに観測した独立した Err を、後始末を待つ間の呼び出し側キャンセルで Interrupted に置き換えない。キャンセル後に観測した Err はこの対象ではない。
+
+`AllErrors` は、原因を問わず未実行・Interrupted の子が残れば、Die の優先規則に該当しない限り Interrupted にする。`E[]` では未完了の検証を表せないため、部分的な値やエラー配列を検証全体の結果として返さない。全件の結果が確定していて解放だけを待っていた場合は、その結果を保持する。
+
+`AllSettled` は、呼び出し側がキャンセルしていなければ、子の Interrupted も `Exit[]` の要素として返す。呼び出し側のキャンセルで未実行・Interrupted の子が残る場合は、集約全体を Interrupted にする。すべての子がキャンセルを Err に変えた場合は、その Err を配列に集める（D10）。
 
 この順位で、各場面の結果は次のようになる。
 
