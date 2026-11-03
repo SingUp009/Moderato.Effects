@@ -179,27 +179,35 @@ public class CompositionLawsTests
         var outcome = ResultOf(kind, 5, defect);
         var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
-        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
         static int F(string error) => error?.Length ?? 0;
         static string G(int error) => "code:" + error.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
+        var original = Pad(source, padding);
+        var identity = Pad(source.MapErr(static error => error), padding);
+        var sequential = Pad(source.MapErr(F).MapErr(G), padding);
+        var composed = Pad(source.MapErr(error => G(F(error))), padding);
+        var originalObserved = Pad(source.Map<int>(_ => throw observer).MapErr<string>(_ => throw observer), padding);
+        var identityObserved = Pad(source.MapErr(static error => error)
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer), padding);
+        var sequentialObserved = Pad(source.MapErr(F).MapErr(G)
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer), padding);
+        var composedObserved = Pad(source.MapErr(error => G(F(error)))
+            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer), padding);
+
         // When
-        var original = source.RunExitAsync(CancellationToken.None);
-        var identity = source.MapErr(static error => error).RunExitAsync(CancellationToken.None);
-        var sequential = source.MapErr(F).MapErr(G).RunExitAsync(CancellationToken.None);
-        var composed = source.MapErr(error => G(F(error))).RunExitAsync(CancellationToken.None);
-        var originalObserved = source.Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        var identityObserved = source.MapErr(static error => error)
-            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        var sequentialObserved = source.MapErr(F).MapErr(G)
-            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        var composedObserved = source.MapErr(error => G(F(error)))
-            .Map<int>(_ => throw observer).MapErr<string>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        bool[] completed = [original.IsCompleted, identity.IsCompleted, sequential.IsCompleted, composed.IsCompleted,
-            originalObserved.IsCompleted, identityObserved.IsCompleted, sequentialObserved.IsCompleted, composedObserved.IsCompleted];
+        var originalRun = original.RunExitAsync(CancellationToken.None);
+        var identityRun = identity.RunExitAsync(CancellationToken.None);
+        var sequentialRun = sequential.RunExitAsync(CancellationToken.None);
+        var composedRun = composed.RunExitAsync(CancellationToken.None);
+        var originalObservedRun = originalObserved.RunExitAsync(CancellationToken.None);
+        var identityObservedRun = identityObserved.RunExitAsync(CancellationToken.None);
+        var sequentialObservedRun = sequentialObserved.RunExitAsync(CancellationToken.None);
+        var composedObservedRun = composedObserved.RunExitAsync(CancellationToken.None);
+        bool[] completed = [originalRun.IsCompleted, identityRun.IsCompleted, sequentialRun.IsCompleted, composedRun.IsCompleted,
+            originalObservedRun.IsCompleted, identityObservedRun.IsCompleted, sequentialObservedRun.IsCompleted, composedObservedRun.IsCompleted];
         gate.SetResult(outcome);
-        var exits = await Task.WhenAll(original.AsTask(), identity.AsTask(), sequential.AsTask(), composed.AsTask(),
-            originalObserved.AsTask(), identityObserved.AsTask(), sequentialObserved.AsTask(), composedObserved.AsTask())
+        var exits = await Task.WhenAll(originalRun.AsTask(), identityRun.AsTask(), sequentialRun.AsTask(), composedRun.AsTask(),
+            originalObservedRun.AsTask(), identityObservedRun.AsTask(), sequentialObservedRun.AsTask(), composedObservedRun.AsTask())
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
@@ -245,20 +253,24 @@ public class CompositionLawsTests
         var outcome = ResultOf(kind, 5, defect);
         var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
-        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
         static long F(int value) => (long)value + 7;
         static int G(string error) => error?.Length ?? 0;
 
+        var successFirst = Pad(source.Map(F).MapErr(G), padding);
+        var errorFirst = Pad(source.MapErr(G).Map(F), padding);
+        var successFirstObserved = Pad(source.Map(F).MapErr(G)
+            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer), padding);
+        var errorFirstObserved = Pad(source.MapErr(G).Map(F)
+            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer), padding);
+
         // When
-        var successFirst = source.Map(F).MapErr(G).RunExitAsync(CancellationToken.None);
-        var errorFirst = source.MapErr(G).Map(F).RunExitAsync(CancellationToken.None);
-        var successFirstObserved = source.Map(F).MapErr(G)
-            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        var errorFirstObserved = source.MapErr(G).Map(F)
-            .Map<long>(_ => throw observer).MapErr<int>(_ => throw observer).RunExitAsync(CancellationToken.None);
-        bool[] completed = [successFirst.IsCompleted, errorFirst.IsCompleted, successFirstObserved.IsCompleted, errorFirstObserved.IsCompleted];
+        var successFirstRun = successFirst.RunExitAsync(CancellationToken.None);
+        var errorFirstRun = errorFirst.RunExitAsync(CancellationToken.None);
+        var successFirstObservedRun = successFirstObserved.RunExitAsync(CancellationToken.None);
+        var errorFirstObservedRun = errorFirstObserved.RunExitAsync(CancellationToken.None);
+        bool[] completed = [successFirstRun.IsCompleted, errorFirstRun.IsCompleted, successFirstObservedRun.IsCompleted, errorFirstObservedRun.IsCompleted];
         gate.SetResult(outcome);
-        var exits = await Task.WhenAll(successFirst.AsTask(), errorFirst.AsTask(), successFirstObserved.AsTask(), errorFirstObserved.AsTask())
+        var exits = await Task.WhenAll(successFirstRun.AsTask(), errorFirstRun.AsTask(), successFirstObservedRun.AsTask(), errorFirstObservedRun.AsTask())
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Then
@@ -301,10 +313,9 @@ public class CompositionLawsTests
         var outcome = ResultOf(kind, 5, new IOException("source"));
         var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(outcome));
-        for (var i = 0; i < padding; i++) source = source.Map(static value => value);
         int First(string error) { calls.Add(("first", error)); return error?.Length ?? 0; }
         string Second(int error) { calls.Add(("second", error)); return error.ToString(System.Globalization.CultureInfo.InvariantCulture); }
-        var effect = source.MapErr(First).MapErr(Second);
+        var effect = Pad(source.MapErr(First).MapErr(Second), padding);
         Assert.Empty(calls);
 
         // When
@@ -450,6 +461,12 @@ public class CompositionLawsTests
         Assert.Equal<Exit<int, Never>>(new Ok<int>(6), composed);
         Assert.Equal(new[] { "g", "f", "run" }, sequentialTrace);
         Assert.Equal(sequentialTrace, trace);
+    }
+
+    private static Effect<T, E, EmptyEnvironment> Pad<T, E>(Effect<T, E, EmptyEnvironment> effect, int count)
+    {
+        for (var i = 0; i < count; i++) effect = effect.Map(static value => value);
+        return effect;
     }
 
     private static ImmutableArray<Suppressed> Context(string prefix, int count)
