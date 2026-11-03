@@ -1,6 +1,5 @@
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks.Sources;
 using Moderato.Effects.Internal;
 
 namespace Moderato.Effects.Tests;
@@ -430,22 +429,4 @@ public class EffectExecutorTests
 
     [StructLayout(LayoutKind.Sequential, Size = 256)]
     private readonly record struct Box(int Value);
-
-    private sealed class PendingValue<T>(bool runContinuationsAsynchronously = true) : IValueTaskSource<T>
-    {
-        private ManualResetValueTaskSourceCore<T> core = new() { RunContinuationsAsynchronously = runContinuationsAsynchronously };
-        private readonly TaskCompletionSource registered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal ValueTask<T> Task => new(this, core.Version);
-        internal Task Registered => registered.Task;
-        internal void Complete(T value) => core.SetResult(value);
-        public T GetResult(short token) => core.GetResult(token);
-        public ValueTaskSourceStatus GetStatus(short token) => core.GetStatus(token);
-
-        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
-        {
-            core.OnCompleted(continuation, state, token, flags);
-            registered.SetResult();
-        }
-    }
 }

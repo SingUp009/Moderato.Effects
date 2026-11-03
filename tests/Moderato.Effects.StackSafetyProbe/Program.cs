@@ -3,9 +3,10 @@ using Moderato.Results;
 
 if (args.Length != 3 || !int.TryParse(args[1], out var depth) || depth < 0
     || args[2] is not ("sync" or "pending")
-    || args[0] is not ("map" or "bind" or "recursive-bind" or "provide" or "query" or "recover" or "conversions" or "resource"))
+    || args[0] is not ("map" or "bind" or "recursive-bind" or "provide" or "query" or "recover" or "conversions"
+        or "resource" or "resource-map" or "resource-query" or "recursive-resource" or "resource-conversions" or "scope"))
 {
-    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|query|recover|conversions|resource> <nonnegative-depth> <sync|pending>");
+    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|query|recover|conversions|resource|resource-map|resource-query|recursive-resource|resource-conversions|scope> <nonnegative-depth> <sync|pending>");
     return 2;
 }
 
@@ -61,13 +62,45 @@ switch (args[0])
         }
         break;
     case "resource":
+    case "resource-map":
+    case "resource-query":
+    case "recursive-resource":
+    case "resource-conversions":
+    case "scope":
         var resource = Make(source.Map(static value => new Lease(value, value, 0)));
-        for (var i = 1; i <= depth; i++)
+        if (args[0] == "recursive-resource")
         {
-            var index = i;
-            resource = resource.AndThen(value => Make(Effect<int>.Succeed(new Lease(value.Origin, value.Value + 1, index))));
+            resource = Recurse(source.Map(static value => new Lease(value, value, 0)), depth);
         }
-        effect = resource.Use(static value => Effect<int>.Succeed(value.Value));
+        else
+        {
+            for (var i = 1; i <= depth; i++)
+            {
+                var index = i;
+                switch (args[0])
+                {
+                    case "resource-map":
+                        resource = resource.Map(static value => value with { Value = value.Value + 1 });
+                        break;
+                    case "resource-conversions":
+                        Resource<Lease, string, int> widened = resource;
+                        resource = widened.MapErr<Never>(static _ => throw new InvalidOperationException("An error cannot inhabit Never."))
+                            .Map(static value => value with { Value = value.Value + 1 });
+                        break;
+                    case "resource-query":
+                        resource = from firstValue in resource
+                                   from secondValue in Make(Effect<int>.Succeed(new Lease(firstValue.Origin, firstValue.Value + 1, index)))
+                                   select secondValue;
+                        break;
+                    default:
+                        resource = resource.AndThen(value => Make(Effect<int>.Succeed(new Lease(value.Origin, value.Value + 1, index))));
+                        break;
+                }
+            }
+        }
+        effect = args[0] == "scope"
+            ? Scope<Never, int>.Gen(async scope => (await scope.Acquire(resource)).Value)
+            : resource.Use(static value => Effect<int>.Succeed(value.Value));
         break;
 }
 
@@ -89,9 +122,10 @@ if (firstResult != Result.Ok(3 + depth) || secondResult != Result.Ok(7 + depth)
 {
     throw new InvalidOperationException("A run lost its value, environment, or lazy source evaluation.");
 }
-if (args[0] == "resource")
+if (args[0].Contains("resource", StringComparison.Ordinal) || args[0] == "scope")
 {
-    var expected = Enumerable.Range(0, depth + 1).Reverse().ToArray();
+    var count = args[0] is "resource-map" or "resource-conversions" ? 1 : depth + 1;
+    var expected = Enumerable.Range(0, count).Reverse().ToArray();
     if (releases.Count != 3 || new[] { 3, 7, 11 }.Any(origin => !releases[origin].SequenceEqual(expected)))
         throw new InvalidOperationException("Resources were not released exactly once in reverse acquisition order.");
 }
@@ -108,6 +142,10 @@ Resource<Lease, Never, int> Make(Effect<Lease, Never, int> acquire)
         }
         return Unit.Value;
     }));
+
+Resource<Lease, Never, int> Recurse(Effect<Lease, Never, int> acquire, int remaining)
+    => remaining == 0 ? Make(acquire) : Make(acquire).AndThen(value =>
+        Recurse(Effect<int>.Succeed(new Lease(value.Origin, value.Value + 1, value.Index + 1)), remaining - 1));
 
 static Effect<int, Never, int> Continue(int value, int remaining)
     => remaining == 0 ? Effect<int>.Succeed(value)

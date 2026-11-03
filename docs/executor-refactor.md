@@ -1,6 +1,6 @@
 # 実行器の移行（Issue #267）
 
-2026-11-03、D1 のデリゲート連鎖から反復実行器へ移行する方針が承認された。この文書は、置換前の観測と受け入れ条件、および E1 の実装を記録する。Effect の合成を置換し、Resource の合成の置換は E2 に残る。
+2026-11-03、D1 のデリゲート連鎖から反復実行器へ移行する方針が承認された。この文書は、置換前の観測と受け入れ条件、および E1・E2 の実装を記録する。Effect と Resource の合成を共通の実行器で進める。
 
 ## 範囲
 
@@ -60,7 +60,7 @@ dotnet tests/Moderato.Effects.StackSafetyProbe/bin/Release/net11.0/Moderato.Effe
 dotnet tests/Moderato.Effects.StackSafetyProbe/bin/Release/net11.0/Moderato.Effects.StackSafetyProbe.dll map 100000 sync
 ```
 
-引数は `<map|bind|recursive-bind|provide|query|recover|conversions|resource> <深さ> <sync|pending>`。`map` は1段ごとに int → 値型 → int の2回の Map を行う。`recursive-bind` は binder が次の合成を返す右側の再帰、`recover` は OrElse による動的な回復、`query` は LINQ、`conversions` は遅延された Never 変換を調べる。全ケースで異なる環境の2実行と再実行の結果・評価回数を確認し、Resource では実行ごとの逆順解放も確認する。pending はゲートを開く前に2実行が両方中断したことを確認する。
+引数は `<操作> <深さ> <sync|pending>`。操作は `map` / `bind` / `recursive-bind` / `provide` / `query` / `recover` / `conversions` / `resource` / `resource-map` / `resource-query` / `recursive-resource` / `resource-conversions` / `scope`。`map` は1段ごとに int → 値型 → int の2回の Map を行う。`recursive-bind` は binder が次の合成を返す右側の再帰、`recover` は OrElse による動的な回復、`query` は LINQ、`conversions` は遅延された Never 変換を調べる。Resource の各操作も対応する合成を調べ、`scope` は深い Resource を Gen で取得する。全ケースで異なる環境の2実行と再実行の結果・評価回数を確認し、Resource では実行ごとの逆順解放も確認する。pending はゲートを開く前に2実行が両方中断したことを確認する。
 
 2026-11-03、Linux x64 / .NET SDK 11.0.100-rc.2.26504.105、置換前の本体 `2d7eb52` での結果：
 
@@ -104,3 +104,30 @@ Resource の取得・合成は従来の再帰実装のままなので、Issue #2
 NativeAOT は、本体と Moderato.Results のビルド済み DLL を参照する独立した consumer で、同じプローブソースをネイティブ化した。Effect の10万段の全14経路が成功した。Source Generator の netstandard2.0 プロジェクトへ PublishAot をグローバル指定する直接 publish は SDK エラーになるため、この検証には使わない。パッケージ経由の検証は通常の CI の package job で別途行う。
 
 BenchmarkDotNet Dry の全246ケースには結果が得られ、実行不能なケースはなかった。Dry は動作確認であり、性能比較には使わない。詳細な性能・保持メモリの評価と、深いプローブの CI 必須化は E3 に残す。
+
+## E2 の実装
+
+Resource の取得を `Effect<T, E, ResourceEnvironment<R>>` として表現し、E1 の実行器へ接続した。ResourceEnvironment は既存の環境と解放先を内部で束ねる型で、公開の R と必要なサービスは変わらない。ResourceAcquisition がその記述と元の3引数の取得デリゲートをつなぐため、Resource 自体の1フィールドの表現は維持する。Fiber の取得など、既存のデリゲート経路も内部で接続できる。
+
+Map・MapErr・Never 変換は ThenInstruction、AndThen・LINQ は BindInstruction を使う。Make は取得成功の直後に元の値と解放関数を登録する。Use・Scope.Acquire・Releases の解放ループと失敗集約の規則は変更しない。
+
+### 同期完了時にも必要な隔離
+
+Resource の AndThen・LINQ は、従来から無条件の async メソッドだった。Effect の通常の Bind と同じ条件付きの隔離に変えると、同期の取得や binder が変更した AsyncLocal と SynchronizationContext が外へ漏れる。
+
+そのため、Resource の Bind には内部の隔離モードを使う。直接経路は元と同じ1つの async メソッドで取得・次の取得・射影を進める。反復経路は IsolatedFrame が入口の文脈を保存し、同期完了時、または最初の中断を外側へ返す前に復元する。後者では、外側の await が復元後の文脈を捕捉するよう、実行器の待機者の走査を更新する。すでに再開した区間の巻き戻しは E1 の処理を使う。
+
+元の Resource の規則に合わせ、次の取得の同期例外・完了済みの失敗タスク・実際の待機後の例外をすべて Outcome に変え、先の取得の文脈を引き継ぐ。通常の Effect の Bind の規則は変えない。
+
+### E2 の検証範囲
+
+- 10万段の Resource.AndThen、Map、LINQ、動的に返す Resource、Never 変換、Gen での取得が、同期・中断ありの両方で成功した。Effect の既存14経路と合わせ、JIT・NativeAOT の全26経路を確認する。
+- 取得途中の Err・Die・Interrupted、Timeout による中断、default の子、256バイトの射影値、解放が複数回失敗する場合を検証する。取得済みの値は逆順に一度ずつ、キャンセル不能なトークンと確定済みの ExitCase で解放する。
+- 直接経路と、Resource の内側を反復経路へ移した実行を比較する。1回目・2回目の取得の同期／非同期、flow suppression の全組み合わせで、binder・mapper・利用本体・解放の文脈を比べる。
+- 深い Resource を Gen・Timeout・All・Race・Fork から実行し、Gen → Fork → Join を Timeout で囲む形も確認する。Race で開始前に中断された敗者の取得数は固定せず、実際の取得と解放を照合する。
+
+この境界検証は、Gen や Timeout のラッパー自体を10万段にするなど、すべての制御操作の任意深さの入れ子を保証するものではない。利用者が callback 内で直接行う C# の再帰も変換しない。
+
+### 残る作業
+
+E3 では深いプローブを CI で必須にし、性能・保持メモリを評価する。E1 で記録した直接 Bind の速度低下（Issue #307）に加え、ResourceAcquisition と命令の構築コストも測る。深いフレームは実行ごとに割り当てられ、浅い経路で割り当てを維持したことを全経路のゼロアロケーションとはみなさない。Q13 の Interrupted を返す解放の方針、Q14 の union の範囲はこの段階では変更していない。

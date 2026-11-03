@@ -45,8 +45,8 @@ public readonly partial struct Effect<T, E, R>
 
     internal Effect<V, G, R> Bind<U, F, V, G, TState>(TState state,
         Func<Outcome<T, E>, TState, EffectSelection<U, F, V, G, R>> select,
-        Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project)
-        => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project));
+        Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project, bool isolate = false)
+        => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project, isolate));
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
