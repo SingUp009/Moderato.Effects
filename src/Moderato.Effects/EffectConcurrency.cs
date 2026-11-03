@@ -10,7 +10,7 @@ public static partial class Effect
     private const string CONCURRENCY_JUSTIFICATION = "Overloads differ by arity; concurrency defaults to Sequential so services that are not thread-safe stay safe.";
 
     /// <summary>Runs the effects and collects their values; the first failure cancels the rest and is the outcome unless an independent defect outranks it.</summary>
-    /// <param name="effects">The effects.</param>
+    /// <param name="effects">The descriptions, copied and validated when the group is built; execution remains deferred.</param>
     /// <param name="concurrency">How they run; sequential by default, which keeps non-thread-safe services safe.</param>
     /// <returns>An effect whose value holds every value, in input order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
@@ -118,7 +118,7 @@ public static partial class Effect
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4), Box(effect5), Box(effect6), Box(effect7), Box(effect8)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!, (T5)values[4]!, (T6)values[5]!, (T7)values[6]!, (T8)values[7]!));
 
     /// <summary>Runs every effect to the end and collects how each ended, an Err made from the caller's cancellation included.</summary>
-    /// <param name="effects">The effects.</param>
+    /// <param name="effects">The descriptions, copied and validated when the group is built; execution remains deferred.</param>
     /// <param name="concurrency">How they run; sequential by default.</param>
     /// <returns>An effect whose value holds each effect's exit, in input order.</returns>
     public static Effect<Exit<T, E>[], Never, R> AllSettled<T, E, R>(IEnumerable<Effect<T, E, R>> effects, Concurrency concurrency = default)
@@ -134,7 +134,7 @@ public static partial class Effect
     }
 
     /// <summary>Runs every effect and collects all errors, as validation needs; a defect still cancels the rest.</summary>
-    /// <param name="effects">The effects.</param>
+    /// <param name="effects">The descriptions, copied and validated when the group is built; execution remains deferred.</param>
     /// <param name="concurrency">How they run; sequential by default.</param>
     /// <returns>Every value, or every error, in input order.</returns>
     public static Effect<T[], E[], R> AllErrors<T, E, R>(IEnumerable<Effect<T, E, R>> effects, Concurrency concurrency = default)
