@@ -5,11 +5,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Breaking changes
+
+- A zero `Timeout` or `TimeoutResult` now expires without starting its body, including constant effects. An already canceled caller still gets `Interrupted`. Use a positive or infinite timeout when the body must run.
+
+- Reject overlapping union case types with MEFF008 instead of generating conversions whose patterns cannot distinguish the alternatives. This includes interface pairs that could share an implementation. Wrap alternatives in distinct records.
+
+- Bound union generation and Catch analysis to 4,096 case-path segments and 256 nodes per type expression. Exceeding either limit reports MEFF007 and emits no code for that generator target, including for finite shapes. Simplify the shape or implement the required interfaces manually.
+
 ### Changed
 
 - Share bounded failure-context operations across outcomes, scopes, concurrency, cancellation, fibers and timeouts, and use one continuation implementation for effect operators.
 
+- Execute core operator composition iteratively, preserving execution-context boundaries and concurrent reuse. Arbitrarily deep nesting of control wrappers such as Gen, Retry and Timeout remains unsupported.
+
+- Document the domain and observations under which effect composition laws hold, including the distinction between explicit environments and ambient AsyncLocal state.
+
+- Clarify that standard AsTask and Preserve adapters consume a scope step when their source GetResult runs. A defect transferred before the body snapshot belongs to the returned Task; callers must await it. The default MEFF310 severity remains Warning.
+
+- Clarify the different interruption contracts of AllErrors and AllSettled, including child interruption without caller cancellation.
+
 ### Fixed
+
+- Treat an interrupted release as `Die(InvalidOperationException)`, run every remaining release, and aggregate failures using the existing priority rules.
+
+- Treat types implementing only IUnion as opaque cases; only actual C# unions are explored for transitive cases.
+
+- Project timeout results after inner execution and cleanup finish, restoring finite nested timeouts that previously overflowed the stack.
 
 - Detect reference cycles when unwrapping hand-written error unions, preserving the unreadable error as context and allowing releases to run.
 
@@ -56,6 +78,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Accept environment classes whose sole primary constructor parameter has the class's own type.
 
 - Preserve Interrupted when a Gen block rethrows an earlier interruption after catching later interrupted steps.
+
+### Tests
+
+- Require deep core-composition and control-wrapper probes under JIT and packed Native AOT in CI.
+
+- Exercise zero deadlines, interrupted Gen and Resource releases, and defects consumed after the body snapshot through the packed application under JIT and Native AOT.
 
 ## [0.1.0-preview.2] - 2026-11-02
 
