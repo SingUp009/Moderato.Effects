@@ -56,12 +56,8 @@ public sealed class RestOfGenerator : IIncrementalGenerator
         // F16: only a direct case of the source can be left out.
         if (!graph.TryReachable(type, out var held))
             return Failed(graph.Failure(location, type.Name));
-        var sourceCases = Shapes.Cases(source);
-        foreach (var @case in sourceCases)
-        {
-            if (!graph.Inspect(@case))
-                return Failed(graph.Failure(location, type.Name));
-        }
+        if (!graph.TryCases(source, out var sourceCases))
+            return Failed(graph.Failure(location, type.Name));
         var missing = sourceCases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
         if (missing.Count != 1)
         {

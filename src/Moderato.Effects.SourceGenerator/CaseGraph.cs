@@ -23,9 +23,14 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
             ? DiagnosticInfo.Create(Diagnostics.OverlappingCases, location, cases)
             : DiagnosticInfo.Create(Diagnostics.CaseGraphTooComplex, location, target, Limit);
 
-    internal bool InspectCase(INamedTypeSymbol union, ImmutableArray<ITypeSymbol> cases, int index, int pathLength = 1)
+    internal bool TryCases(INamedTypeSymbol union, out ImmutableArray<ITypeSymbol> cases, int pathLength = 1)
     {
-        return Inspect(cases[index], pathLength) && CheckOverlap(union, cases, index);
+        cases = Shapes.Cases(union);
+        foreach (var type in cases)
+            if (!Inspect(type, pathLength)) return false;
+        if (Shapes.MemberProvider(union) is not null)
+            cases = [.. cases.GroupBy(Identity).Select(static group => group.FirstOrDefault(Shapes.AdmitsNull) ?? group.First())];
+        return true;
     }
 
     internal bool CheckOverlap(INamedTypeSymbol union, ImmutableArray<ITypeSymbol> cases, int index)
@@ -163,9 +168,10 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
     {
         found = new Dictionary<string, List<CasePath>>(StringComparer.Ordinal);
         if (!CheckTypeShape(union)) return false;
+        if (!TryCases(union, out var initial)) return false;
         var onPath = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { union };
         var pending = new Stack<Frame>();
-        pending.Push(new Frame(union, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
+        pending.Push(new Frame(union, initial, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -179,7 +185,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
 
             var index = frame.Index++;
             var @case = frame.Cases[index];
-            if (!InspectCase(frame.Type, frame.Cases, index, frame.Path.Length + 1))
+            if (!CheckOverlap(frame.Type, frame.Cases, index))
             {
                 found.Clear();
                 return false;
@@ -191,18 +197,21 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
             var key = Identity(@case);
             if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
             var hidden = frame.FileLocal ?? Shapes.FileLocalReference(@case)?.Name;
-            paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && AdmitsNull(@case), hidden));
+            paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && Shapes.AdmitsNull(@case), hidden));
 
             if (@case is INamedTypeSymbol nested && Shapes.IsUnion(nested) && onPath.Add(nested))
-                pending.Push(new Frame(nested, steps, patterns, hidden));
+            {
+                if (!TryCases(nested, out var nestedCases, steps.Length + 1))
+                {
+                    found.Clear();
+                    return false;
+                }
+                pending.Push(new Frame(nested, nestedCases, steps, patterns, hidden));
+            }
         }
 
         return true;
     }
-
-    private static bool AdmitsNull(ITypeSymbol type)
-        => type.NullableAnnotation == NullableAnnotation.Annotated
-            || type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
 
     private sealed class Frame
     {
@@ -214,14 +223,14 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
         internal bool SingleNullable { get; }
         internal int Index { get; set; }
 
-        internal Frame(INamedTypeSymbol type, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal)
+        internal Frame(INamedTypeSymbol type, ImmutableArray<ITypeSymbol> cases, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal)
         {
             Type = type;
-            Cases = Shapes.Cases(type);
+            Cases = cases;
             Path = path;
             Patterns = patterns;
             FileLocal = fileLocal;
-            SingleNullable = Cases.Count(AdmitsNull) == 1;
+            SingleNullable = Cases.Count(Shapes.AdmitsNull) == 1;
         }
     }
 }
