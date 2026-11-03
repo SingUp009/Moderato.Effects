@@ -72,10 +72,14 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var cases = Shapes.Cases(sourceUnion);
+        if (!graph.TryCases(sourceUnion, out var cases))
+        {
+            context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
+            return;
+        }
         for (var index = 0; index < cases.Length; index++)
         {
-            if (graph.InspectCase(sourceUnion, cases, index)) continue;
+            if (graph.CheckOverlap(sourceUnion, cases, index)) continue;
             context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
             return;
         }
