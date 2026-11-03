@@ -180,7 +180,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
         if (!TryCases(union, out var initial)) return false;
         var onPath = new HashSet<string>(StringComparer.Ordinal) { Identity(union) };
         var pending = new Stack<Frame>();
-        pending.Push(new Frame(union, initial, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null));
+        pending.Push(new Frame(union, initial, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty, null, null));
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -206,7 +206,8 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
             var key = Identity(@case);
             if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
             var hidden = frame.FileLocal ?? Shapes.FileLocalReference(@case)?.Name;
-            paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && Shapes.AdmitsNull(@case), hidden));
+            var globalNameFailure = frame.GlobalNameFailure ?? Shapes.GlobalNameFailure(@case, compilation);
+            paths.Add(new CasePath(steps.ToEquatableArray(), patterns.ToEquatableArray(), frame.SingleNullable && Shapes.AdmitsNull(@case), hidden, globalNameFailure));
 
             if (@case is INamedTypeSymbol nested && Shapes.IsUnion(nested) && onPath.Add(Identity(nested)))
             {
@@ -215,7 +216,7 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
                     found.Clear();
                     return false;
                 }
-                pending.Push(new Frame(nested, nestedCases, steps, patterns, hidden));
+                pending.Push(new Frame(nested, nestedCases, steps, patterns, hidden, globalNameFailure));
             }
         }
 
@@ -229,16 +230,18 @@ internal sealed class CaseGraph(Compilation compilation, CancellationToken cance
         internal ImmutableArray<string> Path { get; }
         internal ImmutableArray<string> Patterns { get; }
         internal string? FileLocal { get; }
+        internal string? GlobalNameFailure { get; }
         internal bool SingleNullable { get; }
         internal int Index { get; set; }
 
-        internal Frame(INamedTypeSymbol type, ImmutableArray<ITypeSymbol> cases, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal)
+        internal Frame(INamedTypeSymbol type, ImmutableArray<ITypeSymbol> cases, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal, string? globalNameFailure)
         {
             Type = type;
             Cases = cases;
             Path = path;
             Patterns = patterns;
             FileLocal = fileLocal;
+            GlobalNameFailure = globalNameFailure;
             SingleNullable = Cases.Count(Shapes.AdmitsNull) == 1;
         }
     }

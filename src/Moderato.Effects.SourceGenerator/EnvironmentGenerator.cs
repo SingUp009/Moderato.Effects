@@ -67,6 +67,12 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
                     continue;
                 }
 
+                if (Shapes.GlobalNameFailure(serviceType, compilation) is { } globalNameFailure)
+                {
+                    diagnostics.Add(DiagnosticInfo.Create(Diagnostics.GlobalNameNotAvailable, parameterLocation, "Environment", globalNameFailure));
+                    continue;
+                }
+
                 var name = Shapes.Name(serviceType);
                 var key = Shapes.Identity(serviceType);
                 if (providers.TryGetValue(key, out var first))

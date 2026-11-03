@@ -36,9 +36,9 @@ public static class Compiler
         global using Moderato.Results;
         """;
 
-    public static Build Build(string source, string? referencedSource = null)
+    public static Build Build(string source, string? referencedSource = null, ImmutableArray<MetadataReference> additionalReferences = default)
     {
-        var buildReferences = references;
+        var buildReferences = additionalReferences.IsDefaultOrEmpty ? references : references.AddRange(additionalReferences);
         if (referencedSource is not null)
         {
             var dependency = CSharpCompilation.Create("UserDependency",
