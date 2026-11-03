@@ -164,6 +164,134 @@ public class EffectExecutorTests
     }
 
     [Theory]
+    [InlineData(0, false, 0)]
+    [InlineData(0, true, 0)]
+    [InlineData(100, false, 0)]
+    [InlineData(100, true, 0)]
+    [InlineData(0, false, 128)]
+    [InlineData(0, true, 128)]
+    [InlineData(100, false, 128)]
+    [InlineData(100, true, 128)]
+    public async Task AndThen_BinderThrowsAcrossExecutionPaths_KeepsEarlierContext(int count, bool pending, int padding)
+    {
+        // Given
+        var context = Enumerable.Range(0, count).Select(value => new Suppressed(new Failed(value), Relation.Parallel)).ToArray();
+        var original = Outcome<int, string>.Ok(42).WithSuppressed([.. context], 7);
+        var defect = new IOException("binder");
+        var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(original));
+        var calls = 0;
+        var effect = source.AndThen<long>(value =>
+        {
+            calls++;
+            Assert.Equal(42, value);
+            throw defect;
+        });
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+        Assert.Equal(0, calls);
+
+        // When
+        var running = effect.RunExitAsync(CancellationToken.None);
+        var completed = running.IsCompleted;
+        gate.SetResult(original);
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(!pending, completed);
+        var die = Assert.IsType<Die>(exit.Value);
+        Assert.Same(defect, die.Exception);
+        Assert.Equal(context, die.Suppressed);
+        Assert.Equal(7, die.OmittedSuppressed);
+        Assert.Equal(1, calls);
+    }
+
+    [Theory]
+    [InlineData(0, false, 0)]
+    [InlineData(0, true, 0)]
+    [InlineData(100, false, 0)]
+    [InlineData(100, true, 0)]
+    [InlineData(0, false, 128)]
+    [InlineData(0, true, 128)]
+    [InlineData(100, false, 128)]
+    [InlineData(100, true, 128)]
+    public async Task OrElse_HandlerThrowsAcrossExecutionPaths_KeepsReplacedErrorBeforeContext(int count, bool pending, int padding)
+    {
+        // Given
+        var context = Enumerable.Range(0, count).Select(value => new Suppressed(new Failed(value), Relation.Parallel)).ToArray();
+        var original = Outcome<int, string>.Err("original").WithSuppressed([.. context], 7);
+        var defect = new IOException("recovery");
+        var gate = new TaskCompletionSource<Outcome<int, string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = new Effect<int, string, EmptyEnvironment>((_, _) => pending ? new(gate.Task) : new(original));
+        var calls = 0;
+        var effect = source.OrElse<int>(error =>
+        {
+            calls++;
+            Assert.Equal("original", error);
+            throw defect;
+        });
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+        Assert.Equal(0, calls);
+
+        // When
+        var running = effect.RunExitAsync(CancellationToken.None);
+        var completed = running.IsCompleted;
+        gate.SetResult(original);
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(!pending, completed);
+        var die = Assert.IsType<Die>(exit.Value);
+        Assert.Same(defect, die.Exception);
+        Assert.Equal(new Suppressed(new Failed("original"), Relation.Sequential), die.Suppressed[0]);
+        Assert.Equal(context.Take(99), die.Suppressed.Skip(1));
+        Assert.Equal(7 + Math.Max(0, count + 1 - 100), die.OmittedSuppressed);
+        Assert.Equal(1, calls);
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 128)]
+    public async Task Provide_BuilderThrowsAcrossExecutionPaths_DiesWithoutRunningInnerSource(bool pending, int padding)
+    {
+        // Given
+        var gate = new TaskCompletionSource<Outcome<int, Never>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var upstream = new Effect<int, Never, string>((_, _) => pending ? new(gate.Task) : new(Outcome<int, Never>.Ok(1)));
+        var defect = new IOException("environment builder");
+        var sourceCalls = 0;
+        var buildCalls = 0;
+        string? outer = null;
+        var source = Effect<int>.Access(environment => { sourceCalls++; return environment; });
+        var provided = source.Provide<string>(environment =>
+        {
+            buildCalls++;
+            outer = environment;
+            throw defect;
+        });
+        var effect = upstream.AndThen(_ => provided);
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+        Assert.Equal(0, buildCalls);
+        Assert.Equal(0, sourceCalls);
+
+        // When
+        var running = effect.RunExitAsync("outer", CancellationToken.None);
+        var completed = running.IsCompleted;
+        gate.SetResult(Outcome<int, Never>.Ok(1));
+        var exit = await running.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(!pending, completed);
+        var die = Assert.IsType<Die>(exit.Value);
+        Assert.Same(defect, die.Exception);
+        Assert.Empty(die.Suppressed);
+        Assert.Equal(0, die.OmittedSuppressed);
+        Assert.Equal("outer", outer);
+        Assert.Equal(1, buildCalls);
+        Assert.Equal(0, sourceCalls);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Map_PendingCallbackChangesSynchronizationContext_MatchesTheDirectPath(bool suppressFlow)
