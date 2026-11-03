@@ -35,7 +35,7 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
     {
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsPartial(node)) return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialType, location, type.Name));
-        if (Shapes.Unsupported("Environment", type, location) is { } unsupported) return Failed(unsupported);
+        if (Shapes.Unsupported("Environment", type, location, compilation) is { } unsupported) return Failed(unsupported);
 
         var primary = PrimaryConstructor(type);
         if (primary is null) return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPrimaryConstructor, location, type.Name));
