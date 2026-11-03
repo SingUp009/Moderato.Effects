@@ -91,6 +91,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Tests
 
+- Keep law-test description construction pure and check pure environment-conversion identity/composition across synchronous/pending completion and direct/iterative execution, separately from builder-order recording.
+
 - Check throwing binders, recovery handlers and environment builders across direct/iterative execution and synchronous/pending completion, including retained failure context and skipped inner execution.
 
 - Check pure error-map identity/composition and independent success/error-map commutation across four outcomes, synchronous/pending completion and shallow/iterative execution with padding outside each compared expression, including retained failure context and error-mapper evaluation order/count.

@@ -78,11 +78,22 @@ public class CompositionLawsTests
     public async Task AndThen_TotalBinders_AssociatesPublicExit(string kind)
     {
         // Given
-        // Observation: public Exit and binder order, for valid effects and nonthrowing binders.
+        // Observation: public Exit and executed-step order, with pure description construction.
         var trace = new List<int>();
         var source = From(ResultOf(kind is "middleErr" or "lastErr" ? "ok" : kind, 5, new IOException("source")));
-        Effect<int, string, EmptyEnvironment> F(int value) { trace.Add(value); return kind == "middleErr" ? Effect<EmptyEnvironment>.Fail("middle") : Effect<EmptyEnvironment>.Succeed(value * 2); }
-        Effect<int, string, EmptyEnvironment> G(int value) { trace.Add(value); return kind == "lastErr" ? Effect<EmptyEnvironment>.Fail("last") : Effect<EmptyEnvironment>.Succeed(value + 3); }
+        Effect<int, string, EmptyEnvironment> F(int value) => new((_, _) =>
+        {
+            trace.Add(value);
+            return new(kind == "middleErr" ? Outcome<int, string>.Err("middle") : Outcome<int, string>.Ok(value * 2));
+        });
+        Effect<int, string, EmptyEnvironment> G(int value) => new((_, _) =>
+        {
+            trace.Add(value);
+            return new(kind == "lastErr" ? Outcome<int, string>.Err("last") : Outcome<int, string>.Ok(value + 3));
+        });
+        _ = F(5);
+        _ = G(10);
+        Assert.Empty(trace);
 
         // When
         var left = await source.AndThen(F).AndThen(G).RunExitAsync(CancellationToken.None);
@@ -398,21 +409,24 @@ public class CompositionLawsTests
     public async Task OrElse_TotalRecovery_AssociatesPublicExitAndRecoveryOrder(bool dies)
     {
         // Given
-        // Observation: recovered context is consumed; observe public Exit and the order of recovery calls.
+        // Observation: recovered context is consumed; observe public Exit and recovery execution order.
         var defect = new IOException("recovery");
         var trace = new List<string>();
         var source = From(Outcome<int, string>.Err("a").WithSuppressed(Context("source", 1), 0));
-        Effect<int, string, EmptyEnvironment> F(string error)
+        Effect<int, string, EmptyEnvironment> F(string error) => new((_, _) =>
         {
             trace.Add(error);
-            return From(Outcome<int, string>.Err(error + "b").WithSuppressed(Context("middle", 1), 0));
-        }
-        Effect<int, string, EmptyEnvironment> G(string error)
+            return new(Outcome<int, string>.Err(error + "b").WithSuppressed(Context("middle", 1), 0));
+        });
+        Effect<int, string, EmptyEnvironment> G(string error) => new((_, _) =>
         {
             trace.Add(error);
-            return From((dies ? Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(defect)) : Outcome<int, string>.Ok(error.Length))
+            return new((dies ? Outcome<int, string>.Die(ExceptionDispatchInfo.Capture(defect)) : Outcome<int, string>.Ok(error.Length))
                 .WithSuppressed(Context("last", 1), 0));
-        }
+        });
+        _ = F("a");
+        _ = G("ab");
+        Assert.Empty(trace);
 
         // When
         var left = await source.OrElse(F).OrElse(G).RunExitAsync(CancellationToken.None);
@@ -435,35 +449,68 @@ public class CompositionLawsTests
         }
     }
 
-    [Fact]
-    public async Task Provide_TotalEnvironmentBuilders_ObeysContravariantIdentityAndComposition()
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 128)]
+    public async Task Provide_PureEnvironmentBuilders_ObeysContravariantIdentityAndComposition(bool pending, int padding)
     {
         // Given
-        // Observation: public Exit and environment-builder order, with total builders.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var source = Effect<int>.AccessAsync<int>(async (value, _) =>
+        {
+            if (pending) await gate.Task.ConfigureAwait(false);
+            return value * 2;
+        });
+        static int F(string value) => value.Length;
+        static string G(string[] values) => string.Concat(values);
+        var original = Pad(source, padding);
+        var identity = Pad(source.Provide<int>(static value => value), padding);
+        var sequential = Pad(source.Provide<string>(F).Provide<string[]>(G), padding);
+        var composed = Pad(source.Provide<string[]>(static values => F(G(values))), padding);
+
+        // When
+        var originalRun = original.RunExitAsync(3, CancellationToken.None);
+        var identityRun = identity.RunExitAsync(3, CancellationToken.None);
+        var sequentialRun = sequential.RunExitAsync(["ab", "c"], CancellationToken.None);
+        var composedRun = composed.RunExitAsync(["ab", "c"], CancellationToken.None);
+        bool[] completed = [originalRun.IsCompleted, identityRun.IsCompleted, sequentialRun.IsCompleted, composedRun.IsCompleted];
+        gate.SetResult();
+        var exits = await Task.WhenAll(originalRun.AsTask(), identityRun.AsTask(), sequentialRun.AsTask(), composedRun.AsTask())
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.All(completed, value => Assert.Equal(!pending, value));
+        Assert.Equal(exits[0], exits[1]);
+        Assert.Equal(exits[2], exits[3]);
+        Assert.All(exits, exit => Assert.Equal<Exit<int, Never>>(new Ok<int>(6), exit));
+    }
+
+    [Fact]
+    public async Task Provide_RecordingEnvironmentBuilders_PreservesTransformationOrder()
+    {
+        // Given
+        // This spy checks evaluation order separately from the pure-builder law cases.
         var trace = new List<string>();
         var source = Effect<int>.Access(value => { trace.Add("run"); return value * 2; });
         int F(string value) { trace.Add("f"); return value.Length; }
         string G(string[] values) { trace.Add("g"); return string.Concat(values); }
 
         // When
-        var original = await source.RunExitAsync(3, CancellationToken.None);
-        var identity = await source.Provide<int>(static value => value).RunExitAsync(3, CancellationToken.None);
-        trace.Clear();
         var sequential = await source.Provide<string>(F).Provide<string[]>(G).RunExitAsync(["ab", "c"], CancellationToken.None);
         var sequentialTrace = trace.ToArray();
         trace.Clear();
         var composed = await source.Provide<string[]>(values => F(G(values))).RunExitAsync(["ab", "c"], CancellationToken.None);
 
         // Then
-        Assert.Equal(original, identity);
-        Assert.Equal<Exit<int, Never>>(new Ok<int>(6), identity);
         Assert.Equal(sequential, composed);
         Assert.Equal<Exit<int, Never>>(new Ok<int>(6), composed);
         Assert.Equal(new[] { "g", "f", "run" }, sequentialTrace);
         Assert.Equal(sequentialTrace, trace);
     }
 
-    private static Effect<T, E, EmptyEnvironment> Pad<T, E>(Effect<T, E, EmptyEnvironment> effect, int count)
+    private static Effect<T, E, R> Pad<T, E, R>(Effect<T, E, R> effect, int count)
     {
         for (var i = 0; i < count; i++) effect = effect.Map(static value => value);
         return effect;
