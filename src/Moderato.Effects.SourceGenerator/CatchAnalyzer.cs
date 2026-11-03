@@ -40,24 +40,29 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (model.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol method
-            && !SymbolEqualityComparer.Default.Equals(method.ContainingType.OriginalDefinition, effect.OriginalDefinition))
+        if (model.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol)
         {
             return;
         }
 
         var source = effect.TypeArguments[1];
+        var location = name.TypeArgumentList.Arguments[1].GetLocation();
+        var graph = new CaseGraph(model.Compilation, context.CancellationToken);
         if (rest.AllInterfaces.Any(i => i.OriginalDefinition.ToDisplayString() == "Moderato.Effects.IUnionRest<TSelf, TSource, TCase>"
-            && SymbolEqualityComparer.Default.Equals(i.TypeArguments[1], source)
-            && Shapes.Identity(i.TypeArguments[2]) == Shapes.Identity(caught)))
+            && SameType(i.TypeArguments[1], source)
+            && SameType(i.TypeArguments[2], caught)))
         {
             return;
         }
 
-        var location = name.TypeArgumentList.Arguments[1].GetLocation();
         var declared = rest.GetAttributes().Any(a => a.AttributeClass is { IsGenericType: true } c
             && c.ConstructedFrom.ToDisplayString() == "Moderato.Effects.RestOfAttribute<E>"
-            && SymbolEqualityComparer.Default.Equals(c.TypeArguments[0], source));
+            && SameType(c.TypeArguments[0], source));
+        if (graph.Limit.Length != 0)
+        {
+            context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
+            return;
+        }
         if (!declared)
         {
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.NotRestOf, location, rest.Name, source.Name));
@@ -65,7 +70,6 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         }
 
         if (source is not INamedTypeSymbol sourceUnion) return;
-        var graph = new CaseGraph(model.Compilation, context.CancellationToken);
         if (!graph.CheckTypeShape(sourceUnion) || !graph.TryReachable(rest, out var held))
         {
             context.ReportDiagnostic(graph.Failure(location, rest.Name).ToDiagnostic());
@@ -85,7 +89,15 @@ public sealed class CatchAnalyzer : DiagnosticAnalyzer
         }
 
         var leftOut = cases.Where(c => !held.ContainsKey(Shapes.Identity(c))).ToList();
-        if (leftOut.Count == 1)
-            context.ReportDiagnostic(Diagnostic.Create(Diagnostics.RestLeavesOutAnother, location, rest.Name, leftOut[0].Name, caught.Name));
+        if (leftOut.Count == 1 && !SameType(leftOut[0], caught))
+        {
+            context.ReportDiagnostic(graph.Limit.Length != 0
+                ? graph.Failure(location, rest.Name).ToDiagnostic()
+                : Diagnostic.Create(Diagnostics.RestLeavesOutAnother, location, rest.Name, leftOut[0].Name, caught.Name));
+        }
+
+        bool SameType(ITypeSymbol first, ITypeSymbol second)
+            => graph.CheckTypeShape(first) && graph.CheckTypeShape(second)
+                && ((CSharpCompilation)model.Compilation).ClassifyConversion(first, second).IsIdentity;
     }
 }
