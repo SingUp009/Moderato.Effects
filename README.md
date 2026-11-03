@@ -1,6 +1,6 @@
 # Moderato.Effects
 
-Zero Allocation Effect System for C#
+Effect System for C#
 
 ```csharp
 // async / await
@@ -64,6 +64,7 @@ dotnet add package Moderato.Effects --prerelease
 The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderato.Effects/wiki):
 
 - [Getting started](https://github.com/SingUp009/Moderato.Effects/wiki/Getting-started)
+- [Adopting in an application](https://github.com/SingUp009/Moderato.Effects/wiki/Adopting-in-an-application)
 - [Gen blocks](https://github.com/SingUp009/Moderato.Effects/wiki/Gen-blocks)
 - [Operators](https://github.com/SingUp009/Moderato.Effects/wiki/Operators)
 - [Error unions](https://github.com/SingUp009/Moderato.Effects/wiki/Error-unions)
