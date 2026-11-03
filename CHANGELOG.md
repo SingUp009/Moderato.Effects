@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Preserve reachable conversions through recursive unions whose equivalent constructed types use different object/dynamic or tuple-name spellings.
+
 - Respect C# type identity when checking Catch sources, avoiding MEFF308 for equivalent tuple names and object/dynamic spellings, including manual rest interfaces.
 
 - Discover C# union member-provider factories, including inherited and equivalent case types, while preserving nullable cases and bounded analysis.
