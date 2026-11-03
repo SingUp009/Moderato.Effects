@@ -33,9 +33,9 @@ public readonly partial struct Effect<T, E, R>
     public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return Then<U, E, Func<T, Effect<U, E, R>>>(binder, static (outcome, env, context, bind) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(bind(outcome.Value).Run(env, context), outcome, static (next, previous) => next.After(previous))
-            : new(outcome.WithValueType<U>()));
+        return Bind<U, E, U, E, Func<T, Effect<U, E, R>>>(binder, static (outcome, bind) => outcome.Kind == OutcomeKind.Ok
+            ? new(bind(outcome.Value)) : new(outcome.WithValueType<U>()),
+            static (next, previous, _, _) => next.After(previous));
     }
 
     /// <summary>Runs a check on the value and keeps the value if the check succeeds.</summary>
@@ -44,11 +44,10 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R> AndThrough<U>(Func<T, Effect<U, E, R>> check)
     {
         ArgumentNullException.ThrowIfNull(check);
-        return Then<T, E, Func<T, Effect<U, E, R>>>(check, static (outcome, env, context, checkStep) => outcome.Kind == OutcomeKind.Ok
-            ? Steps.Then(checkStep(outcome.Value).Run(env, context), outcome, static (next, previous) => (next.Kind == OutcomeKind.Ok
+        return Bind<U, E, T, E, Func<T, Effect<U, E, R>>>(check, static (outcome, checkStep) => outcome.Kind == OutcomeKind.Ok
+            ? new(checkStep(outcome.Value)) : new(outcome), static (next, previous, _, _) => (next.Kind == OutcomeKind.Ok
                 ? Outcome<T, E>.Ok(previous.Value).After(next)
-                : next.WithValueType<T>()).After(previous))
-            : new(outcome));
+                : next.WithValueType<T>()).After(previous));
     }
 
     /// <summary>Recovers from the error with the next effect.</summary>
@@ -57,13 +56,13 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, F, R> OrElse<F>(Func<E, Effect<T, F, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return Then<T, F, Func<E, Effect<T, F, R>>>(binder, static (outcome, env, context, recover) =>
+        return Bind<T, F, T, F, Func<E, Effect<T, F, R>>>(binder, static (outcome, recover) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             var recovery = recover(outcome.Error).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return recovery.Run(env, context);
-        });
+            return new(recovery);
+        }, static (next, _, _, _) => next);
     }
 
     /// <summary>Runs a side effect on the value.</summary>
@@ -138,14 +137,14 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) where F : IUnionRest<F, E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return Then<T, F, Func<TCase, Effect<T, F, R>>>(handler, static (outcome, env, context, handle) =>
+        return Bind<T, F, T, F, Func<TCase, Effect<T, F, R>>>(handler, static (outcome, handle) =>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(outcome.WithError<T, F>(rest));
             var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed);
-            return recovery.Run(env, context);
-        });
+            return new(recovery);
+        }, static (next, _, _, _) => next);
     }
 
     /// <summary>Widens the error to a union that has it as a case.</summary>
@@ -158,21 +157,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R2> Provide<R2>(Func<R2, R> build)
     {
         ArgumentNullException.ThrowIfNull(build);
-        var effect = Validate();
-        return new((outer, context) =>
-        {
-            R inner;
-            try
-            {
-                inner = build(outer);
-            }
-            catch (Exception exception)
-            {
-                return new(Defects.From<T, E>(exception, context));
-            }
-
-            return effect.Run(inner, context);
-        });
+        return new(new ProvideInstruction<T, E, R, R2>(Validate(), build));
     }
 
     /// <summary>Runs with an environment that provides at least what this effect needs.</summary>
@@ -184,7 +169,7 @@ public readonly partial struct Effect<T, E, R>
         return Deferred(effect);
 
         static Effect<T, E, R2> Deferred(Effect<T, E, R> effect)
-            => new((env, context) => effect.Run(env, context));
+            => new(new ProvideInstruction<T, E, R, R2>(effect, static environment => environment));
     }
 
     /// <summary>A resource running the effect as a fiber, canceled and awaited on release (in a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>).</summary>
