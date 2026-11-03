@@ -32,6 +32,11 @@ internal static class Diagnostics
         "MEFF006", "File-local types are not supported", "[{0}] does not support file-local type '{1}'",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor CaseGraphTooComplex = new(
+        "MEFF007", "Union case graph is too complex",
+        "'{0}' exceeds the union generation limit of {1}; simplify the union or implement its interfaces manually",
+        CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor NeedsPartialType = new(
         "MEFF101", "Needs a partial type", "'{0}' must be partial to use [Environment]",
         CATEGORY, DiagnosticSeverity.Error, isEnabledByDefault: true);

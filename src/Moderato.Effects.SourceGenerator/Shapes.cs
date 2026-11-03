@@ -59,37 +59,6 @@ internal static class Shapes
                 && !SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, union))
             .Select(static c => c.Parameters[0].Type)];
 
-    /// <summary>Every type reachable through the union's cases, with each way to reach it.</summary>
-    public static Dictionary<string, List<CasePath>> Reachable(INamedTypeSymbol union)
-    {
-        var found = new Dictionary<string, List<CasePath>>(StringComparer.Ordinal);
-        var onPath = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default) { union };
-        Visit(union, ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
-        return found;
-
-        void Visit(INamedTypeSymbol current, ImmutableArray<string> path, ImmutableArray<string> patterns, string? fileLocal = null)
-        {
-            var cases = Cases(current);
-            var nullCase = NullCase(cases.Select(Name));
-            foreach (var @case in cases)
-            {
-                var steps = path.Add(Name(@case));
-                var casePatterns = patterns.Add(PatternType(@case));
-                var name = Name(@case);
-                var key = Identity(@case);
-                if (!found.TryGetValue(key, out var paths)) found[key] = paths = [];
-                var hidden = fileLocal ?? FileLocalReference(@case)?.Name;
-                paths.Add(new CasePath(steps.ToEquatableArray(), casePatterns.ToEquatableArray(), name == nullCase, hidden));
-
-                if (@case is INamedTypeSymbol nested && IsUnion(nested) && onPath.Add(nested))
-                {
-                    Visit(nested, steps, casePatterns, hidden);
-                    onPath.Remove(nested);
-                }
-            }
-        }
-    }
-
     public static bool IsPartial(TypeDeclarationSyntax node) => node.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword));
 
     public static Declaration Declare(INamedTypeSymbol type, TypeDeclarationSyntax node)
