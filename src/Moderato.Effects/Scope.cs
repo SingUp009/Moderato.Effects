@@ -24,7 +24,7 @@ public sealed class Scope<E, R>
     private int busy;
     private bool closed;
     private PendingStep? running;
-    private List<PendingStep>? unobserved;
+    private List<PendingStep>? unconsumed;
 
     private Scope(R env, RunContext context)
     {
@@ -138,8 +138,7 @@ public sealed class Scope<E, R>
 
         if (!task.IsCompletedSuccessfully)
         {
-            // The previous step was not awaited (MEFF310), so the block's end settles it.
-            if (Volatile.Read(ref running) is { Observed: false } previous) (unobserved ??= []).Add(previous);
+            if (Volatile.Read(ref running) is { Consumed: false } previous) (unconsumed ??= []).Add(previous);
             var pending = new PendingStep<T>();
             Volatile.Write(ref running, pending);
             _ = CompleteAsync(task, pending);
@@ -222,15 +221,15 @@ public sealed class Scope<E, R>
         internal bool Consequential { get; } = consequential;
     }
 
-    /// <summary>A step that did not finish at once, tracking whether the body read it.</summary>
+    /// <summary>A step that did not finish at once, tracking source consumption.</summary>
     private abstract class PendingStep
     {
         private TaskCompletionSource<ExitCase?>? done;
         private ExitCase? failure;
-        private int observed;
+        private int consumed;
 
-        /// <summary>Whether the body read the step's result (or its failure).</summary>
-        internal bool Observed => Volatile.Read(ref observed) == 1;
+        /// <summary>Whether GetResult consumed the source, directly or through an adapter.</summary>
+        internal bool Consumed => Volatile.Read(ref consumed) == 1;
 
         /// <summary>Completes with the step's failure, if any, once recorded on the scope.</summary>
         internal ValueTask<ExitCase?> Done => Completed ? new(failure) : new((done ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task);
@@ -248,7 +247,7 @@ public sealed class Scope<E, R>
         /// <summary>Whether the step's Err became the block's own error.</summary>
         internal bool RecordedError { get; private set; }
 
-        protected void Observe() => Volatile.Write(ref observed, 1);
+        protected void Consume() => Volatile.Write(ref consumed, 1);
 
         protected void Finish(ExitCase? failure, ObservedFailure? defect, bool recordedError)
         {
@@ -280,7 +279,7 @@ public sealed class Scope<E, R>
             {
                 throw new InvalidOperationException("The scope step has not completed.");
             }
-            Observe();
+            Consume();
             return core.GetResult(token);
         }
 
@@ -310,13 +309,13 @@ public sealed class Scope<E, R>
         {
             if (thrown is not null) outcome = Thrown<T>(thrown);
             else outcome = failures is { Failed: true } ? RecordedError<T>() : Outcome<T, E>.Ok(value);
-            steps = unobserved?.FindAll(static step => !step.Observed);
-            if (Volatile.Read(ref running) is { Observed: false } last) (steps ??= []).Add(last);
+            steps = unconsumed?.FindAll(static step => !step.Consumed);
+            if (Volatile.Read(ref running) is { Consumed: false } last) (steps ??= []).Add(last);
             // A step ended by now has its Err on the outcome already.
             endedWithBody = steps?.ConvertAll(static step => step.Completed);
         }
 
-        if (steps is not null) outcome = await SettleUnobservedAsync(outcome, steps, endedWithBody!).ConfigureAwait(false);
+        if (steps is not null) outcome = await SettleUnconsumedAsync(outcome, steps, endedWithBody!).ConfigureAwait(false);
 
         closed = true;
         if (suppressed is { Count: > 0 } || omitted > 0) outcome = outcome.After(suppressed?.DrainToImmutable() ?? [], omitted);
@@ -351,8 +350,7 @@ public sealed class Scope<E, R>
         return outcome;
     }
 
-    // Unawaited steps (MEFF310) are canceled and awaited, so none outlives the block or loses its failure.
-    private async ValueTask<Outcome<T, E>> SettleUnobservedAsync<T>(Outcome<T, E> outcome, List<PendingStep> steps, List<bool> endedWithBody)
+    private async ValueTask<Outcome<T, E>> SettleUnconsumedAsync<T>(Outcome<T, E> outcome, List<PendingStep> steps, List<bool> endedWithBody)
     {
         if (steps.Count == 0) return outcome;
 
@@ -362,7 +360,7 @@ public sealed class Scope<E, R>
             var step = steps[i];
             ValueTask<ExitCase?> done;
             lock (gate) done = step.Done;
-            // Adapter reads after the snapshot cannot count as handling by the body.
+            // The snapshot must survive adapters reading the source during the drain.
             if (await done.ConfigureAwait(false) is not { Value: not Interrupted } failure)
             {
                 continue;
