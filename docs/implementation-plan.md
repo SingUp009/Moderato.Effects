@@ -2,6 +2,8 @@
 
 設計は `docs/design.md` にまとめてある。この計画は、その設計をどの順番で実装するかを記録する。
 
+各段階の結果にあるテスト数・測定値・未公開の記述は、その段階が終わった時点の記録。現在の契約と制約は設計メモ、未出荷の変更は CHANGELOG、利用方法は GitHub wiki を参照する。
+
 ## 進め方
 
 - **段階ごとに一度止まって確認する**。段階が1つ終わるたびに「何を作ったか」「設計から変えた点（あれば）」を報告し、確認してもらってから次へ進む。
@@ -14,7 +16,7 @@
 | | 確かめたこと | 結果 |
 |---|---|---|
 | S1 | `Effect` / `Effect<R>` / `Effect<T, E, R>` / `Scope<E, R>.Gen` / `Effect.Gen(...)` の共存と型推論。Never の2つの暗黙変換と LINQ の4通りの `SelectMany`。作る API、`scope.Run` / `Get`（case 版を含む）、`throw scope.Fail`、`Attempt`、`Widen`、`Sleep`、`Timeout`（union / Never）、`All`、`EmptyEnvironment` の `RunAsync(ct)` | **33ケースすべて期待どおり**（成功すべき28ケースが通り、失敗すべき5ケースがコンパイルエラーになる）。ただし設計を1点修正：`CatchCase` は拡張メソッドにし、`CatchCase((NotFound nf) => ...)` の形にする。ハンドラが Never の Effect を返す版のオーバーロードも必要（D13） |
-| S2 | netstandard2.0 の Source Generator が `union` を検出し、`partial union` にコードを足せるか | **できる**。Roslyn 4.14 で作った Generator が SDK の Roslyn 5.12 の上で動く。ただし、ソースの union には `[Union]` 属性が見えないので、検出は `IUnion` の実装で行う（D13） |
+| S2 | netstandard2.0 の Source Generator が `union` を検出し、`partial union` にコードを足せるか | **できる**。Roslyn 4.14 で作った Generator が SDK の Roslyn 5.12 の上で動く。ソースの union には `[Union]` 属性が見えない。現在は `union` 宣言のキーワードまたは `[Union]` 属性で検出する（D13）。`IUnion` の実装だけでは不十分なことを Issue #277 で確認した |
 
 S1 の33ケースは、回帰テストとしてテストプロジェクトに移す（型推論や変換の結果が、SDK の更新で変わっていないことを確かめるため）。
 - 成功すべきケースは、使う API ができた段階で、その段階のテストとして書く。P1 で、LINQ の4通り、`AndThen` の推論、`Widen`、`CatchCase`、`Result` からの変換、`EmptyEnvironment` の `RunAsync(ct)` を移した。P2 で Gen のケース（`Scope<E, R>.Gen` / `Effect.Gen` の推論、`Run` に渡せる Effect の形、`Get` の case 版、`throw scope.Fail` による絞り込み、Gen の中の `Attempt` と `scope.Env.Resolve`）を移した。P3 で `Sleep` と `Timeout`（union / Never）を移した。P4 で `All` を移した。
@@ -116,10 +118,10 @@ P0〜P8 後の改修。D1 の反復実行器への移行も、冒頭の段階レ
 
 | 段階 | 完了条件 | 状態 |
 |---|---|---|
-| E0 契約と再現 | 通常の同期・非同期実行で守る観測をテストに残す。深い合成のプロセス終了を、テストホストから隔離して再現する。候補方式の失敗条件を記録する | 完了、レビュー待ち |
-| E1 Effect の実行器 | 型を保った命令と実行ごとの継続で Map・AndThen・環境変換・Never 変換・LINQ を実行する。動的に返された Effect も反復実行に戻す。E0 の契約と既存テストを保つ | 完了、レビュー待ち |
-| E2 Resource と境界 | Resource の取得・合成・解放、および Gen・時間操作・並行操作との境界を検証する。取得済みリソースは失敗・中断時も逆順に一度ずつ解放する | 完了、レビュー待ち |
-| E3 出荷前の検証 | 深い合成の隔離テストを CI で必須にし、再実行・同時実行・大きな値型・割り当て・性能を確認する。パッケージ、サンプル、NativeAOT、wiki を確認する | 完了、レビュー待ち |
+| E0 契約と再現 | 通常の同期・非同期実行で守る観測をテストに残す。深い合成のプロセス終了を、テストホストから隔離して再現する。候補方式の失敗条件を記録する | 完了、[PR #308](https://github.com/SingUp009/Moderato.Effects/pull/308) でマージ済み |
+| E1 Effect の実行器 | 型を保った命令と実行ごとの継続で Map・AndThen・環境変換・Never 変換・LINQ を実行する。動的に返された Effect も反復実行に戻す。E0 の契約と既存テストを保つ | 完了、[PR #308](https://github.com/SingUp009/Moderato.Effects/pull/308) でマージ済み |
+| E2 Resource と境界 | Resource の取得・合成・解放、および Gen・時間操作・並行操作との境界を検証する。取得済みリソースは失敗・中断時も逆順に一度ずつ解放する | 完了、[PR #309](https://github.com/SingUp009/Moderato.Effects/pull/309) でマージ済み |
+| E3 出荷前の検証 | 深い合成の隔離テストを CI で必須にし、再実行・同時実行・大きな値型・割り当て・性能を確認する。パッケージ、サンプル、NativeAOT、wiki を確認する | 完了、[PR #311](https://github.com/SingUp009/Moderato.Effects/pull/311) でマージ済み |
 
 E0 の終了だけでは #267 を修正済みにしない。各段階の終了時に、実装と設計の差、通った検証、残る制約を報告する。
 
