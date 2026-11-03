@@ -36,7 +36,15 @@ internal static class ExitCases
     {
         try
         {
-            while (error is System.Runtime.CompilerServices.IUnion union) error = union.Value;
+            object? first = null;
+            HashSet<object>? seen = null;
+            while (error is System.Runtime.CompilerServices.IUnion union)
+            {
+                if (first is null) first = union;
+                else if (ReferenceEquals(first, union) || !(seen ??= new(ReferenceEqualityComparer.Instance) { first }).Add(union))
+                    throw new InvalidOperationException("The error union contains a reference cycle.");
+                error = union.Value;
+            }
         }
         catch (Exception exception)
         {

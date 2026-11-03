@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Detect reference cycles when unwrapping hand-written error unions, preserving the unreadable error as context and allowing releases to run.
+
 - Keep separate parent and child failures when they throw the same exception instance, while counting a joined child's failure only once.
 
 - Preserve step defects read by adapters after the Gen body snapshot without resurrecting failures the body already handled.
