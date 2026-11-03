@@ -3,9 +3,9 @@ using Moderato.Results;
 
 if (args.Length != 3 || !int.TryParse(args[1], out var depth) || depth < 0
     || args[2] is not ("sync" or "pending")
-    || args[0] is not ("map" or "bind" or "recursive-bind" or "provide" or "resource"))
+    || args[0] is not ("map" or "bind" or "recursive-bind" or "provide" or "query" or "recover" or "conversions" or "resource"))
 {
-    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|resource> <nonnegative-depth> <sync|pending>");
+    Console.Error.WriteLine("Usage: <map|bind|recursive-bind|provide|query|recover|conversions|resource> <nonnegative-depth> <sync|pending>");
     return 2;
 }
 
@@ -43,6 +43,22 @@ switch (args[0])
     case "provide":
         for (var i = 0; i < depth; i++)
             effect = effect.Provide<int>(static environment => environment + 1);
+        break;
+    case "query":
+        for (var i = 0; i < depth; i++)
+            effect = from firstValue in effect from secondValue in Effect<int>.Succeed(new Box(firstValue + 1)) select secondValue.Value;
+        break;
+    case "recover":
+        Effect<int, int, int> recoverSource = source;
+        effect = recoverSource.AndThen(value => Recover(value, depth)).UnwrapOr(-1);
+        break;
+    case "conversions":
+        for (var i = 0; i < depth; i++)
+        {
+            Effect<int, string, int> widened = effect;
+            effect = widened.MapErr<Never>(static _ => throw new InvalidOperationException("An error cannot inhabit Never."))
+                .Map(static value => value + 1);
+        }
         break;
     case "resource":
         var resource = Make(source.Map(static value => new Lease(value, value, 0)));
@@ -96,6 +112,10 @@ Resource<Lease, Never, int> Make(Effect<Lease, Never, int> acquire)
 static Effect<int, Never, int> Continue(int value, int remaining)
     => remaining == 0 ? Effect<int>.Succeed(value)
         : Effect<int>.Succeed(value + 1).AndThen(next => Continue(next, remaining - 1));
+
+static Effect<int, int, int> Recover(int value, int remaining)
+    => ((Effect<int, int, int>)Effect<int>.Fail(remaining))
+        .OrElse<int>(count => count == 0 ? Effect<int>.Succeed(value) : Recover(value + 1, count - 1));
 
 internal readonly record struct Box(int Value);
 

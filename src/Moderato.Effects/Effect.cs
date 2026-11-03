@@ -15,42 +15,38 @@ public readonly partial struct Effect<T, E, R>
 
     internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run) => this.run = run;
 
+    // The delegate target carries instructions without growing each Effect value.
+    internal Effect(EffectInstruction<T, E, R> instruction) => run = instruction.Run;
+
     internal Effect(Result<T, E> constant) => this.constant = constant;
 
     internal Effect<T, E, R> Validate()
         => constant.HasValue || run is not null ? this : ThrowHelper.ThrowUninitializedEffect<Effect<T, E, R>>();
 
     internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context)
-        => constant.HasValue ? new(Steps.FromResult(constant, context))
-            : (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
+        => Run(environment, context, EffectExecutor.DIRECT_DEPTH);
+
+    internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context, int depth)
+    {
+        if (constant.HasValue) return new(Steps.FromResult(constant, context));
+        if (run?.Target is EffectInstruction<T, E, R> instruction)
+            return depth == 0 ? EffectExecutor.Run(this, environment, context) : instruction.RunDirect(environment, context, depth - 1);
+        return (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
+    }
+
+    internal EffectFrame<T, E> Enter(R environment, RunContext context, EffectFrame? parent)
+        => run?.Target is EffectInstruction<T, E, R> instruction
+            ? instruction.Enter(environment, context, parent) : new LeafFrame<T, E, R>(this, environment, context, parent);
 
     /// <summary>Continues with the outcome and construction-time state; thrown callbacks become defects.</summary>
     internal Effect<U, F, R> Then<U, F, TState>(TState state,
         Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next)
-    {
-        var effect = Validate();
-        return new((env, context) =>
-        {
-            var task = effect.Run(env, context);
-            return task.IsCompletedSuccessfully ? Continue(task.Result, env, context) : Await(task, env, context);
-        });
+        => new(new ThenInstruction<T, E, U, F, R, TState>(Validate(), state, next));
 
-        // The effect owns state, so a suspended run needs only a reference to it.
-        async ValueTask<Outcome<U, F>> Await(ValueTask<Outcome<T, E>> task, R env, RunContext context)
-            => await Continue(await task.ConfigureAwait(false), env, context).ConfigureAwait(false);
-
-        ValueTask<Outcome<U, F>> Continue(Outcome<T, E> outcome, R env, RunContext context)
-        {
-            try
-            {
-                return next(outcome, env, context, state);
-            }
-            catch (Exception exception)
-            {
-                return new(Defects.From<U, F>(exception, context).Replacing(outcome));
-            }
-        }
-    }
+    internal Effect<V, G, R> Bind<U, F, V, G, TState>(TState state,
+        Func<Outcome<T, E>, TState, EffectSelection<U, F, V, G, R>> select,
+        Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project)
+        => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project));
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
@@ -60,7 +56,7 @@ public readonly partial struct Effect<T, E, R>
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<T, Never, R> effect)
-            => new((env, context) => Steps.Then(effect.Run(env, context), static outcome => outcome.WithErrorType<E>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithErrorType<E>()));
     }
 
     /// <summary>An effect that cannot succeed can stand in for one with any value type.</summary>
@@ -71,7 +67,7 @@ public readonly partial struct Effect<T, E, R>
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<Never, E, R> effect)
-            => new((env, context) => Steps.Then(effect.Run(env, context), static outcome => outcome.WithValueType<T>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithValueType<T>()));
     }
 
     /// <summary>An effect that ends in the result.</summary>

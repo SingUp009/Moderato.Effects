@@ -2,8 +2,10 @@ namespace Moderato.Effects.Tests;
 
 public class ExecutionContextTests
 {
-    [Fact]
-    public async Task AndThen_SynchronousResourceAcquisition_RestoresAmbientContextOnceBeforeMappingAndUse()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(128)]
+    public async Task AndThen_SynchronousResourceAcquisition_RestoresAmbientContextOnceBeforeMappingAndUse(int padding)
     {
         // Given
         var transitions = new List<(string? Previous, string? Current)>();
@@ -35,6 +37,8 @@ public class ExecutionContextTests
                 return value;
             }));
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(CancellationToken.None);
         var observedTransitions = transitions.ToArray();
@@ -50,9 +54,11 @@ public class ExecutionContextTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RunAsync_SynchronousOperators_PreserveAmbientChangesUntilTheCallerBoundary(bool cancellable)
+    [InlineData(false, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 0)]
+    [InlineData(true, 128)]
+    public async Task RunAsync_SynchronousOperators_PreserveAmbientChangesUntilTheCallerBoundary(bool cancellable, int padding)
     {
         // Given
         var local = new AsyncLocal<string?> { Value = "caller" };
@@ -91,6 +97,8 @@ public class ExecutionContextTests
                 return value;
             });
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(cancellable ? cancellation.Token : default);
         var callerValue = local.Value;
@@ -104,8 +112,10 @@ public class ExecutionContextTests
         Assert.Equal(cancellable ? "caller" : "child", local.Value);
     }
 
-    [Fact]
-    public async Task RunAsync_PendingOperators_RestoreEachAwaitingOperatorsAmbientContext()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(128)]
+    public async Task RunAsync_PendingOperators_RestoreEachAwaitingOperatorsAmbientContext(int padding)
     {
         // Given
         var local = new AsyncLocal<string?> { Value = "caller" };
@@ -140,6 +150,8 @@ public class ExecutionContextTests
                 return value;
             });
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(CancellationToken.None).AsTask();
         var suspended = !running.IsCompleted;
@@ -154,9 +166,11 @@ public class ExecutionContextTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Provide_EnvironmentBuilderChangesAmbientContext_PreservesSynchronousAndPendingBoundaries(bool pending)
+    [InlineData(false, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 0)]
+    [InlineData(true, 128)]
+    public async Task Provide_EnvironmentBuilderChangesAmbientContext_PreservesSynchronousAndPendingBoundaries(bool pending, int padding)
     {
         // Given
         var local = new AsyncLocal<string?> { Value = "caller" };
@@ -195,6 +209,8 @@ public class ExecutionContextTests
                 return value;
             });
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(CancellationToken.None).AsTask();
         var completed = running.IsCompletedSuccessfully;
@@ -211,9 +227,11 @@ public class ExecutionContextTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Use_AcquisitionChangesAmbientContext_PreservesUseAndReleaseBoundaries(bool pending)
+    [InlineData(false, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 0)]
+    [InlineData(true, 128)]
+    public async Task Use_AcquisitionChangesAmbientContext_PreservesUseAndReleaseBoundaries(bool pending, int padding)
     {
         // Given
         var local = new AsyncLocal<string?> { Value = "caller" };
@@ -249,6 +267,8 @@ public class ExecutionContextTests
                 return value;
             });
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(CancellationToken.None).AsTask();
         var completed = running.IsCompletedSuccessfully;
@@ -265,9 +285,11 @@ public class ExecutionContextTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Gen_StepChangesAmbientContext_PreservesBlockAndReleaseBoundaries(bool pending)
+    [InlineData(false, 0)]
+    [InlineData(false, 128)]
+    [InlineData(true, 0)]
+    [InlineData(true, 128)]
+    public async Task Gen_StepChangesAmbientContext_PreservesBlockAndReleaseBoundaries(bool pending, int padding)
     {
         // Given
         var local = new AsyncLocal<string?> { Value = "caller" };
@@ -304,6 +326,8 @@ public class ExecutionContextTests
                 return value;
             });
 
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
+
         // When
         var running = effect.RunAsync(CancellationToken.None).AsTask();
         var completed = running.IsCompletedSuccessfully;
@@ -320,15 +344,23 @@ public class ExecutionContextTests
     }
 
     [Theory]
-    [InlineData("Operators", false)]
-    [InlineData("Operators", true)]
-    [InlineData("Provide", false)]
-    [InlineData("Provide", true)]
-    [InlineData("Resource", false)]
-    [InlineData("Resource", true)]
-    [InlineData("Gen", false)]
-    [InlineData("Gen", true)]
-    public async Task RunAsync_WithSynchronizationContext_OnlySynchronousCallbacksRunOnIt(string composition, bool pending)
+    [InlineData("Operators", false, 0)]
+    [InlineData("Operators", false, 128)]
+    [InlineData("Operators", true, 0)]
+    [InlineData("Operators", true, 128)]
+    [InlineData("Provide", false, 0)]
+    [InlineData("Provide", false, 128)]
+    [InlineData("Provide", true, 0)]
+    [InlineData("Provide", true, 128)]
+    [InlineData("Resource", false, 0)]
+    [InlineData("Resource", false, 128)]
+    [InlineData("Resource", true, 0)]
+    [InlineData("Resource", true, 128)]
+    [InlineData("Gen", false, 0)]
+    [InlineData("Gen", false, 128)]
+    [InlineData("Gen", true, 0)]
+    [InlineData("Gen", true, 128)]
+    public async Task RunAsync_WithSynchronizationContext_OnlySynchronousCallbacksRunOnIt(string composition, bool pending, int padding)
     {
         // Given
         var context = new RecordingSynchronizationContext();
@@ -374,6 +406,8 @@ public class ExecutionContextTests
         var previous = SynchronizationContext.Current;
         Task<Result<int, Never>> running;
         bool completed;
+
+        for (var i = 0; i < padding; i++) effect = effect.Map(static value => value);
 
         // When
         try
