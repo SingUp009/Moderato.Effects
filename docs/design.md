@@ -299,7 +299,7 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - 片方が **Die** になったら、その時点で Race 全体を Die で終える（もう片方はキャンセルする）。バグを黙って捨てないため。Err として扱いたいときは `Try` で包む。
 - `RaceFirst`：成功・失敗に関係なく、先に**終わった**ほうを採る。
 - 負けた側にはキャンセルを送り、終了を待つ。**負けた側の終了処理（解放処理を含む）が Die になったら、勝った側の結果より Die を優先する**（G3）。重大な失敗を見落とさないため。`Race` と `RaceFirst` で同じ規則にする。待たずに戻る仕組み（Effect-TS の `disconnect`）は、必要になったら明示的に選ぶ形で検討する。
-- `Timeout` は `RaceFirst(effect, Sleep(t) → Err(TimeoutError))` として定義する（D8）。
+- `Timeout` は処理と期限の競合を扱う専用の実装とする。ゼロ時間やキャンセルの優先順を含む契約は D8・D18 に従い、`RaceFirst(effect, Sleep(t) → Err(TimeoutError))` への一般の等式置換はしない。
 
 **`Fork`**
 
@@ -337,7 +337,7 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - `Race` / `RaceFirst` は2つの Effect を取る版だけにした。3つ以上は、必要になったら足す。
 - `AllErrors` は、Err では止まらず、Die だけで残りをキャンセルする。
 - `Concurrency.Sequential.WithMaxDegree(n)` は例外にする（順番に実行するものに上限を付けても意味がないため）。
-- `Effect.All([失敗しない Effect, AppError の Effect])` は E を推論できない（Never と AppError の両方が候補になる）。変数の型を書くか、Gen の中で `scope.Run` を使う。README に書く。
+- `Effect.All([失敗しない Effect, AppError の Effect])` は E を推論できない。入力コレクションの要素型を書くか、`All` の型引数を指定する。結果を受ける変数の型だけでは解決しない。Gen の中で `scope.Run` を使う方法も含め、利用例は wiki に載せる。
 - `Timeout` は P3 の専用の実装のままにした。`Race` と共通の部品は、キャンセルの単位（`Cancellation`）と主となる失敗の選び方。
 
 ### D11. Gen の詳細
