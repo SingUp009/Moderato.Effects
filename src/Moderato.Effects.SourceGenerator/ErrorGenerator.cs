@@ -32,7 +32,7 @@ public sealed class ErrorGenerator : IIncrementalGenerator
         var location = node.Identifier.GetLocation();
         if (!Shapes.IsUnion(type) || !Shapes.IsPartial(node))
             return Failed(DiagnosticInfo.Create(Diagnostics.NeedsPartialUnion, location, "Error", type.Name));
-        if (Shapes.Unsupported("Error", type, location) is { } unsupported) return Failed(unsupported);
+        if (Shapes.Unsupported("Error", type, location, compilation) is { } unsupported) return Failed(unsupported);
 
         var graph = new CaseGraph(compilation, cancellationToken);
         if (!graph.TryReachable(type, out var reachable))
