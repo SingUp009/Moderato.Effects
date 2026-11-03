@@ -510,6 +510,128 @@ public class CompositionLawsTests
         Assert.Equal(sequentialTrace, trace);
     }
 
+    [Theory]
+    [InlineData("none", 0)]
+    [InlineData("none", 128)]
+    [InlineData("source", 0)]
+    [InlineData("source", 128)]
+    [InlineData("f", 0)]
+    [InlineData("f", 128)]
+    [InlineData("g", 0)]
+    [InlineData("g", 128)]
+    public async Task AndThen_ConstantBinders_AssociatesPublicExit(string failure, int padding)
+    {
+        // Given
+        var observer = new IOException("observer");
+        Effect<int, string, EmptyEnvironment> source = failure == "source"
+            ? Effect<EmptyEnvironment>.Fail("source") : Effect<EmptyEnvironment>.Succeed(5);
+        Effect<long, string, EmptyEnvironment> F(int value) => failure == "f"
+            ? Effect<EmptyEnvironment>.Fail("f") : Effect<EmptyEnvironment>.Succeed((long)value * 2);
+        Effect<string, string, EmptyEnvironment> G(long value) => failure == "g"
+            ? Effect<EmptyEnvironment>.Fail("g") : Effect<EmptyEnvironment>.Succeed("value:" + value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Result<string, string> expected = failure switch
+        {
+            "source" => Result.Err("source"),
+            "f" => Result.Err("f"),
+            "g" => Result.Err("g"),
+            _ => Result.Ok("value:10"),
+        };
+        var leftCore = source.AndThen(F).AndThen(G);
+        var rightCore = source.AndThen(value => F(value).AndThen(G));
+        var left = Pad(leftCore, padding);
+        var right = Pad(rightCore, padding);
+        var folded = Effect<EmptyEnvironment>.FromResult(expected);
+        var leftObserved = Pad(leftCore.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+        var rightObserved = Pad(rightCore.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+        var foldedObserved = Pad(folded.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+
+        // When
+        var leftRun = left.RunExitAsync(CancellationToken.None);
+        var rightRun = right.RunExitAsync(CancellationToken.None);
+        var foldedRun = folded.RunExitAsync(CancellationToken.None);
+        var leftObservedRun = leftObserved.RunExitAsync(CancellationToken.None);
+        var rightObservedRun = rightObserved.RunExitAsync(CancellationToken.None);
+        var foldedObservedRun = foldedObserved.RunExitAsync(CancellationToken.None);
+        bool[] completed = [leftRun.IsCompletedSuccessfully, rightRun.IsCompletedSuccessfully, foldedRun.IsCompletedSuccessfully,
+            leftObservedRun.IsCompletedSuccessfully, rightObservedRun.IsCompletedSuccessfully, foldedObservedRun.IsCompletedSuccessfully];
+        var leftExit = await leftRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var rightExit = await rightRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var foldedExit = await foldedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var leftObservedExit = await leftObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var rightObservedExit = await rightObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var foldedObservedExit = await foldedObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.All(completed, Assert.True);
+        Assert.Equal(((IUnion)expected).Value, foldedExit.Value);
+        SameExit(foldedExit, leftExit);
+        SameExit(foldedExit, rightExit);
+        Assert.Same(observer, Assert.IsType<Die>(foldedObservedExit.Value).Exception);
+        SameExit(foldedObservedExit, leftObservedExit);
+        SameExit(foldedObservedExit, rightObservedExit);
+    }
+
+    [Theory]
+    [InlineData("sourceOk", 0)]
+    [InlineData("sourceOk", 128)]
+    [InlineData("first", 0)]
+    [InlineData("first", 128)]
+    [InlineData("second", 0)]
+    [InlineData("second", 128)]
+    [InlineData("allErr", 0)]
+    [InlineData("allErr", 128)]
+    public async Task OrElse_ConstantRecoveries_AssociatesPublicExit(string recovery, int padding)
+    {
+        // Given
+        var observer = new IOException("observer");
+        Effect<int, string, EmptyEnvironment> source = recovery == "sourceOk"
+            ? Effect<EmptyEnvironment>.Succeed(7) : Effect<EmptyEnvironment>.Fail("a");
+        Effect<int, int, EmptyEnvironment> F(string error) => recovery == "first"
+            ? Effect<EmptyEnvironment>.Succeed((error?.Length ?? 0) * 10) : Effect<EmptyEnvironment>.Fail(error?.Length ?? 0);
+        Effect<int, bool, EmptyEnvironment> G(int error) => recovery == "allErr"
+            ? Effect<EmptyEnvironment>.Fail(false) : Effect<EmptyEnvironment>.Succeed(error * 20);
+        Result<int, bool> expected = recovery switch
+        {
+            "sourceOk" => Result.Ok(7),
+            "first" => Result.Ok(10),
+            "second" => Result.Ok(20),
+            _ => Result.Err(false),
+        };
+        var leftCore = source.OrElse(F).OrElse(G);
+        var rightCore = source.OrElse(error => F(error).OrElse(G));
+        var left = Pad(leftCore, padding);
+        var right = Pad(rightCore, padding);
+        var folded = Effect<EmptyEnvironment>.FromResult(expected);
+        var leftObserved = Pad(leftCore.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+        var rightObserved = Pad(rightCore.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+        var foldedObserved = Pad(folded.Map<Unit>(_ => throw observer).MapErr<Unit>(_ => throw observer), padding);
+
+        // When
+        var leftRun = left.RunExitAsync(CancellationToken.None);
+        var rightRun = right.RunExitAsync(CancellationToken.None);
+        var foldedRun = folded.RunExitAsync(CancellationToken.None);
+        var leftObservedRun = leftObserved.RunExitAsync(CancellationToken.None);
+        var rightObservedRun = rightObserved.RunExitAsync(CancellationToken.None);
+        var foldedObservedRun = foldedObserved.RunExitAsync(CancellationToken.None);
+        bool[] completed = [leftRun.IsCompletedSuccessfully, rightRun.IsCompletedSuccessfully, foldedRun.IsCompletedSuccessfully,
+            leftObservedRun.IsCompletedSuccessfully, rightObservedRun.IsCompletedSuccessfully, foldedObservedRun.IsCompletedSuccessfully];
+        var leftExit = await leftRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var rightExit = await rightRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var foldedExit = await foldedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var leftObservedExit = await leftObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var rightObservedExit = await rightObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var foldedObservedExit = await foldedObservedRun.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.All(completed, Assert.True);
+        Assert.Equal(((IUnion)expected).Value, foldedExit.Value);
+        SameExit(foldedExit, leftExit);
+        SameExit(foldedExit, rightExit);
+        Assert.Same(observer, Assert.IsType<Die>(foldedObservedExit.Value).Exception);
+        SameExit(foldedObservedExit, leftObservedExit);
+        SameExit(foldedObservedExit, rightObservedExit);
+    }
+
     private static Effect<T, E, R> Pad<T, E, R>(Effect<T, E, R> effect, int count)
     {
         for (var i = 0; i < count; i++) effect = effect.Map(static value => value);
