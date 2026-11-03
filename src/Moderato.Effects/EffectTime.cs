@@ -48,7 +48,7 @@ public static class EffectTimeExtensions
 {
     /// <summary>Fails with <see cref="TimeoutError"/>, a case of the error union, if the effect runs out of time.</summary>
     /// <param name="effect">The effect.</param>
-    /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
+    /// <param name="after">The time limit, at most about 49.7 days; zero expires without starting the effect, and <see cref="Timeout.InfiniteTimeSpan"/> disables the limit.</param>
     /// <returns>An effect with the same error type.</returns>
     public static Effect<T, E, R> Timeout<T, E, R>(this Effect<T, E, R> effect, TimeSpan after)
         where E : IUnionCase<E, TimeoutError>
@@ -57,7 +57,7 @@ public static class EffectTimeExtensions
 
     /// <summary>Fails with <see cref="TimeoutError"/> if the effect does not finish in time.</summary>
     /// <param name="effect">The effect, which cannot fail otherwise.</param>
-    /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
+    /// <param name="after">The time limit, at most about 49.7 days; zero expires without starting the effect, and <see cref="Timeout.InfiniteTimeSpan"/> disables the limit.</param>
     /// <returns>An effect whose only error is the timeout.</returns>
     public static Effect<T, TimeoutError, R> Timeout<T, R>(this Effect<T, Never, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
@@ -65,7 +65,7 @@ public static class EffectTimeExtensions
 
     /// <summary>Fails with <see cref="TimeoutError"/> if the effect does not finish in time.</summary>
     /// <param name="effect">The effect, whose only error is already a timeout.</param>
-    /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
+    /// <param name="after">The time limit, at most about 49.7 days; zero expires without starting the effect, and <see cref="Timeout.InfiniteTimeSpan"/> disables the limit.</param>
     /// <returns>An effect with the same error type.</returns>
     public static Effect<T, TimeoutError, R> Timeout<T, R>(this Effect<T, TimeoutError, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
@@ -73,7 +73,7 @@ public static class EffectTimeExtensions
 
     /// <summary>Fails with the error <paramref name="onTimeout"/> builds if the effect does not finish in time.</summary>
     /// <param name="effect">The effect.</param>
-    /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
+    /// <param name="after">The time limit, at most about 49.7 days; zero expires without starting the effect, and <see cref="Timeout.InfiniteTimeSpan"/> disables the limit.</param>
     /// <param name="onTimeout">Builds the error from the timeout.</param>
     /// <returns>An effect with the same error type.</returns>
     public static Effect<T, E, R> Timeout<T, E, R>(this Effect<T, E, R> effect, TimeSpan after, Func<TimeoutError, E> onTimeout)
@@ -85,7 +85,7 @@ public static class EffectTimeExtensions
 
     /// <summary>Succeeds with <c>Err(TimeoutError)</c> if the effect runs out of time, making the timeout a value.</summary>
     /// <param name="effect">The effect.</param>
-    /// <param name="after">The time limit, at most about 49.7 days (the timer's limit).</param>
+    /// <param name="after">The time limit, at most about 49.7 days; zero expires without starting the effect, and <see cref="Timeout.InfiniteTimeSpan"/> disables the limit.</param>
     /// <returns><c>Ok</c> with the effect's value, or <c>Err</c> with the timeout.</returns>
     public static Effect<Result<T, TimeoutError>, E, R> TimeoutResult<T, E, R>(this Effect<T, E, R> effect, TimeSpan after)
         where R : IHas<TimeProvider>
