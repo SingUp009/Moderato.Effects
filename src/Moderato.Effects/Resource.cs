@@ -12,15 +12,28 @@ public readonly struct Resource<T, E, R>
 
     internal Resource(Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire) => this.acquire = acquire;
 
+    internal Resource(Effect<T, E, ResourceEnvironment<R>> effect)
+        => acquire = new ResourceAcquisition<T, E, R>(effect).Run;
+
     /// <summary>Acquires the value and registers its releases with <c>releases</c>.</summary>
     internal Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> Acquire
         => acquire ?? ThrowHelper.ThrowUninitializedResource<Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>>>();
 
+    internal Effect<T, E, ResourceEnvironment<R>> Acquisition
+    {
+        get
+        {
+            var acquire = Acquire;
+            return acquire.Target is ResourceAcquisition<T, E, R> acquisition ? acquisition.Effect
+                : new((environment, context) => acquire(environment.Environment, context, environment.Releases));
+        }
+    }
+
     /// <summary>A resource that cannot fail to acquire can stand in for one with any error type.</summary>
     public static implicit operator Resource<T, E, R>(Resource<T, Never, R> resource)
     {
-        var acquire = resource.Acquire;
-        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), static outcome => outcome.WithErrorType<E>()));
+        return new(resource.Acquisition.Then<T, E, Unit>(Unit.Value,
+            static (outcome, _, _, _) => new(outcome.WithErrorType<E>())));
     }
 
     /// <summary>Acquires the value, runs <paramref name="use"/> with it, then releases it however the use ended.</summary>
@@ -77,17 +90,16 @@ public readonly struct Resource<T, E, R>
     public Resource<U, E, R> Map<U>(Func<T, U> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
-        var acquire = Acquire;
-        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), (mapper, context), static (outcome, state) =>
+        return new(Acquisition.Then<U, E, Func<T, U>>(mapper, static (outcome, _, context, map) =>
         {
-            if (outcome.Kind != OutcomeKind.Ok) return outcome.WithValueType<U>();
+            if (outcome.Kind != OutcomeKind.Ok) return new(outcome.WithValueType<U>());
             try
             {
-                return Outcome<U, E>.Ok(state.mapper(outcome.Value)).After(outcome);
+                return new(Outcome<U, E>.Ok(map(outcome.Value)).After(outcome));
             }
             catch (Exception exception)
             {
-                return Defects.From<U, E>(exception, state.context).After(outcome);
+                return new(Defects.From<U, E>(exception, context).After(outcome));
             }
         }));
     }
@@ -98,17 +110,16 @@ public readonly struct Resource<T, E, R>
     public Resource<T, F, R> MapErr<F>(Func<E, F> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
-        var acquire = Acquire;
-        return new((env, context, releases) => Steps.Then(acquire(env, context, releases), (mapper, context), static (outcome, state) =>
+        return new(Acquisition.Then<T, F, Func<E, F>>(mapper, static (outcome, _, context, map) =>
         {
-            if (outcome.Kind != OutcomeKind.Err) return outcome.WithErrorType<F>();
+            if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             try
             {
-                return outcome.WithError<T, F>(state.mapper(outcome.Error));
+                return new(outcome.WithError<T, F>(map(outcome.Error)));
             }
             catch (Exception exception)
             {
-                return Defects.From<T, F>(exception, state.context).Replacing(outcome);
+                return new(Defects.From<T, F>(exception, context).Replacing(outcome));
             }
         }));
     }
@@ -119,24 +130,10 @@ public readonly struct Resource<T, E, R>
     public Resource<U, E, R> AndThen<U>(Func<T, Resource<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        var acquire = Acquire;
-        return new((env, context, releases) => AcquireBothAsync(acquire, binder, env, context, releases));
-
-        static async ValueTask<Outcome<U, E>> AcquireBothAsync(
-            Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire, Func<T, Resource<U, E, R>> binder,
-            R env, RunContext context, Releases<R> releases)
-        {
-            var first = await acquire(env, context, releases).ConfigureAwait(false);
-            if (first.Kind != OutcomeKind.Ok) return first.WithValueType<U>();
-            try
-            {
-                return (await binder(first.Value).Acquire(env, context, releases).ConfigureAwait(false)).After(first);
-            }
-            catch (Exception exception)
-            {
-                return Defects.From<U, E>(exception, context).After(first);
-            }
-        }
+        return new(Acquisition.Bind<U, E, U, E, Func<T, Resource<U, E, R>>>(binder,
+            static (outcome, bind) => outcome.Kind == OutcomeKind.Ok
+                ? new(bind(outcome.Value).Acquisition) : new(outcome.WithValueType<U>()),
+            static (next, previous, _, _) => next.After(previous), isolate: true));
     }
 
     /// <summary>Widens the acquisition error to a union that has it as a case.</summary>
@@ -155,12 +152,13 @@ public static class Resource
     {
         ArgumentNullException.ThrowIfNull(release);
         acquire = acquire.Validate();
-        return new((env, context, releases) => Steps.Then(acquire.Run(env, context), (release, releases), static (outcome, state) =>
+        return new(acquire.Provide<ResourceEnvironment<R>>(static environment => environment.Environment)
+            .Then<T, E, Func<T, ExitCase, Effect<Unit, Never, R>>>(release, static (outcome, environment, _, release) =>
         {
             // Registered before any token check, so a cancellation right after cannot leak the value.
-            if (outcome.Kind == OutcomeKind.Ok) state.releases.Add(outcome.Value, state.release);
+            if (outcome.Kind == OutcomeKind.Ok) environment.Releases.Add(outcome.Value, release);
 
-            return outcome;
+            return new(outcome);
         }));
     }
 }
@@ -223,21 +221,15 @@ public static class ResourceLinq
         Resource<T, E, R> source, Func<T, Resource<U, F, R>> selector, Func<T, U, V> resultSelector,
         Func<Outcome<U, F>, Outcome<U, E>> widen)
     {
-        var acquire = source.Acquire;
-        return new((env, context, releases) => AcquireAsync(acquire, selector, resultSelector, widen, env, context, releases));
-
-        static async ValueTask<Outcome<V, E>> AcquireAsync(
-            Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire,
-            Func<T, Resource<U, F, R>> selector, Func<T, U, V> resultSelector,
-            Func<Outcome<U, F>, Outcome<U, E>> widen, R env, RunContext context, Releases<R> releases)
+        return new(source.Acquisition.Bind((selector, resultSelector, widen), static (first, state) => first.Kind == OutcomeKind.Ok
+                ? new EffectSelection<U, F, V, E, ResourceEnvironment<R>>(state.selector(first.Value).Acquisition)
+                : new EffectSelection<U, F, V, E, ResourceEnvironment<R>>(first.WithValueType<V>()),
+            static (raw, first, context, state) =>
         {
-            var first = await acquire(env, context, releases).ConfigureAwait(false);
-            if (first.Kind != OutcomeKind.Ok) return first.WithValueType<V>();
-
             Outcome<U, E> second;
             try
             {
-                second = widen(await selector(first.Value).Acquire(env, context, releases).ConfigureAwait(false));
+                second = state.widen(raw);
             }
             catch (Exception exception)
             {
@@ -247,12 +239,12 @@ public static class ResourceLinq
             if (second.Kind != OutcomeKind.Ok) return second.WithValueType<V>().After(first);
             try
             {
-                return Outcome<V, E>.Ok(resultSelector(first.Value, second.Value)).After(second).After(first);
+                return Outcome<V, E>.Ok(state.resultSelector(first.Value, second.Value)).After(second).After(first);
             }
             catch (Exception exception)
             {
                 return Defects.From<V, E>(exception, context).After(second).After(first);
             }
-        }
+        }, isolate: true));
     }
 }
