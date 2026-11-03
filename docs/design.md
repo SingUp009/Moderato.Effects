@@ -495,11 +495,12 @@ public partial union AppError(NotFound, Forbidden, TimeoutError);
   - `Effect<T, E, R>.Widen<F>() where F : IUnionCase<F, E>`：LINQ やコンビネータで明示的に広げる。LINQ では、合成した結果をどの union にするかを C# が決められないので、自動では広げられない。
   - `CatchCase((TCase c) => ...)`：`TryGet` を使って1つの case だけ処理する（E は変わらない）。インスタンスメソッドではクラスの型パラメータ E に制約を付けられない（CS0699）ため、拡張メソッドにし、TCase はラムダの引数の型から推論させる（S1 で確認）。拡張メソッドでは E もメソッドの型パラメータになり、ハンドラが `Effect<T, Never, R>` を返すと推論がぶつかるので、ハンドラが Never の Effect を返す版のオーバーロードも用意する。
 - .NET 11 RC2 で確認済み：`partial union` を書ける。union に static abstract メンバーを持つインターフェースを実装できる。汎用の拡張メソッドで型推論が効く。間違った case を渡すとコンパイルエラーになる。
-- union は Roslyn のプレビュー API ではなく、**ソースの宣言キーワードが `union` であること、または `[Union]` 属性が付いていること**と、引数1つの public コンストラクタ＝case であることで検出する。`IUnion` の実装だけでは通常のクラスや struct に union のパターン照合は有効にならないため、そのような型は内部を探索しない1つの case として扱う。これは[コンパイラが union と認識する条件](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/union)に合わせる。S2 で確認した事実：
+- union は Roslyn のプレビュー API ではなく、**ソースの宣言キーワードが `union` であること、または `[Union]` 属性が付いていること**で検出する。`IUnion` の実装だけでは通常のクラスや struct に union のパターン照合は有効にならないため、そのような型は内部を探索しない1つの case として扱う。これは[コンパイラが union と認識する条件](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/union)に合わせる。S2 で確認した事実：
   - コンパイル中のソースの union には、`[Union]` 属性が**見えない**（コンパイラが出力時に付ける）。`IUnion` の実装と、case ごとのコンストラクタ、`Value` プロパティは見える。
   - 参照しているアセンブリ（メタデータ）の union には、`[Union]` 属性と `IUnion` の両方が見える。
   - 手で書いた union（`[Union]` 属性を付けた struct）は、ソースでも属性が見える。
   - Roslyn 4.14 で作った Generator が、SDK の Roslyn 5.12 の上で動く。union の宣言は `UnionDeclarationSyntax`（`TypeDeclarationSyntax` の派生）として `ForAttributeWithMetadataName` で拾え、`partial` も構文から判定できる。生成した `partial union` のコードも正しく足される。
+- case は C# の union creation member から取得する。通常は引数1つの public コンストラクタを使い、公開された入れ子の `IUnionMembers` provider がある場合は、継承したメンバーを含め、その provider の引数1つの非ジェネリックな public static `Create`（戻り値がその union 自身）の引数型を使う。引数は値渡しまたは `in` に限る。provider がある場合、union 自身のコンストラクタは case として扱わない。同じ型を作る provider の factory が複数あっても1つの case とし、異なる union を通る重複経路とは区別する。閉じたジェネリック union の型引数も置換した上で探索する。[provider の規則](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/union#union-member-providers)に従う。
 - 最初は、ジェネリックではない union だけを対象にする。ジェネリックな union には診断を出す。
 
 **入れ子の union**

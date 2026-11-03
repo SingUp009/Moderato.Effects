@@ -19,6 +19,7 @@ AssertZeroAllocation(valueFailure.Retry(Schedule.Immediately.UpTo(7)), valueCloc
 AssertZeroAllocation(valueSuccess.Repeat(Schedule.Immediately.UpTo(7)), valueClock, Result.Ok(20));
 AssertZeroAllocation(Effect.Sleep<ValueClock>(TimeSpan.Zero), valueClock, Result.Ok(Unit.Value));
 await AssertZeroTimeout();
+await AssertUnionMemberProvider();
 await AssertInterruptedRelease(useResource: false);
 await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
@@ -164,6 +165,31 @@ static async Task AssertSnapshotTransfer()
     }
 }
 
+static async Task AssertUnionMemberProvider()
+{
+    // Given
+    Effect<int, string, EmptyEnvironment> failure = Effect<EmptyEnvironment>.Fail("hello");
+    var defect = new InvalidOperationException("expected error");
+    Effect<int, ProviderOutcome<string>, EmptyEnvironment> held = Effect<EmptyEnvironment>.Fail<ProviderOutcome<string>>("hello");
+    Effect<int, ProviderOutcome<string>, EmptyEnvironment> handled = Effect<EmptyEnvironment>.Fail<ProviderOutcome<string>>(defect);
+
+    // When
+    var widened = await failure.Widen<ProviderError>()
+        .CatchCase((string value) => Effect<EmptyEnvironment>.Succeed(value.Length)).RunAsync(CancellationToken.None);
+    var remaining = await held
+        .Catch<Exception, ProviderRemaining>(_ => Effect<EmptyEnvironment>.Succeed(42)).RunAsync(CancellationToken.None);
+    var caught = await handled
+        .Catch<Exception, ProviderRemaining>(_ => Effect<EmptyEnvironment>.Succeed(42)).RunAsync(CancellationToken.None);
+
+    // Then
+    if (widened.Value is not Ok<int> { Value: 5 }
+        || remaining.Value is not Err<ProviderRemaining> error || error.Error is not string text || text != "hello"
+        || caught.Value is not Ok<int> { Value: 42 })
+    {
+        throw new InvalidOperationException("Provider cases must support widening, matching and splitting.");
+    }
+}
+
 static async Task AssertZeroTimeout()
 {
     // Given
@@ -248,6 +274,31 @@ public readonly struct LeafCarrier(ILeaf value) : ILeaf
 [Error] public partial union InterfaceError(LeafCarrier);
 [Error] public partial union InterfaceSource(ILeaf, Guid);
 [Error, RestOf<InterfaceSource>] public partial union InterfaceRemaining(LeafCarrier);
+
+[System.Runtime.CompilerServices.Union]
+public partial struct ProviderOutcome<T> : ProviderOutcome<T>.IUnionMembers
+{
+    private readonly object? value;
+    private ProviderOutcome(object? value) => this.value = value;
+    public interface IFactory
+    {
+        static ProviderOutcome<T> Create(T value) => new(value);
+        static ProviderOutcome<T> Create(Exception value) => new(value);
+    }
+    public interface IUnionMembers : IFactory
+    {
+        new static ProviderOutcome<T> Create(T value) => new(value);
+        static ProviderOutcome<T> Create<U>(U value) => new(value);
+        object? Value { get; }
+    }
+    object? IUnionMembers.Value => value;
+}
+
+[Error]
+public partial union ProviderError(ProviderOutcome<string>, Guid);
+
+[Error, RestOf<ProviderOutcome<string>>]
+public partial union ProviderRemaining(string);
 
 [Error]
 public partial union AppError(NotFound, TimeoutError);
