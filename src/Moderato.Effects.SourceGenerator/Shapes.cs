@@ -53,21 +53,23 @@ internal static class Shapes
         => type.DeclaringSyntaxReferences.Any(static reference => reference.GetSyntax() is TypeDeclarationSyntax { Keyword.Text: "union" })
             || type.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.UnionAttribute");
 
+    public static INamedTypeSymbol? MemberProvider(INamedTypeSymbol union)
+        => union.GetTypeMembers("IUnionMembers", 0).FirstOrDefault(static type => type.TypeKind == TypeKind.Interface);
+
     /// <summary>The parameter types of a union's constructors or provider factories.</summary>
     public static ImmutableArray<ITypeSymbol> Cases(INamedTypeSymbol union)
     {
-        var provider = union.GetTypeMembers("IUnionMembers", 0).FirstOrDefault(static type => type.TypeKind == TypeKind.Interface);
+        var provider = MemberProvider(union);
         var members = provider is null
             ? union.InstanceConstructors
             : provider.GetMembers("Create").OfType<IMethodSymbol>()
                 .Concat(provider.AllInterfaces.SelectMany(static type => type.GetMembers("Create").OfType<IMethodSymbol>()))
                 .Where(method => method.IsStatic && method.Arity == 0 && SymbolEqualityComparer.Default.Equals(method.ReturnType, union));
-        var cases = members
+        return [.. members
             .Where(method => method.DeclaredAccessibility == Accessibility.Public && method.Parameters.Length == 1
                 && method.Parameters[0].RefKind is RefKind.None or RefKind.In
                 && (provider is not null || !SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, union)))
-            .Select(static method => method.Parameters[0].Type);
-        return [.. provider is null ? cases : cases.Distinct<ITypeSymbol>(SymbolEqualityComparer.Default)];
+            .Select(static method => method.Parameters[0].Type)];
     }
 
     public static bool IsPartial(TypeDeclarationSyntax node) => node.Modifiers.Any(static m => m.IsKind(SyntaxKind.PartialKeyword));
@@ -145,10 +147,18 @@ internal static class Shapes
         return admitting.Count == 1 ? admitting[0] : null;
     }
 
+    public static bool AdmitsNull(ITypeSymbol type)
+        => type.NullableAnnotation == NullableAnnotation.Annotated
+            || type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
+
     /// <summary>MEFF005 for each direct case of <paramref name="union"/> that admits null, which is indistinguishable from <c>default</c>.</summary>
     public static IEnumerable<DiagnosticInfo> NullableCases(INamedTypeSymbol union, Location location)
-        => Cases(union).Select(Name).Where(static c => c.EndsWith("?", StringComparison.Ordinal))
+    {
+        var cases = Cases(union).Where(AdmitsNull);
+        if (MemberProvider(union) is not null) cases = cases.GroupBy(Identity).Select(static group => group.First());
+        return cases.Select(Name)
             .Select(c => DiagnosticInfo.Create(Diagnostics.NullableCase, location, union.Name, c.Substring(c.LastIndexOf('.') + 1)));
+    }
 
     /// <summary>A pattern narrowing <paramref name="value"/> along <paramref name="path"/> to a null in its last union.</summary>
     public static string NarrowToNull(CasePath path, string value)

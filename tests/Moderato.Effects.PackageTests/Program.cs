@@ -172,6 +172,7 @@ static async Task AssertUnionMemberProvider()
     var defect = new InvalidOperationException("expected error");
     Effect<int, ProviderOutcome<string>, EmptyEnvironment> held = Effect<EmptyEnvironment>.Fail<ProviderOutcome<string>>("hello");
     Effect<int, ProviderOutcome<string>, EmptyEnvironment> handled = Effect<EmptyEnvironment>.Fail<ProviderOutcome<string>>(defect);
+    Effect<int, object?, EmptyEnvironment> empty = Effect<EmptyEnvironment>.Fail<object?>(null);
 
     // When
     var widened = await failure.Widen<ProviderError>()
@@ -180,11 +181,14 @@ static async Task AssertUnionMemberProvider()
         .Catch<Exception, ProviderRemaining>(_ => Effect<EmptyEnvironment>.Succeed(42)).RunAsync(CancellationToken.None);
     var caught = await handled
         .Catch<Exception, ProviderRemaining>(_ => Effect<EmptyEnvironment>.Succeed(42)).RunAsync(CancellationToken.None);
+    var nullCase = await empty.Widen<ProviderAliasError>()
+        .CatchCase((object? value) => Effect<EmptyEnvironment>.Succeed(value is null ? 42 : -1)).RunAsync(CancellationToken.None);
 
     // Then
     if (widened.Value is not Ok<int> { Value: 5 }
         || remaining.Value is not Err<ProviderRemaining> error || error.Error is not string text || text != "hello"
-        || caught.Value is not Ok<int> { Value: 42 })
+        || caught.Value is not Ok<int> { Value: 42 }
+        || nullCase.Value is not Ok<int> { Value: 42 })
     {
         throw new InvalidOperationException("Provider cases must support widening, matching and splitting.");
     }
@@ -296,6 +300,23 @@ public partial struct ProviderOutcome<T> : ProviderOutcome<T>.IUnionMembers
 
 [Error]
 public partial union ProviderError(ProviderOutcome<string>, Guid);
+
+[System.Runtime.CompilerServices.Union]
+public struct ProviderAlias<T> : ProviderAlias<T>.IUnionMembers
+{
+    private readonly object? value;
+    private ProviderAlias(object? value) => this.value = value;
+    public interface IFactory { static ProviderAlias<T> Create(T value) => new(value); }
+    public interface IUnionMembers : IFactory
+    {
+        static ProviderAlias<T> Create(dynamic? value) => new((object?)value);
+        object? Value { get; }
+    }
+    object? IUnionMembers.Value => value;
+}
+
+[Error]
+public partial union ProviderAliasError(ProviderAlias<object?>);
 
 [Error, RestOf<ProviderOutcome<string>>]
 public partial union ProviderRemaining(string);
