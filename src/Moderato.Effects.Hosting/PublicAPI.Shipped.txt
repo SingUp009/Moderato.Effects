@@ -1,1 +1,15 @@
 #nullable enable
+Moderato.Effects.Hosting.EffectHostedServiceException
+Moderato.Effects.Hosting.EffectHostedServiceException.Exit.get -> Moderato.Effects.ExitCase
+Moderato.Effects.Hosting.EffectsHostingOptions
+Moderato.Effects.Hosting.EffectsHostingOptions.Diagnostics.get -> System.Func<System.IServiceProvider!, Moderato.Effects.Hosting.IEffectDiagnostics!>!
+Moderato.Effects.Hosting.EffectsHostingOptions.Diagnostics.set -> void
+Moderato.Effects.Hosting.EffectsHostingOptions.EffectsHostingOptions() -> void
+Moderato.Effects.Hosting.EffectsHostingServiceCollectionExtensions
+Moderato.Effects.Hosting.IEffectDiagnostics
+Moderato.Effects.Hosting.IEffectDiagnostics.Report(Moderato.Effects.ExitCase failure) -> void
+Moderato.Effects.Hosting.LoggerDiagnostics
+Moderato.Effects.Hosting.LoggerDiagnostics.LoggerDiagnostics(Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
+Moderato.Effects.Hosting.LoggerDiagnostics.Report(Moderato.Effects.ExitCase failure) -> void
+static Moderato.Effects.Hosting.EffectsHostingServiceCollectionExtensions.AddEffectHostedService<E, R>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Moderato.Effects.Effect<Moderato.Results.Unit, E, R> effect, System.Func<System.IServiceProvider!, R>! environment, System.Func<E, R, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! onError) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Moderato.Effects.Hosting.EffectsHostingServiceCollectionExtensions.AddEffectsHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Moderato.Effects.Hosting.EffectsHostingOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
