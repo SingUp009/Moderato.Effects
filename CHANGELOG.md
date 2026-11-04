@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.3] - 2026-11-04
+
 ### Breaking changes
 
 - Recompiled `TapErr(error => BuildEffect(error))` calls now run the returned effect. Use an explicit `Action<E>` when only the callback's synchronous side effects are intended.
@@ -106,20 +108,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Accept environment classes whose sole primary constructor parameter has the class's own type.
 
 - Preserve Interrupted when a Gen block rethrows an earlier interruption after catching later interrupted steps.
-
-### Tests
-
-- Keep law-test description construction pure and check pure environment-conversion identity/composition across synchronous/pending completion and direct/iterative execution, separately from builder-order recording.
-
-- Check throwing binders, recovery handlers and environment builders across direct/iterative execution and synchronous/pending completion, including retained failure context and skipped inner execution.
-
-- Check pure error-map identity/composition and independent success/error-map commutation across four outcomes, synchronous/pending completion and shallow/iterative execution with padding outside each compared expression, including retained failure context and error-mapper evaluation order/count.
-
-- Cover Resource error widening and jittered schedule limits through public Use and Retry calls, including ownership, zero/negative limits and cap ordering.
-
-- Require deep core-composition and control-wrapper probes under JIT and packed Native AOT in CI.
-
-- Exercise zero deadlines, interrupted Gen and Resource releases, and defects consumed after the body snapshot through the packed application under JIT and Native AOT.
 
 ## [0.1.0-preview.2] - 2026-11-02
 
@@ -278,6 +266,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 - Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...HEAD
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.3...HEAD
+[0.1.0-preview.3]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...v0.1.0-preview.3
 [0.1.0-preview.2]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/SingUp009/Moderato.Effects/releases/tag/v0.1.0-preview.1

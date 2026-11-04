@@ -37,3 +37,13 @@ MEFF310 | Moderato.Effects | Warning | Analyzers
 Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 MEFF006 | Moderato.Effects | Error | Diagnostics
+
+## Release 0.1.0.3
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+MEFF007 | Moderato.Effects | Error | Union case graph exceeds generation limits
+MEFF008 | Moderato.Effects | Error | Union cases may match the same value
+MEFF009 | Moderato.Effects | Error | Generated type reference has no unambiguous global name

@@ -34,15 +34,22 @@ Moderato.Effects.Effect<T, E, R>.OnThreadPool() -> Moderato.Effects.Effect<T, E,
 Moderato.Effects.Effect<T, E, R>.OrElse<F>(System.Func<E, Moderato.Effects.Effect<T, F, R>>! binder) -> Moderato.Effects.Effect<T, F, R>
 Moderato.Effects.Effect<T, E, R>.Provide<R2>(System.Func<R2, R>! build) -> Moderato.Effects.Effect<T, E, R2>
 Moderato.Effects.Effect<T, E, R>.RunAsync(R environment, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+Moderato.Effects.Effect<T, E, R>.RunAsync(R environment, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
 Moderato.Effects.Effect<T, E, R>.RunExitAsync(R environment, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+Moderato.Effects.Effect<T, E, R>.RunExitAsync(R environment, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
 Moderato.Effects.Effect<T, E, R>.Tap(System.Action<T>! action) -> Moderato.Effects.Effect<T, E, R>
 Moderato.Effects.Effect<T, E, R>.TapErr(System.Action<E>! action) -> Moderato.Effects.Effect<T, E, R>
+Moderato.Effects.Effect<T, E, R>.TapErr<U>(System.Func<E, Moderato.Effects.Effect<U, Moderato.Effects.Never!, R>>! action) -> Moderato.Effects.Effect<T, E, R>
 Moderato.Effects.Effect<T, E, R>.UnwrapOr(T fallback) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
 Moderato.Effects.Effect<T, E, R>.UnwrapOrElse(System.Func<E, T>! fallback) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
 Moderato.Effects.Effect<T, E, R>.Widen<F>() -> Moderato.Effects.Effect<T, F, R>
 Moderato.Effects.Effect<T, E, R>.WidenEnv<R2>() -> Moderato.Effects.Effect<T, E, R2>
 Moderato.Effects.EffectDiagnostics
 Moderato.Effects.EffectLinq
+Moderato.Effects.EffectRunOptions
+Moderato.Effects.EffectRunOptions.EffectRunOptions() -> void
+Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.get -> System.Action<Moderato.Effects.ExitCase>?
+Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.init -> void
 Moderato.Effects.EffectScheduleExtensions
 Moderato.Effects.EffectTimeExtensions
 Moderato.Effects.EffectUnionExtensions
@@ -259,9 +266,13 @@ static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Mod
 static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
 static Moderato.Effects.EmptyEnvironment.Value.get -> Moderato.Effects.EmptyEnvironment!
 static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
 static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
 static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
 static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
+static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
 static Moderato.Effects.Exit<T, E>.operator !=(Moderato.Effects.Exit<T, E> left, Moderato.Effects.Exit<T, E> right) -> bool
 static Moderato.Effects.Exit<T, E>.operator ==(Moderato.Effects.Exit<T, E> left, Moderato.Effects.Exit<T, E> right) -> bool
 static Moderato.Effects.Failed.operator !=(Moderato.Effects.Failed? left, Moderato.Effects.Failed? right) -> bool

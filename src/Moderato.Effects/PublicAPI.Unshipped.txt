@@ -1,12 +1,1 @@
 #nullable enable
-Moderato.Effects.Effect<T, E, R>.RunAsync(R environment, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
-Moderato.Effects.Effect<T, E, R>.RunExitAsync(R environment, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
-Moderato.Effects.EffectRunOptions
-Moderato.Effects.EffectRunOptions.EffectRunOptions() -> void
-Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.get -> System.Action<Moderato.Effects.ExitCase>?
-Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.init -> void
-static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
-static Moderato.Effects.EnvironmentRunExtensions.RunAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
-static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.DefaultEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
-static Moderato.Effects.EnvironmentRunExtensions.RunExitAsync<T, E>(this Moderato.Effects.Effect<T, E, Moderato.Effects.EmptyEnvironment!> effect, System.Threading.CancellationToken cancellationToken, Moderato.Effects.EffectRunOptions! options) -> System.Threading.Tasks.ValueTask<Moderato.Effects.Exit<T, E>>
-Moderato.Effects.Effect<T, E, R>.TapErr<U>(System.Func<E, Moderato.Effects.Effect<U, Moderato.Effects.Never!, R>>! action) -> Moderato.Effects.Effect<T, E, R>
