@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Moderato.Effects.Hosting" Version="$(ModeratoEffectsVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.3.26522.148" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
+    <Compile Remove="Misuse.cs" />
+  </ItemGroup>
+</Project>

@@ -244,3 +244,14 @@ await builder.Build().RunAsync();
 - 通常の接続中も global の設定は変更しない。診断の適用範囲はこの登録が開始したルートと子であり、任意の直接実行や HTTP リクエストは含まない。
 - 標準 logger のカテゴリーは `Moderato.Effects.Hosting`。EventId 1001 `UnobservedDefect`（Error）は `FailureKind`・`SuppressedCount`・`OmittedSuppressed` と元例外、1002 `UnjoinedError`（Warning）は `FailureKind` を持つ。1003 `SuppressedFailure`（Error）は保持順に `SuppressedIndex`（0始まり）・`Relation`・`FailureKind` と分かる場合の例外を持つ。型付きエラー値を自動出力しない。無効時は付属情報を列挙しない。
 - ZLogger を使うアプリは `builder.Logging.AddZLoggerConsole()` などでプロバイダーを選ぶ。初版に専用の Hosting 登録口を追加しない。既知の非互換は呼び出し後に state を読む独自 provider との測定1例であり、すべての provider に一般化しない。
+
+## 10. H3 の出荷物検証（2026-11-04）
+
+- Hosting を別 nupkg / snupkg にし、README・XML docs・SourceLink と repository commit を `tests/verify-packages.py` で検証する。生成器を重複して同梱せず、Core の package から推移的に受け取る。
+- Core と Microsoft.Extensions.Logging への参照は NuGet の最小版指定であり、完全一致ではない。上位版を拒否する上限を付けない（[NuGet の範囲規則](https://learn.microsoft.com/en-us/nuget/concepts/package-versioning#version-ranges)）。Hosting.Abstractions は net11.0 の参照フレームワークに含まれるため、冗長な PackageReference を置かない。AddLogging のための Logging 実装 package は維持する。
+- ソース上の開発版はリリースの確定ではない。非タグ CI は固有の `-ci.<run>.<attempt>`、ローカル検証も固有の未公開版を両パッケージへ渡す。リリース PR で両方を更新し、タグとの一致を検査してから既存の承認付き公開へ進む。
+- SDK は `11.0.100-rc.3.26522.148`。RC2 付属の Native AOT compiler に対する NU1903 を実測したため、[修正済み RC3](https://github.com/advisories/GHSA-p3jp-9v83-76w9)へ更新した。NuGet の監査や IL 警告を抑制しない。
+- Hosting のみの PackageReference を持つ利用側で、型付きエラー union の生成と Widen、onError の待機後の失敗と元 Err、成功／失敗と scope 破棄成功／失敗の4組、同型2登録と診断の所有権を検証する。誤用を加えた build が MEFF301 で失敗することも CI で確認する。同じ consumer を linux-x64 Native AOT で発行・実行する。
+- `LoggingAllocationTests` は、事前構築した Die（付属情報1件）と Failed を標準 ILoggerFactory の No-op provider に渡す。各1024回の準備後に1024回計測し、有効／無効の4条件すべてで呼び出しスレッドの追加割り当ては0 B。データ構築、実プロバイダー、外部出力の費用は含めない。
+- BenchmarkDotNet 0.15.8、RC3、inProcess の Short job でも同じ4条件を測った。無効時は Die 約3.57 ns／Failed 約4.58 ns、有効時は Die 約56.60 ns／Failed 約23.58 ns、追加割り当ては検出されなかった。実行条件付きの短期測定であり、他のマシンや実プロバイダーの上限ではない。
+- 既存を含む全274 benchmark ケースを inProcess の Dry job で実行した。これは実行のスモーク確認であり、速度改善や性能上限の根拠にはしない。全体の性能最適化は Hosting 後の別作業である。

@@ -161,3 +161,5 @@ bench/Moderato.Effects.Benchmarks/               BenchmarkDotNet（P8）
 | H3 | パッケージ・CI・サンプル・公開 API 記録・利用ガイド・リリース手順 | 個別の未公開バージョンで pack し、利用側・Analyzer・NativeAOT と必要な性能確認を実行。公開済みの同名バージョンをローカルキャッシュへ上書きしない |
 
 開発中の Hosting は最新の本体への ProjectReference を使う。公開済み preview.2 に最新の契約がすべて入っているとは扱わない。バージョン確定・タグ・公開はリリース手順の別の段階とする。
+
+H1 は PR #373、H2 は PR #374 でレビュー・マージ済み。H3 は実行物・依存範囲・シンボル・SourceLink・利用側の生成器／Analyzer・Native AOT と wiki を対象とし、確認結果は Hosting 要件の節10に記録する。NuGet 公開・タグ作成・リリース版の確定は含めない。
