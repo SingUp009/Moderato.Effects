@@ -141,9 +141,18 @@ internal sealed class Probe
 
     private bool ResourceScenario { get; }
 
+    internal Task Window(TimeSpan duration, Func<bool>? shouldStop = null)
+        => BoundedWindow(() => RunWindow(duration, shouldStop), duration + TimeSpan.FromSeconds(30));
+
+    private static Task BoundedWindow(Func<Task> work, TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        return Task.Run(work).WaitAsync(timeout);
+    }
+
     // Finish the async state machine before collecting samples; live locals are not leaks.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    internal async Task Window(TimeSpan duration, Func<bool>? shouldStop = null)
+    private async Task RunWindow(TimeSpan duration, Func<bool>? shouldStop)
     {
         // Drain the current run rather than adding cancelable-caller overhead to each measured operation.
         if (shouldStop?.Invoke() == true) return;
@@ -244,6 +253,26 @@ internal sealed class Probe
                 throw new InvalidOperationException("The completed-window collection control did not run and release once.");
         }
         Console.WriteLine("PASS weak-reference controls: completed windows collect; retained samples do not");
+
+        // Given
+        using var resume = new ManualResetEventSlim();
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task StalledWindow()
+        {
+            resume.Wait();
+            ended.SetResult();
+            return Task.CompletedTask;
+        }
+        // When
+        var bounded = BoundedWindow(StalledWindow, TimeSpan.FromMilliseconds(100));
+        var timedOut = false;
+        try { await bounded; }
+        catch (TimeoutException) { timedOut = true; }
+        finally { resume.Set(); }
+        await ended.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // Then
+        if (!timedOut) throw new InvalidOperationException("A stalled window did not fail at its deadline.");
+        Console.WriteLine("PASS window deadline: synchronous stall detected and control worker released");
     }
 
     private static void Reject(Action action)
