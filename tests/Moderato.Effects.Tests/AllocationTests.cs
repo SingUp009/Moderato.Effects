@@ -16,6 +16,51 @@ public class AllocationTests
     public static TheoryData<SchedulingAllocationCase> SchedulingCases => new(Enum.GetValues<SchedulingAllocationCase>());
 
     [Fact]
+    public async Task RunAsync_OneDeferredRelease_AllocatesLikeNoRelease()
+    {
+        // Given
+        var released = 0;
+        var release = Effect<EmptyEnvironment>.Sync(() =>
+        {
+            released++;
+            return Unit.Value;
+        });
+        Func<ExitCase, Effect<Unit, Never, EmptyEnvironment>> callback = _ => release;
+        var effects = new[] { 0, 1 }.Select(count => Scope<Never, EmptyEnvironment>.Gen(scope =>
+        {
+            if (count != 0) scope.Defer(callback);
+            return new ValueTask<Unit>(Unit.Value);
+        })).ToArray();
+        foreach (var effect in effects)
+            for (var i = 0; i < WARM_UP_RUNS; i++) await effect.RunAsync(CancellationToken.None);
+        long[] allocated = [long.MaxValue, long.MaxValue];
+
+        // When
+        var completedAtOnce = true;
+        var succeeded = true;
+        for (var scenario = 0; scenario < effects.Length; scenario++)
+        {
+            for (var window = 0; window < WINDOWS; window++)
+            {
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < RUNS; i++)
+                {
+                    var run = effects[scenario].RunAsync(CancellationToken.None);
+                    completedAtOnce &= run.IsCompletedSuccessfully;
+                    succeeded &= (await run).TryGetOk(out _);
+                }
+                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+        }
+
+        // Then
+        Assert.True(completedAtOnce);
+        Assert.True(succeeded);
+        Assert.Equal(WARM_UP_RUNS + WINDOWS * RUNS, released);
+        Assert.True(allocated[1] <= allocated[0], $"No release: {allocated[0]}; one release: {allocated[1]}");
+    }
+
+    [Fact]
     public async Task RunExitAsync_SingleReleaseFailureHasContext_AllocatesLikeEmptyContext()
     {
         // Given

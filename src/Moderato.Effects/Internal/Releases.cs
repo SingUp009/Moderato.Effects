@@ -9,7 +9,7 @@ namespace Moderato.Effects.Internal;
 internal sealed class Releases<R>(Cancellation bodyCancellation)
 {
     // The owner never escapes to user code, so it can be its own gate.
-    private List<object>? actions;
+    private object? actions;
     private ImmutableArray<Outcome<Unit, Never>>.Builder? childDefects;
     private bool bodyEnded;
 
@@ -29,15 +29,19 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         return true;
     }
 
-    internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release)
-    {
-        lock (this) (actions ??= []).Add(release);
-    }
+    internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release) => AddAction(release);
 
     internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release)
+        => AddAction(new AcquiredRelease<T>(value, release));
+
+    private void AddAction(object action)
     {
-        var acquired = new AcquiredRelease<T>(value, release);
-        lock (this) (actions ??= []).Add(acquired);
+        lock (this)
+        {
+            if (actions is null) actions = action;
+            else if (actions is List<object> multiple) multiple.Add(action);
+            else actions = new List<object> { actions, action };
+        }
     }
 
     private interface IAcquiredRelease
@@ -55,14 +59,14 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
-        List<object> actions;
+        object actions;
         lock (this)
         {
             bodyEnded = true;
             if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects);
             // Any cancellation of the body may have left a callback failure.
             body = bodyCancellation.WithCallbackFailure(body);
-            if (this.actions is not { Count: > 0 }) return body;
+            if (this.actions is null) return body;
             actions = this.actions;
             this.actions = null;
         }
@@ -81,12 +85,12 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
         ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
         ImmutableArray<Suppressed>.Builder? carried = null;
         var carriedOmitted = 0;
-        for (var i = actions.Count - 1; i >= 0; i--)
+        for (var i = actions is List<object> multiple ? multiple.Count - 1 : 0; i >= 0; i--)
         {
             Outcome<Unit, Never> released;
             try
             {
-                var action = actions[i];
+                var action = actions is List<object> registered ? registered[i] : actions;
                 var release = action is Func<ExitCase, Effect<Unit, Never, R>> callback
                     ? callback(exit)
                     : ((IAcquiredRelease)action).Invoke(exit);

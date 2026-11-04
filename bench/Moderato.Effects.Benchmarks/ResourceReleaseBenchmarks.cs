@@ -8,6 +8,8 @@ public class ResourceReleaseBenchmarks
 {
     private Effect<int, Never, EmptyEnvironment> use;
     private Effect<int, Never, EmptyEnvironment> gen;
+    private Effect<int, Never, EmptyEnvironment> twoReleases;
+    private Effect<int, Never, EmptyEnvironment> eightReleases;
     private Effect<int, Never, EmptyEnvironment> suspendedUse;
     private Effect<int, Never, EmptyEnvironment> suspendedGen;
 
@@ -47,6 +49,21 @@ public class ResourceReleaseBenchmarks
             return new ValueTask<int>(42);
         });
 
+        twoReleases = WithReleases(2);
+        eightReleases = WithReleases(8);
+        Effect<int, Never, EmptyEnvironment> WithReleases(int count)
+        {
+            Func<ExitCase, Effect<Unit, Never, EmptyEnvironment>> cleanup = _ => release;
+            return Scope<Never, EmptyEnvironment>.Gen<int>(scope =>
+            {
+                // These registrations deliberately share the measured scope's lifetime.
+#pragma warning disable MEFF305
+                for (var i = 0; i < count; i++) scope.Defer(cleanup);
+#pragma warning restore MEFF305
+                return new(42);
+            });
+        }
+
         empty = Scope<Never, EmptyEnvironment>.Gen<int>(static _ => new(42));
         var exception = new IOException("release failed");
         var fail = Effect<EmptyEnvironment>.Sync<Unit>(() => throw exception);
@@ -67,6 +84,7 @@ public class ResourceReleaseBenchmarks
         }
 
         if (Use().Result.UnwrapOr(-1) != 42 || Gen().Result.UnwrapOr(-1) != 42
+            || TwoReleases().Result.UnwrapOr(-1) != 42 || EightReleases().Result.UnwrapOr(-1) != 42
             || SuspendedUse().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42
             || SuspendedGen().AsTask().GetAwaiter().GetResult().UnwrapOr(-1) != 42)
         {
@@ -98,4 +116,6 @@ public class ResourceReleaseBenchmarks
     }
 
     [Benchmark] public ValueTask<Result<int, Never>> Gen() => gen.RunAsync();
+    [Benchmark] public ValueTask<Result<int, Never>> TwoReleases() => twoReleases.RunAsync();
+    [Benchmark] public ValueTask<Result<int, Never>> EightReleases() => eightReleases.RunAsync();
 }
