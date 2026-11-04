@@ -7,7 +7,7 @@ using Moderato.Results;
 
 if (args is ["self-check"])
 {
-    Probe.SelfCheck();
+    await Probe.SelfCheck();
     return 0;
 }
 if (args.Length != 3 || args[0] is not ("gen" or "resource" or "provide" or "bind" or "cancel" or "fiber" or "die" or "host") ||
@@ -25,7 +25,7 @@ var probe = new Probe(args[0]);
 using var process = Process.GetCurrentProcess();
 Console.WriteLine("WARMUP 1 second (counts remain cumulative)");
 await probe.Window(TimeSpan.FromSeconds(1));
-probe.CheckCollected();
+await probe.CheckCollectedAsync();
 var clock = Stopwatch.StartNew();
 var duration = TimeSpan.FromMinutes(minutes);
 Console.WriteLine("elapsed_s,ops,ops_window,us_per_op,allocated_window,gen0,gen1,gen2,post_gc_heap,gc_committed,private,working_set,threads,handles,created,released,expected_err,interrupted,defects,diagnostics");
@@ -41,7 +41,7 @@ while (clock.Elapsed < duration)
     var elapsed = Stopwatch.GetElapsedTime(started);
     var allocatedWindow = GC.GetTotalAllocatedBytes(precise: true) - allocated;
     var gcCounts = Enumerable.Range(0, 3).Select(i => GC.CollectionCount(i) - collections[i]).ToArray();
-    probe.CheckCollected();
+    await probe.CheckCollectedAsync();
     process.Refresh();
     Console.WriteLine(FormattableString.Invariant($"{clock.Elapsed.TotalSeconds:F3},{probe.Completed},{probe.Completed - previous},{elapsed.TotalMicroseconds / (probe.Completed - previous):F3},{allocatedWindow},{gcCounts[0]},{gcCounts[1]},{gcCounts[2]},{GC.GetTotalMemory(false)},{GC.GetGCMemoryInfo().TotalCommittedBytes},{process.PrivateMemorySize64},{process.WorkingSet64},{process.Threads.Count},{process.HandleCount},{probe.Created},{probe.Released},{probe.Errors},{probe.Interruptions},{probe.Defects},{probe.Diagnostics}"));
 }
@@ -167,17 +167,20 @@ internal sealed class Probe
 
     internal void Track(object value) => references[referenceAt++ % references.Length] = new WeakReference(value);
 
-    internal void CheckCollected()
+    internal async Task CheckCollectedAsync()
     {
-        // Unwinding can continue briefly after the public result has been delivered.
-        var collected = SpinWait.SpinUntil(() =>
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            return references.All(static reference => reference is null || !reference.IsAlive);
-        }, TimeSpan.FromSeconds(5));
+        // Leave the producer's inline completion stack before waiting for its locals to collect.
+        await Task.Yield();
+        var collected = SpinWait.SpinUntil(CollectSamples, TimeSpan.FromSeconds(5));
         if (!collected) throw new InvalidOperationException("Completed environment or lease sample remains alive.");
+    }
+
+    private bool CollectSamples()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        return references.All(static reference => reference is null || !reference.IsAlive);
     }
 
     internal static void Validate(Exit<int, string> exit, int id, bool error)
@@ -187,7 +190,7 @@ internal sealed class Probe
         throw new InvalidOperationException($"Unexpected outcome for id {id}: {exit}.");
     }
 
-    internal static void SelfCheck()
+    internal static async Task SelfCheck()
     {
         // Given
         Exit<int, string> ok = new Ok<int>(7);
@@ -207,7 +210,27 @@ internal sealed class Probe
         lease.Dispose();
         Reject(lease.Dispose);
         if (probe.Created != 1 || probe.Released != 1) throw new InvalidOperationException("Lease counter self-check failed.");
+        // When
+        var retainedDetected = false;
+        try { await probe.CheckCollectedAsync(); }
+        catch (InvalidOperationException) { retainedDetected = true; }
+        GC.KeepAlive(lease);
+        // Then
+        if (!retainedDetected) throw new InvalidOperationException("A retained sample was reported as collected.");
         Console.WriteLine("PASS outcome and cleanup self-check (including seven negative controls)");
+
+        // Given
+        for (var i = 0; i < 8; i++)
+        {
+            var completed = new Probe("gen");
+            // When
+            await completed.Window(TimeSpan.Zero);
+            await completed.CheckCollectedAsync();
+            // Then
+            if (completed.Completed != 1 || completed.Created != completed.Released)
+                throw new InvalidOperationException("The completed-window collection control did not run and release once.");
+        }
+        Console.WriteLine("PASS weak-reference controls: completed windows collect; retained samples do not");
     }
 
     private static void Reject(Action action)

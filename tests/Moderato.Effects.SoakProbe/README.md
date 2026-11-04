@@ -64,7 +64,11 @@ warmup; per-window operation and allocation deltas exclude it.
 Each CSV window records elapsed wall time, process-wide allocated bytes and natural
 GC counts during work, then forces collection and checks a fixed ring of weak
 references to completed environments and leases. The async window must have ended
-before collection. A short bounded retry allows completion unwinding. Failure to
+before collection. The collection check first yields out of the producer's inline
+completion stack, then retries for at most five seconds. The self-check exercises
+single-operation windows whose final environment and lease are both sampled; a
+separate retained-reference control must still fail through that same collection
+check. No extra executions replace the sampled objects. Failure to
 collect samples fails the run. Forced collections are excluded from the natural
 GC columns. Sampling, formatting and runtime activity can contribute to metrics;
 this is not a microbenchmark. Window timing includes validation, not the later
