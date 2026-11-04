@@ -834,6 +834,7 @@ R を推論する手がかりがないので、作る API はすべて **`Effect
 **Results と同じ操作**
 
 - `Map` / `MapErr` / `AndThen` / `AndThrough` / `OrElse` / `Tap` / `TapErr` を用意する。
+- `TapErr<U>(Func<E, Effect<U, Never, R>>)` は Err を観測する Effect を実行する。成功時は元の Err、失敗時は観測の Die / Interrupted を返し、元の Err を Sequential の文脈へ保持する。公開 Interrupted の付属情報の制約は変えない。非同期処理・環境・トークンは観測する Effect で表現し、独自の Async 演算子は作らない。Hosting の Err ハンドラーはこの観測に成功した後でだけ Err を消費する。再コンパイル時に Effect を返す式本体の既存コールバックは新 overload を選ぶため、その Effect が実行される。構築時の副作用だけを意図する場合は明示的な `Action<E>` を使う。
 - `Match(ok, err)` → `Effect<U, Never, R>`。実行はせず、両方の場合を1つの値にまとめる Effect を返す。
 - `UnwrapOr` / `UnwrapOrElse` → `Effect<T, Never, R>`。
 - 複数の Effect をまとめる操作は、`All` / `AllErrors` / `AllSettled`（D10）。
@@ -1003,7 +1004,7 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 ## リリース後の追加機能の候補
 
 - **`Moderato.Effects.Hosting`**：長く動き続ける Effect を `BackgroundService` として動かすための連携。アプリの停止を実行トークンに連動させ、本体の規則で終了結果を分類する。診断実装を登録口へ渡し、その Hosting が開始した Effect と子の診断を、その Host の `ILogger` へ接続する。
-  - [要件草案](requirements/moderato-effects-hosting.md)で、停止・失敗・DI の寿命・診断ログの所有権を議論する。2026-11-04、`RunExitAsync` で分類した Die を元情報付きで Host へ異常として伝えること、ルート Err に型付きハンドラーを必須とすること、診断実装を渡す登録方法と、接続先・所有者・寿命を Host に揃えることを合意した。公開 API・本体の拡張・接続終了後の扱いは未決で、実装はまだない。現在の全体共通ハンドラーだけで Host 分離を保証するものではない。
+  - [要件草案](requirements/moderato-effects-hosting.md)で、停止・失敗・DI の寿命・診断ログの所有権を議論する。2026-11-04、`RunExitAsync` で分類した Die を元情報付きで Host へ異常として伝えること、ルート Err に型付きハンドラーを必須とすること、診断実装を渡す登録方法と、接続先・所有者・寿命を Host に揃えることを合意した。H1 で本体の実行単位の診断先を実装し、H2 で公開 API だけを使う Hosting 連携を実装する。具体的な API・所有権・遅延診断の扱いは要件文書の節9に記録する。Hosting に本体の internal を公開せず、失敗集約を複製しない。
   - Interrupted は結果を受け取った時点の停止トークンで判定し、キャンセル済みなら正常停止、未キャンセルなら Host へ異常として伝える。初版は Host 標準の停止猶予を尊重し、自動延長や Host 破棄の独自の保留は行わない。猶予内に後始末が終わる構成は利用者の責任とする（2026-11-04 合意）。
   - Hosting の `onError` が Die で失敗した場合は、処理しようとした元の Err を Sequential の付属情報として保持する。ハンドラーの同期・非同期で規則を変えず、既存の `OrElse` の消費規則も変更しない（2026-11-04 合意）。
 - **`Moderato.Effects.AspNetCore`**：`Result` / `Exit` を `IResult` に変換する補助（Die を ProblemDetails にする、など）。

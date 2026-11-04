@@ -89,6 +89,29 @@ public readonly partial struct Effect<T, E, R>
         });
     }
 
+    /// <summary>Runs an effect on the error, retaining the error if observation fails.</summary>
+    /// <param name="action">Builds the observation effect.</param>
+    /// <returns>An effect with the original outcome when observation succeeds.</returns>
+    public Effect<T, E, R> TapErr<U>(Func<E, Effect<U, Never, R>> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return Then<T, E, Func<E, Effect<U, Never, R>>>(action, static async (outcome, environment, context, tap) =>
+        {
+            if (outcome.Kind != OutcomeKind.Err) return outcome;
+            try
+            {
+                var observed = await tap(outcome.Error).Validate().Run(environment, context).ConfigureAwait(false);
+                if (observed.Kind != OutcomeKind.Ok) return observed.WithTypes<T, E>().Replacing(outcome);
+                var (suppressed, omitted) = SuppressedContext.Concat(outcome.Suppressed, outcome.Omitted, observed.Suppressed, observed.Omitted);
+                return outcome.WithSuppressed(suppressed, omitted);
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<T, E>(exception, context).Replacing(outcome);
+            }
+        });
+    }
+
     /// <summary>Folds the value and the error into one value.</summary>
     /// <param name="ok">Folds the value.</param>
     /// <param name="err">Folds the error.</param>
