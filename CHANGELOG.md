@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Keep pending task storage only in execution frames that can await their own task, reducing deep Bind, Provide and Resource execution allocations without changing the public API or failure/context rules.
+
 - Use .NET 11 RC3 to replace the vulnerable RC2 Native AOT toolchain. Verify uniquely versioned Core and Hosting artifacts in non-tag CI builds.
 
 - Share bounded failure-context operations across outcomes, scopes, concurrency, cancellation, fibers and timeouts, and use one continuation implementation for effect operators.

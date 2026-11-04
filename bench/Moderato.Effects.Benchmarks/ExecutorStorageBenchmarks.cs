@@ -13,15 +13,17 @@ public class ExecutorStorageBenchmarks
     private Effect<int, Never, EmptyEnvironment> mapped;
     private Effect<int, Never, EmptyEnvironment> bound;
     private Effect<int, Never, EmptyEnvironment> resource;
+    private Effect<int, Never, EmptyEnvironment> provided;
 
     [GlobalSetup]
     public void Setup()
     {
+        provided = BuildProvide();
         mapped = BuildMap();
         bound = BuildBind();
         resource = BuildResource().Use(Effect<EmptyEnvironment>.Succeed);
         if (RunMap().Result.UnwrapOr(-1) != Length || RunBind().Result.UnwrapOr(-1) != Length
-            || RunResource().Result.UnwrapOr(-1) != Length)
+            || RunResource().Result.UnwrapOr(-1) != Length || RunProvide().Result.UnwrapOr(-1) != Length)
         {
             throw new InvalidOperationException("Executor storage benchmarks disagree.");
         }
@@ -58,6 +60,15 @@ public class ExecutorStorageBenchmarks
             => Resource.Make(Effect<EmptyEnvironment>.Succeed(value), static (_, _) => Effect<EmptyEnvironment>.Succeed(Unit.Value));
     }
 
+    [Benchmark]
+    public Effect<int, Never, EmptyEnvironment> BuildProvide()
+    {
+        var effect = Effect<EmptyEnvironment>.Succeed(Length);
+        for (var i = 0; i < Length; i++) effect = effect.Provide<EmptyEnvironment>(static environment => environment);
+        return effect;
+    }
+
+    [Benchmark] public ValueTask<Result<int, Never>> RunProvide() => provided.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> RunMap() => mapped.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> RunBind() => bound.RunAsync();
     [Benchmark] public ValueTask<Result<int, Never>> RunResource() => resource.RunAsync();
