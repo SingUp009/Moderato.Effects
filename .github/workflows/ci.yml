@@ -52,6 +52,13 @@ jobs:
           dotnet build tests/Moderato.Effects.StackSafetyProbe -c Release
           bash tests/Moderato.Effects.StackSafetyProbe/verify.sh dotnet tests/Moderato.Effects.StackSafetyProbe/bin/Release/net11.0/Moderato.Effects.StackSafetyProbe.dll
 
+      - name: Verify sustained execution harness with short runs
+        run: |
+          dotnet build tests/Moderato.Effects.SoakProbe -c Release
+          dotnet format whitespace tests/Moderato.Effects.SoakProbe --verify-no-changes --no-restore
+          dotnet format style tests/Moderato.Effects.SoakProbe --verify-no-changes --severity warn --no-restore
+          bash tests/Moderato.Effects.SoakProbe/verify.sh dotnet tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/Moderato.Effects.SoakProbe.dll
+
       - name: Run the samples
         run: |
           dotnet run --project samples/Moderato.Effects.Samples -c Release
