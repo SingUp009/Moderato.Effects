@@ -31,7 +31,7 @@ internal sealed class ThenInstruction<A, B, T, E, R, TState>(Effect<A, B, R> sou
         => new Frame(this, environment, context, parent);
 
     private sealed class Frame(ThenInstruction<A, B, T, E, R, TState> instruction, R environment, RunContext context,
-        EffectFrame? parent) : EffectFrame<T, E>(parent)
+        EffectFrame? parent) : AwaitingEffectFrame<T, E>(parent)
     {
         private EffectFrame<A, B>? input;
         internal override bool CapturesContext => input is not null;

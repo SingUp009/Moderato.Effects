@@ -165,7 +165,8 @@ internal abstract class EffectFrame(EffectFrame? parent)
     internal virtual bool CapturesContext => false;
     internal virtual bool Suspend() => false;
     internal abstract EffectFrame? Step();
-    internal abstract ValueTask WaitAsync();
+    internal virtual ValueTask WaitAsync()
+        => throw new InvalidOperationException("This execution frame does not wait for a task.");
 
     internal void Resume(ref List<ExecutionScope>? scopes)
     {
@@ -185,10 +186,14 @@ internal abstract class EffectFrame<T, E>(EffectFrame? parent) : EffectFrame(par
 {
     internal Outcome<T, E> Output;
     internal ExceptionDispatchInfo? Fault;
-    private ValueTask<Outcome<T, E>> pending;
 
     internal ValueTask<Outcome<T, E>> Result()
         => Fault is null ? new(Output) : ValueTask.FromException<Outcome<T, E>>(Fault.SourceException);
+}
+
+internal abstract class AwaitingEffectFrame<T, E>(EffectFrame? parent) : EffectFrame<T, E>(parent)
+{
+    private ValueTask<Outcome<T, E>> pending;
 
     protected EffectFrame? Complete(ValueTask<Outcome<T, E>> task)
     {
@@ -222,7 +227,7 @@ internal abstract class EffectFrame<T, E>(EffectFrame? parent) : EffectFrame(par
 }
 
 internal sealed class LeafFrame<T, E, R>(Effect<T, E, R> effect, R environment, RunContext context, EffectFrame? parent)
-    : EffectFrame<T, E>(parent)
+    : AwaitingEffectFrame<T, E>(parent)
 {
     internal override EffectFrame? Step()
     {
