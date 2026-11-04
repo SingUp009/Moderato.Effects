@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Moderato.Effects\Moderato.Effects.csproj" />
+    <ProjectReference Include="../../src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj" />
     <Compile Include="..\..\tests\Shared\AllocationScenarios.cs" Link="AllocationScenarios.cs" />
     <Compile Include="..\..\tests\Shared\SchedulingAllocationScenarios.cs" Link="SchedulingAllocationScenarios.cs" />
     <Compile Include="..\..\tests\Shared\ValueClockAllocationScenarios.cs" Link="ValueClockAllocationScenarios.cs" />

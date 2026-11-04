@@ -53,7 +53,9 @@ jobs:
           bash tests/Moderato.Effects.StackSafetyProbe/verify.sh dotnet tests/Moderato.Effects.StackSafetyProbe/bin/Release/net11.0/Moderato.Effects.StackSafetyProbe.dll
 
       - name: Run the samples
-        run: dotnet run --project samples/Moderato.Effects.Samples -c Release
+        run: |
+          dotnet run --project samples/Moderato.Effects.Samples -c Release
+          dotnet run --project samples/Moderato.Effects.Hosting.Samples -c Release
 
   pack:
     needs: [lint, format, test]
@@ -65,16 +67,31 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Check the tag matches <Version>
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Select and verify the package version
         run: |
           version=$(dotnet msbuild src/Moderato.Effects -getProperty:Version)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$version</Version>"
+          hosting_version=$(dotnet msbuild src/Moderato.Effects.Hosting -getProperty:Version)
+          if [ "$version" != "$hosting_version" ]; then
+            echo "::error::Core and Hosting development versions must match"
             exit 1
           fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$version</Version>"
+              exit 1
+            fi
+          else
+            version="${version%%-*}-ci.$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
+          fi
+          mkdir -p artifacts
+          echo "$version" > artifacts/version.txt
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
-      - run: dotnet pack src/Moderato.Effects -c Release -o artifacts
+      - name: Pack Core and Hosting
+        run: |
+          dotnet pack src/Moderato.Effects -c Release -p:Version=$VERSION -o artifacts
+          dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version=$VERSION -o artifacts
+          python3 tests/verify-packages.py artifacts "$VERSION" "$GITHUB_SHA"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -98,7 +115,7 @@ jobs:
           path: artifacts
 
       - name: Find the packed version
-        run: echo "VERSION=$(dotnet msbuild src/Moderato.Effects -getProperty:Version)" >> "$GITHUB_ENV"
+        run: echo "VERSION=$(cat artifacts/version.txt)" >> "$GITHUB_ENV"
 
       - name: Run a consumer of the package
         run: dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
@@ -115,6 +132,22 @@ jobs:
         run: |
           dotnet publish tests/Moderato.Effects.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot
           ./aot/Moderato.Effects.PackageTests
+
+      - name: Run a consumer referencing only the Hosting package
+        run: dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+
+      - name: Check analyzers through the Hosting dependency
+        run: |
+          if dotnet build tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:CheckAnalyzers=true > hosting-analyzers.log; then
+            echo "::error::Hosting consumer misuse built without the expected analyzer error"
+            exit 1
+          fi
+          grep -q "error MEFF301" hosting-analyzers.log || { cat hosting-analyzers.log; exit 1; }
+
+      - name: Publish and run the Hosting consumer with Native AOT
+        run: |
+          dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-hosting
+          ./aot-hosting/Moderato.Effects.Hosting.PackageTests
 
       - name: Verify deep composition in the native package consumer
         run: |

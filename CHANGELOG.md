@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Package Hosting separately with its own XML docs, symbols, SourceLink and guide; verify a Hosting-only package consumer under JIT and Native AOT.
+
 - Add Host-scoped effect services with typed error handlers, asynchronous DI scopes and injectable diagnostics. Hosting uses the public Core API and preserves defect and cleanup context.
 
 - Add effect-returning `TapErr` observers, keeping the original error as context when observation fails.
@@ -24,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Add explicit `EffectRunOptions` overloads for per-execution diagnostics, including children and cleanup, without changing the global handler or existing run signatures.
 
 ### Changed
+
+- Use .NET 11 RC3 to replace the vulnerable RC2 Native AOT toolchain. Verify uniquely versioned Core and Hosting artifacts in non-tag CI builds.
 
 - Share bounded failure-context operations across outcomes, scopes, concurrency, cancellation, fibers and timeouts, and use one continuation implementation for effect operators.
 

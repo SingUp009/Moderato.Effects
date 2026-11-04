@@ -47,7 +47,7 @@ Results are [Moderato.Results](https://github.com/SingUp009/Moderato.Results) `R
 
 ## Requirements
 
-- .NET 11 SDK (`11.0.100-rc.2` or later), `net11.0`
+- .NET 11 SDK (`11.0.100-rc.3` or later), `net11.0`
 - C# 15
 
 The library is Native AOT compatible (`IsAotCompatible`). The package includes source generators and analyzers.
@@ -68,6 +68,7 @@ The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderat
 - [Operators](https://github.com/SingUp009/Moderato.Effects/wiki/Operators)
 - [Error unions](https://github.com/SingUp009/Moderato.Effects/wiki/Error-unions)
 - [Environments](https://github.com/SingUp009/Moderato.Effects/wiki/Environments)
+- [Hosting (unreleased)](https://github.com/SingUp009/Moderato.Effects/wiki/Hosting)
 - [Resources](https://github.com/SingUp009/Moderato.Effects/wiki/Resources)
 - [Time](https://github.com/SingUp009/Moderato.Effects/wiki/Time)
 - [Concurrency](https://github.com/SingUp009/Moderato.Effects/wiki/Concurrency)
