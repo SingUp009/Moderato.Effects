@@ -50,6 +50,14 @@ For a before/after comparison, copy the identical probe directory to a separate
 worktree pinned at the comparison commit. Record both manifests, and run them
 sequentially. Keep machine load and GC configuration comparable. Defaults are
 Workstation, nonconcurrent GC; the executable prints the actual configuration.
+Exercise the Host condition under both Workstation and Server GC, keeping their
+results separate. The short verification script also requires a Server GC pass
+and checks the reported mode (the machine must support Server GC):
+
+```bash
+DOTNET_gcServer=1 bash tests/Moderato.Effects.SoakProbe/run.sh host 30 /tmp/soak-host-server
+```
+
 Build/initialization and one second of warmup precede the timed run. Counts include
 warmup; per-window operation and allocation deltas exclude it.
 
@@ -61,6 +69,10 @@ collect samples fails the run. Forced collections are excluded from the natural
 GC columns. Sampling, formatting and runtime activity can contribute to metrics;
 this is not a microbenchmark. Window timing includes validation, not the later
 forced collections; total elapsed time includes observation pauses.
+Both `us_per_op` and the working-set series describe this workload with periodic
+forced full GC, not the steady state of a service using only natural collections.
+Do not use these rates as production throughput estimates. Weak-reference survival
+is an assertion after each completed window, not a constant-valued CSV column.
 
 Post-GC managed heap, GC committed bytes, process private bytes and working set are
 different measurements. None isolates the library's retained bytes. Do not divide
@@ -71,7 +83,8 @@ objects were collected. Thread and handle counts describe this process only.
 
 `host` observes live services in its windows, including in-flight scopes. Its weak
 references and exact counters are checked after all services stop and Hosts are
-disposed; live objects are not classified as leaks. Startup precedes the measured
+disposed; live objects are not classified as leaks. Each Host has its own 30-second
+stop-and-join budget. Startup precedes the measured
 windows; counts include startup, with no separate warmup. It reports its own CSV
 schema. Forced GC pauses the workload, so
 this condition does not establish uninterrupted production throughput.

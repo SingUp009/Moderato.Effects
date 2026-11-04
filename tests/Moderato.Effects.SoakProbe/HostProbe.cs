@@ -42,7 +42,6 @@ internal static class HostProbe
             foreach (var host in hosts) await host.StartAsync();
             var tasks = hosts.SelectMany(host => host.Services.GetServices<IHostedService>())
                 .Cast<BackgroundService>().Select(service => service.ExecuteTask!).ToArray();
-            var completed = Task.WhenAll(tasks);
             var firstCompleted = Task.WhenAny(tasks);
             using var process = Process.GetCurrentProcess();
             var clock = Stopwatch.StartNew();
@@ -80,9 +79,13 @@ internal static class HostProbe
                 Console.WriteLine(FormattableString.Invariant($"{clock.Elapsed.TotalSeconds:F3},{operations},{operations - previous},{allocationDelta},{counts[0]},{counts[1]},{counts[2]},{GC.GetTotalMemory(false)},{GC.GetGCMemoryInfo().TotalCommittedBytes},{process.PrivateMemorySize64},{process.WorkingSet64},{process.Threads.Count},{process.HandleCount},{states.Sum(state => Volatile.Read(ref state.ScopesCreated) - Volatile.Read(ref state.ScopesDisposed))},{states.Sum(state => Volatile.Read(ref state.Diagnostics))}"));
                 previous = operations;
             }
-            using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            foreach (var host in hosts) await host.StopAsync(stop.Token);
-            await completed.WaitAsync(stop.Token);
+            foreach (var host in hosts)
+            {
+                using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                await host.StopAsync(stop.Token);
+                await Task.WhenAll(host.Services.GetServices<IHostedService>().Cast<BackgroundService>()
+                    .Select(service => service.ExecuteTask!)).WaitAsync(stop.Token);
+            }
             Console.WriteLine($"Host run actualSeconds={clock.Elapsed.TotalSeconds:F3}");
         }
         finally

@@ -28,7 +28,7 @@ await probe.Window(TimeSpan.FromSeconds(1));
 probe.CheckCollected();
 var clock = Stopwatch.StartNew();
 var duration = TimeSpan.FromMinutes(minutes);
-Console.WriteLine("elapsed_s,ops,ops_window,us_per_op,allocated_window,gen0,gen1,gen2,post_gc_heap,gc_committed,private,working_set,threads,handles,created,released,expected_err,interrupted,defects,diagnostics,weak_alive");
+Console.WriteLine("elapsed_s,ops,ops_window,us_per_op,allocated_window,gen0,gen1,gen2,post_gc_heap,gc_committed,private,working_set,threads,handles,created,released,expected_err,interrupted,defects,diagnostics");
 while (clock.Elapsed < duration)
 {
     var remaining = duration - clock.Elapsed;
@@ -43,7 +43,7 @@ while (clock.Elapsed < duration)
     var gcCounts = Enumerable.Range(0, 3).Select(i => GC.CollectionCount(i) - collections[i]).ToArray();
     probe.CheckCollected();
     process.Refresh();
-    Console.WriteLine(FormattableString.Invariant($"{clock.Elapsed.TotalSeconds:F3},{probe.Completed},{probe.Completed - previous},{elapsed.TotalMicroseconds / (probe.Completed - previous):F3},{allocatedWindow},{gcCounts[0]},{gcCounts[1]},{gcCounts[2]},{GC.GetTotalMemory(false)},{GC.GetGCMemoryInfo().TotalCommittedBytes},{process.PrivateMemorySize64},{process.WorkingSet64},{process.Threads.Count},{process.HandleCount},{probe.Created},{probe.Released},{probe.Errors},{probe.Interruptions},{probe.Defects},{probe.Diagnostics},0"));
+    Console.WriteLine(FormattableString.Invariant($"{clock.Elapsed.TotalSeconds:F3},{probe.Completed},{probe.Completed - previous},{elapsed.TotalMicroseconds / (probe.Completed - previous):F3},{allocatedWindow},{gcCounts[0]},{gcCounts[1]},{gcCounts[2]},{GC.GetTotalMemory(false)},{GC.GetGCMemoryInfo().TotalCommittedBytes},{process.PrivateMemorySize64},{process.WorkingSet64},{process.Threads.Count},{process.HandleCount},{probe.Created},{probe.Released},{probe.Errors},{probe.Interruptions},{probe.Defects},{probe.Diagnostics}"));
 }
 GC.KeepAlive(probe);
 Console.WriteLine($"PASS actualSeconds={clock.Elapsed.TotalSeconds:F3} operations={probe.Completed} acquired={probe.Created} released={probe.Released} errors={probe.Errors}");
