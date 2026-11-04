@@ -29,7 +29,7 @@ public sealed class Scope<E, R>
     private Scope(R env, RunContext context)
     {
         Env = env;
-        cancellation = new Cancellation(context.CancellationToken);
+        cancellation = new Cancellation(context);
         releases = new Releases<R>(cancellation);
         this.context = releases.BodyContext;
     }

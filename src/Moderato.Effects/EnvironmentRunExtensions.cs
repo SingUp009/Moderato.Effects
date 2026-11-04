@@ -6,7 +6,7 @@ namespace Moderato.Effects;
 /// <summary>Runs effects whose environment the library provides.</summary>
 public static class EnvironmentRunExtensions
 {
-    private const string TOKEN_JUSTIFICATION = "Overloads differ by environment type; the trailing token follows the async convention.";
+    private const string TOKEN_JUSTIFICATION = "Overloads differ by environment; legacy token defaults remain and options require an explicit token.";
 
     /// <summary>Runs an effect that needs nothing.</summary>
     /// <param name="effect">The effect.</param>
@@ -43,4 +43,36 @@ public static class EnvironmentRunExtensions
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = TOKEN_JUSTIFICATION)]
     public static ValueTask<Exit<T, E>> RunExitAsync<T, E>(this Effect<T, E, DefaultEnvironment> effect, CancellationToken cancellationToken = default)
         => effect.RunExitAsync(DefaultEnvironment.Value, cancellationToken);
+
+    /// <summary>Runs an effect that needs nothing with scoped diagnostics.</summary>
+    /// <param name="effect">The effect.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>The value, or the expected error.</returns>
+    public static ValueTask<Result<T, E>> RunAsync<T, E>(this Effect<T, E, EmptyEnvironment> effect, CancellationToken cancellationToken, EffectRunOptions options)
+        => effect.RunAsync(EmptyEnvironment.Value, cancellationToken, options);
+
+    /// <summary>Runs an effect that needs nothing with scoped diagnostics.</summary>
+    /// <param name="effect">The effect.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>Ok, Err, Die or Interrupted.</returns>
+    public static ValueTask<Exit<T, E>> RunExitAsync<T, E>(this Effect<T, E, EmptyEnvironment> effect, CancellationToken cancellationToken, EffectRunOptions options)
+        => effect.RunExitAsync(EmptyEnvironment.Value, cancellationToken, options);
+
+    /// <summary>Runs an effect using the default environment with scoped diagnostics.</summary>
+    /// <param name="effect">The effect.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>The value, or the expected error.</returns>
+    public static ValueTask<Result<T, E>> RunAsync<T, E>(this Effect<T, E, DefaultEnvironment> effect, CancellationToken cancellationToken, EffectRunOptions options)
+        => effect.RunAsync(DefaultEnvironment.Value, cancellationToken, options);
+
+    /// <summary>Runs an effect using the default environment with scoped diagnostics.</summary>
+    /// <param name="effect">The effect.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>Ok, Err, Die or Interrupted.</returns>
+    public static ValueTask<Exit<T, E>> RunExitAsync<T, E>(this Effect<T, E, DefaultEnvironment> effect, CancellationToken cancellationToken, EffectRunOptions options)
+        => effect.RunExitAsync(DefaultEnvironment.Value, cancellationToken, options);
 }

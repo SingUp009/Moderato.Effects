@@ -2,7 +2,7 @@ namespace Moderato.Effects.Internal;
 
 internal sealed class AndThenInstruction<A, T, E, R>(Effect<A, E, R> input, Func<A, Effect<T, E, R>> binder)
     : BindInstruction<A, E, T, E, T, E, R, Func<A, Effect<T, E, R>>>(input, binder,
-        static (previous, bind) => previous.Kind == OutcomeKind.Ok ? new(bind(previous.Value)) : new(previous.WithValueType<T>()),
+        static (previous, bind, _) => previous.Kind == OutcomeKind.Ok ? new(bind(previous.Value)) : new(previous.WithValueType<T>()),
         static (next, previous, _, _) => next.After(previous), isolate: false)
 {
     internal override ValueTask<Outcome<T, E>> RunDirect(R environment, RunContext context, int depth)

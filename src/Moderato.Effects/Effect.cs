@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Moderato.Effects.Internal;
 using Moderato.Results;
 
@@ -10,6 +11,8 @@ namespace Moderato.Effects;
 [DebuggerDisplay("Effect<{typeof(T).Name,nq}, {typeof(E).Name,nq}, {typeof(R).Name,nq}>")]
 public readonly partial struct Effect<T, E, R>
 {
+    private const string RUN_OPTIONS_JUSTIFICATION = "The original overload preserves compatibility; explicit options require a token to keep default arguments unambiguous.";
+
     private readonly Result<T, E> constant;
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
@@ -46,7 +49,7 @@ public readonly partial struct Effect<T, E, R>
         => new(new ThenInstruction<T, E, U, F, R, TState>(Validate(), state, next));
 
     internal Effect<V, G, R> Bind<U, F, V, G, TState>(TState state,
-        Func<Outcome<T, E>, TState, EffectSelection<U, F, V, G, R>> select,
+        Func<Outcome<T, E>, TState, RunContext, EffectSelection<U, F, V, G, R>> select,
         Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project, bool isolate = false)
         => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project, isolate));
 
@@ -79,107 +82,141 @@ public readonly partial struct Effect<T, E, R>
     /// <param name="environment">The services the effect needs.</param>
     /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
     /// <returns>The value, or the expected error.</returns>
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = RUN_OPTIONS_JUSTIFICATION)]
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken = default)
+        => RunResult(environment, new RunContext(cancellationToken));
+
+    /// <summary>Runs the effect with diagnostics scoped to this execution.</summary>
+    /// <param name="environment">The services the effect needs.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>The value, or the expected error.</returns>
+    public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken, EffectRunOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return RunResult(environment, new RunContext(cancellationToken, options.UnobservedFailureHandler));
+    }
+
+    private ValueTask<Result<T, E>> RunResult(R environment, RunContext context)
     {
         Validate();
+        var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
         if (constant.HasValue) return new(constant);
 
         try
         {
-            var task = Start(environment, cancellationToken);
-            return task.IsCompletedSuccessfully ? ToResult(task.Result, cancellationToken) : Await(task, cancellationToken);
+            var task = Start(environment, context);
+            return task.IsCompletedSuccessfully ? ToResult(task.Result, context) : Await(task, context);
         }
         catch (Exception exception)
         {
-            return ToResult(Defects.From<T, E>(exception, new RunContext(cancellationToken)), cancellationToken);
+            return ToResult(Defects.From<T, E>(exception, context), context);
         }
 
-        static async ValueTask<Result<T, E>> Await(ValueTask<Outcome<T, E>> task, CancellationToken cancellationToken)
-            => await ToResult(await task.ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+        static async ValueTask<Result<T, E>> Await(ValueTask<Outcome<T, E>> task, RunContext context)
+            => await ToResult(await task.ConfigureAwait(false), context).ConfigureAwait(false);
     }
 
     /// <summary>Runs the effect and returns how it ended, without throwing.</summary>
     /// <param name="environment">The services the effect needs.</param>
     /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
     /// <returns>Ok, Err, Die or Interrupted.</returns>
+    [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = RUN_OPTIONS_JUSTIFICATION)]
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
+        => RunExit(environment, new RunContext(cancellationToken));
+
+    /// <summary>Runs the effect with scoped diagnostics and returns how it ended.</summary>
+    /// <param name="environment">The services the effect needs.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="options">The run's diagnostic settings.</param>
+    /// <returns>Ok, Err, Die or Interrupted.</returns>
+    public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken, EffectRunOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return RunExit(environment, new RunContext(cancellationToken, options.UnobservedFailureHandler));
+    }
+
+    private ValueTask<Exit<T, E>> RunExit(R environment, RunContext context)
     {
         Validate();
+        var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
-        if (constant.HasValue) return new(ToExit(Steps.FromResult(constant)));
+        if (constant.HasValue) return new(ToExit(Steps.FromResult(constant, context), context));
 
         try
         {
-            var task = Start(environment, cancellationToken);
-            return task.IsCompletedSuccessfully ? new(ToExit(task.Result)) : Await(task, cancellationToken);
+            var task = Start(environment, context);
+            return task.IsCompletedSuccessfully ? new(ToExit(task.Result, context)) : Await(task, context);
         }
         catch (Exception exception)
         {
-            return new(ToExit(Defects.From<T, E>(exception, new RunContext(cancellationToken))));
+            return new(ToExit(Defects.From<T, E>(exception, context), context));
         }
 
-        static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task, CancellationToken cancellationToken)
+        static async ValueTask<Exit<T, E>> Await(ValueTask<Outcome<T, E>> task, RunContext context)
         {
             try
             {
-                return ToExit(await task.ConfigureAwait(false));
+                return ToExit(await task.ConfigureAwait(false), context);
             }
             catch (Exception exception)
             {
-                return ToExit(Defects.From<T, E>(exception, new RunContext(cancellationToken)));
+                return ToExit(Defects.From<T, E>(exception, context), context);
             }
         }
     }
 
-    private ValueTask<Outcome<T, E>> Start(R environment, CancellationToken cancellationToken)
+    private ValueTask<Outcome<T, E>> Start(R environment, RunContext context)
     {
-        if (!cancellationToken.CanBeCanceled) return Run(environment, new RunContext(cancellationToken));
-        return Isolated(this, environment, cancellationToken);
+        if (!context.CancellationToken.CanBeCanceled) return Run(environment, context);
+        return Isolated(this, environment, context);
 
-        static async ValueTask<Outcome<T, E>> Isolated(Effect<T, E, R> effect, R environment, CancellationToken cancellationToken)
+        static async ValueTask<Outcome<T, E>> Isolated(Effect<T, E, R> effect, R environment, RunContext context)
         {
-            using var caller = Cancellation.ForCaller(cancellationToken);
+            using var caller = Cancellation.ForCaller(context);
+            var body = caller.Context;
             Outcome<T, E> outcome;
             try
             {
-                outcome = await effect.Run(environment, new RunContext(caller.Token)).ConfigureAwait(false);
+                outcome = await effect.Run(environment, body).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                outcome = Defects.From<T, E>(exception, new RunContext(caller.Token));
+                outcome = Defects.From<T, E>(exception, body);
             }
 
             return caller.WithCallbackFailure(outcome);
         }
     }
 
-    private static ValueTask<Result<T, E>> ToResult(Outcome<T, E> outcome, CancellationToken cancellationToken)
+    private static ValueTask<Result<T, E>> ToResult(Outcome<T, E> outcome, RunContext context)
     {
         switch (outcome.Kind)
         {
             case OutcomeKind.Ok:
                 // Result cannot carry suppressed failures, so their defects are reported here.
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
                 return new(new Result<T, E>(new Ok<T>(outcome.Value)));
             case OutcomeKind.Err:
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
                 return new(new Result<T, E>(new Err<E>(outcome.Error)));
             case OutcomeKind.Die:
                 var exception = outcome.Defect!.SourceException;
-                AttachSuppressed(exception, outcome.Suppressed);
+                AttachSuppressed(exception, outcome.Suppressed, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
                 // An inner cancellation can interrupt the run while the caller's token is not canceled.
-                return ValueTask.FromCanceled<Result<T, E>>(cancellationToken.IsCancellationRequested ? cancellationToken : new CancellationToken(canceled: true));
+                return ValueTask.FromCanceled<Result<T, E>>(context.CancellationToken.IsCancellationRequested
+                    ? context.CancellationToken : new CancellationToken(canceled: true));
         }
     }
 
-    private static Exit<T, E> ToExit(Outcome<T, E> outcome) => Exits.From(outcome);
+    private static Exit<T, E> ToExit(Outcome<T, E> outcome, RunContext context) => Exits.From(outcome, context);
 
     // Overwritten, so a rethrown exception does not accumulate stale entries.
-    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed)
+    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed, RunContext context)
     {
         try
         {
@@ -189,7 +226,7 @@ public readonly partial struct Effect<T, E, R>
         catch (Exception metadataFailure)
         {
             // Metadata failures must not replace the exception being rethrown.
-            UnobservedFailures.Report(new Die(metadataFailure, suppressed));
+            UnobservedFailures.Report(new Die(metadataFailure, suppressed), context);
         }
     }
 

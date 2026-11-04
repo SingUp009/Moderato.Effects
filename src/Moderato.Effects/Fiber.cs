@@ -3,7 +3,7 @@ using Moderato.Results;
 
 namespace Moderato.Effects;
 
-/// <summary>Forked work that its parent's scope cancels and awaits when it ends; its defect fails the parent, and its Err shows only through <see cref="Join"/> or, if unjoined, <see cref="EffectDiagnostics.UnobservedFailureHandler"/>.</summary>
+/// <summary>Forked work that its parent's scope cancels and awaits when it ends; its defect fails the parent, and its Err shows only through <see cref="Join"/> or, if unjoined, the run's diagnostic handler.</summary>
 /// <typeparam name="T">The value.</typeparam>
 /// <typeparam name="E">The error.</typeparam>
 /// <typeparam name="R">The environment.</typeparam>
@@ -17,7 +17,7 @@ public sealed class Fiber<T, E, R>
     private Fiber(Effect<T, E, R> effect, R env, Releases<R> owner, Cancellation cancellation)
     {
         this.cancellation = cancellation;
-        var context = new RunContext(cancellation.Token);
+        var context = cancellation.Context;
         task = Task.Run(async () =>
         {
             Outcome<T, E> outcome;
@@ -45,13 +45,13 @@ public sealed class Fiber<T, E, R>
         effect = effect.Validate();
         return new((env, context, releases) =>
         {
-            var fiber = new Fiber<T, E, R>(effect, env, releases, new Cancellation(context.CancellationToken));
+            var fiber = new Fiber<T, E, R>(effect, env, releases, new Cancellation(context));
             releases.Add(fiber.Release);
             return new(Outcome<Fiber<T, E, R>, Never>.Ok(fiber));
         });
     }
 
-    private Effect<Unit, Never, R> Release(ExitCase _) => new((_, _) => ReleaseAsync());
+    private Effect<Unit, Never, R> Release(ExitCase _) => new((_, context) => ReleaseAsync(context));
 
     private async ValueTask<Outcome<T, E>> JoinAsync(RunContext context)
     {
@@ -69,13 +69,13 @@ public sealed class Fiber<T, E, R>
         }
     }
 
-    private async ValueTask<Outcome<Unit, Never>> ReleaseAsync()
+    private async ValueTask<Outcome<Unit, Never>> ReleaseAsync(RunContext context)
     {
         cancellation.TryCancel(CancellationReason.ParentScopeClosed);
         var outcome = await task.ConfigureAwait(false);
         var callbackFailure = cancellation.TakeCallbackFailure();
         cancellation.Dispose();
-        var released = Observe(outcome);
+        var released = Observe(outcome, context);
         if (callbackFailure is null) return released;
 
         // A callback that threw during cancellation fails the release once the fiber has ended.
@@ -89,7 +89,7 @@ public sealed class Fiber<T, E, R>
         return failure.WithSuppressed(suppressed, omitted);
     }
 
-    private Outcome<Unit, Never> Observe(Outcome<T, E> outcome)
+    private Outcome<Unit, Never> Observe(Outcome<T, E> outcome, RunContext context)
     {
         if (Volatile.Read(ref joined) == 1) return Outcome<Unit, Never>.Ok(Unit.Value);
 
@@ -99,14 +99,14 @@ public sealed class Fiber<T, E, R>
                 // The parent's body had already ended, so the defect fails the release.
                 return outcome.WithTypes<Unit, Never>();
             case OutcomeKind.Die when outcome.Consequential:
-                UnobservedFailures.Report(ExitCases.ToDie(outcome));
+                UnobservedFailures.Report(ExitCases.ToDie(outcome), context);
                 break;
             case OutcomeKind.Err:
-                UnobservedFailures.Report(ExitCases.Failed(outcome.Error));
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
+                UnobservedFailures.Report(ExitCases.Failed(outcome.Error), context);
+                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
                 break;
             case OutcomeKind.Ok or OutcomeKind.Interrupted:
-                UnobservedFailures.ReportDefects(outcome.Suppressed);
+                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
                 break;
         }
 

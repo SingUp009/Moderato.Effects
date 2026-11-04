@@ -14,7 +14,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     private bool bodyEnded;
 
     /// <summary>The context the scope's body runs with.</summary>
-    internal RunContext BodyContext { get; } = new(bodyCancellation.Token);
+    internal RunContext BodyContext { get; } = bodyCancellation.Context;
 
     /// <summary>Records a forked child's defect and cancels the body (D10); false once the body has ended.</summary>
     internal bool TryFailFromChild(Outcome<Unit, Never> defect)
@@ -76,7 +76,7 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
             exit = ExitCases.From(body);
         }
         // Releases ignore the run's token, which would otherwise stop a rollback.
-        var context = new RunContext(CancellationToken.None);
+        var context = BodyContext.WithCancellation(CancellationToken.None);
 
         ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
         ImmutableArray<Suppressed>.Builder? carried = null;

@@ -2,22 +2,25 @@ using System.Collections.Immutable;
 
 namespace Moderato.Effects.Internal;
 
-/// <summary>Sends failures that no outcome could carry to <see cref="EffectDiagnostics.UnobservedFailureHandler"/>.</summary>
+/// <summary>Sends failures that no outcome could carry to the run's diagnostic handler.</summary>
 internal static class UnobservedFailures
 {
     /// <summary>Reports the defects among failures that are about to be dropped.</summary>
-    internal static void ReportDefects(ImmutableArray<Suppressed> suppressed)
+    internal static void ReportDefects(ImmutableArray<Suppressed> suppressed, RunContext context)
     {
         foreach (var failure in suppressed)
         {
-            if (failure.Case is Die) Report(failure.Case);
+            if (failure.Case is Die) Report(failure.Case, context);
         }
     }
 
     /// <summary>Reports a failure that would otherwise disappear.</summary>
-    internal static void Report(ExitCase failure)
+    internal static void Report(ExitCase failure, RunContext context)
+        => Report(failure, context.UnobservedFailureHandler);
+
+    internal static void Report(ExitCase failure, Action<ExitCase>? runHandler)
     {
-        var handler = EffectDiagnostics.UnobservedFailureHandler;
+        var handler = runHandler ?? EffectDiagnostics.UnobservedFailureHandler;
         if (handler is null)
         {
             Write(failure, static failure => $"Moderato.Effects unobserved failure: {Describe(failure)}");

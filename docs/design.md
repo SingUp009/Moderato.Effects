@@ -319,7 +319,7 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 - Join しなかった子が失敗したとき：
   - Die は親の Scope に伝わる。兄弟と親をキャンセルし、親は Die で終わる。このとき親の中で投げられる OCE は、呼び出し側のトークンによるものではないので Interrupted にはならない。**親の結果は子の Die** とする。
   - Err は Join したときにだけ現れる。子の E が親の E に含まれるとは限らず、型の上で伝えようがないため。
-  - Join しないまま Scope が閉じたら、その Err は**全体共通の診断用ハンドラー**に報告する（既定ではログに出す。R3 の `UnhandledExceptionHandler` や UniTask の `UnobservedTaskException` と同じ位置づけ）。黙って消すことはしない。このハンドラーは処理の結果を左右しない、診断のためだけの出口なので、「依存は R に出す」原則の例外として許容する。
+  - Join しないまま Scope が閉じたら、その Err は**実行の診断用ハンドラー**に報告する（既定ではログに出す。R3 の `UnhandledExceptionHandler` や UniTask の `UnobservedTaskException` と同じ位置づけ）。黙って消すことはしない。このハンドラーは処理の結果を左右しない、診断のためだけの出口なので、「依存は R に出す」原則の例外として許容する。
 - 親から切り離して実行する仕組み（Effect-TS の `forkDaemon`）は、最初は用意しない。
 
 **環境 R のスレッド安全性**
@@ -335,7 +335,8 @@ Effect.All(effects, Concurrency.Parallel.WithMaxDegree(4));  // 上限を指定�
 
 - Fiber は `Fiber<T, E, R>` にした。`scope.Run(fiber.Join())` と書けるように、`Join()` が `Effect<T, E, R>` を返す必要があるため。Gen の中では `scope.Fork(effect)`、それ以外では `effect.Fork()`（`Resource<Fiber<T, E, R>, Never, R>`）を使う。
 - Fork した子の Die で親をキャンセルするため、Gen のブロックと `Resource.Use` は、実行ごとに自分のキャンセルの単位（連動したトークン）を持つ。
-- 診断用ハンドラーは `EffectDiagnostics.UnobservedFailureHandler`（`Action<ExitCase>?`）。受け取るのは `Die` か `Failed`。`null` で既定（Console.Error に書く）に戻る。ハンドラーの例外は無視する。全体共通なので、ハンドラーを差し替えるテストは並列に動かせない。
+- 既定の診断用ハンドラーは全体共通の `EffectDiagnostics.UnobservedFailureHandler`（`Action<ExitCase>?`）。受け取るのは `Die` か `Failed`。`null` で既定（Console.Error に書く）に戻る。ハンドラーの例外は結果を変えない。全体共通のハンドラーを差し替えるテストは並列に動かせない。
+- `RunAsync(environment, cancellationToken, options)` / `RunExitAsync(environment, cancellationToken, options)` に `EffectRunOptions.UnobservedFailureHandler` を渡すと、その実行と子・回復・解放・遅れて発生したキャンセルの診断だけを指定先へ送る。全体共通の設定や `AsyncLocal` は変更しない。指定先が `null` なら報告時点の全体共通設定を使う。既存の実行 API は維持し、新しい overload のトークンと options は必須として `default` を使う既存呼び出しを曖昧にしない。ハンドラーには並行して通知されることがあるため、利用側でスレッド安全性を確保する。
 - `Race` / `RaceFirst` は2つの Effect を取る版だけにした。3つ以上は、必要になったら足す。
 - `AllErrors` は、Err では止まらず、Die だけで残りをキャンセルする。
 - `Concurrency.Sequential.WithMaxDegree(n)` は例外にする（順番に実行するものに上限を付けても意味がないため）。
@@ -911,7 +912,7 @@ public enum Relation
 }
 ```
 
-- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は内部の実行文脈として `CancellationToken` を持つ。キャンセルの理由は各操作の `Cancellation` が保持し、診断は共通の `EffectDiagnostics.UnobservedFailureHandler` へ報告する。追跡（Q11）は未実装の拡張候補であり、現在の文脈のフィールドには含めない。
+- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は内部の実行文脈として `CancellationToken` と任意の実行単位の診断先を持つ。キャンセルの理由は各操作の `Cancellation` が保持し、トークンを切り替えても診断先は引き継ぐ。指定がなければ共通の `EffectDiagnostics.UnobservedFailureHandler` へ報告する。追跡（Q11）は未実装の拡張候補であり、現在の文脈のフィールドには含めない。
 - 付属情報に `Relation` を付けておくのは、将来 `Cause` の木（Sequential / Parallel）に広げるため。
 - `Relation` は合成上の関係を表し、主失敗を基準とした時刻を表さない。本体の Err の後に解放が Die で終わると、先に起きた Err が後の主失敗 Die の `Sequential` な付属情報になる。`Parallel` も観測時刻の一致を保証しない。`Consequence` は以下の観測時の規則で分類し、利用者コード内部の実際の因果関係を解析するものではない。
 

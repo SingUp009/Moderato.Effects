@@ -6,7 +6,7 @@ namespace Moderato.Effects.Internal;
 /// <summary>Runs an effect against a timer that cancels it, waiting for it to finish.</summary>
 internal static class Timeouts
 {
-    private sealed class Deadline(CancellationToken parent) : Cancellation(parent)
+    private sealed class Deadline(RunContext parent) : Cancellation(parent)
     {
         private int expirationStarted;
 
@@ -70,8 +70,8 @@ internal static class Timeouts
         try
         {
             var clock = Services.Resolve<TimeProvider, R>(env);
-            using var cancellation = new Deadline(context.CancellationToken);
-            var innerContext = new RunContext(cancellation.Token);
+            using var cancellation = new Deadline(context);
+            var innerContext = cancellation.Context;
             var timer = clock.CreateTimer(
                 static state => ((Deadline)state!).Expire(), cancellation, after, Timeout.InfiniteTimeSpan);
             try
@@ -91,7 +91,7 @@ internal static class Timeouts
             catch (Exception exception)
             {
                 var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>(1);
-                defects.Add(Defects.From<Unit, Never>(exception, new RunContext(CancellationToken.None)));
+                defects.Add(Defects.From<Unit, Never>(exception, context.WithCancellation(CancellationToken.None)));
                 inner = Releases<R>.Combine(inner, defects);
             }
 
