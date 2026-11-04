@@ -21,15 +21,24 @@ if (args.Length != 3 || args[0] is not ("gen" or "resource" or "provide" or "bin
 Console.WriteLine($"runtime={RuntimeInformation.FrameworkDescription} os={RuntimeInformation.OSDescription} arch={RuntimeInformation.ProcessArchitecture} cpu={System.Environment.ProcessorCount}");
 Console.WriteLine($"gcServer={System.Runtime.GCSettings.IsServerGC} gcLatency={System.Runtime.GCSettings.LatencyMode} scenario={args[0]} minutes={minutes:R} windowSeconds={seconds:R}");
 if (args[0] == "host") return await HostProbe.Run(TimeSpan.FromMinutes(minutes), TimeSpan.FromSeconds(seconds));
+var stopRequested = 0;
+void RequestStop(PosixSignalContext signal)
+{
+    signal.Cancel = true;
+    Interlocked.Exchange(ref stopRequested, 1);
+}
+Func<bool> shouldStop = () => Volatile.Read(ref stopRequested) != 0;
+using var interrupt = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGINT, RequestStop);
+using var terminate = OperatingSystem.IsWindows() ? null : PosixSignalRegistration.Create(PosixSignal.SIGTERM, RequestStop);
 var probe = new Probe(args[0]);
 using var process = Process.GetCurrentProcess();
 Console.WriteLine("WARMUP 1 second (counts remain cumulative)");
-await probe.Window(TimeSpan.FromSeconds(1));
+await probe.Window(TimeSpan.FromSeconds(1), shouldStop);
 await probe.CheckCollectedAsync();
 var clock = Stopwatch.StartNew();
 var duration = TimeSpan.FromMinutes(minutes);
 Console.WriteLine("elapsed_s,ops,ops_window,us_per_op,allocated_window,gen0,gen1,gen2,post_gc_heap,gc_committed,private,working_set,threads,handles,created,released,expected_err,interrupted,defects,diagnostics");
-while (clock.Elapsed < duration)
+while (!shouldStop() && clock.Elapsed < duration)
 {
     var remaining = duration - clock.Elapsed;
     if (remaining <= TimeSpan.Zero) break;
@@ -37,7 +46,8 @@ while (clock.Elapsed < duration)
     var collections = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
     var started = Stopwatch.GetTimestamp();
     var previous = probe.Completed;
-    await probe.Window(remaining < TimeSpan.FromSeconds(seconds) ? remaining : TimeSpan.FromSeconds(seconds));
+    await probe.Window(remaining < TimeSpan.FromSeconds(seconds) ? remaining : TimeSpan.FromSeconds(seconds), shouldStop);
+    if (probe.Completed == previous) break;
     var elapsed = Stopwatch.GetElapsedTime(started);
     var allocatedWindow = GC.GetTotalAllocatedBytes(precise: true) - allocated;
     var gcCounts = Enumerable.Range(0, 3).Select(i => GC.CollectionCount(i) - collections[i]).ToArray();
@@ -46,8 +56,9 @@ while (clock.Elapsed < duration)
     Console.WriteLine(FormattableString.Invariant($"{clock.Elapsed.TotalSeconds:F3},{probe.Completed},{probe.Completed - previous},{elapsed.TotalMicroseconds / (probe.Completed - previous):F3},{allocatedWindow},{gcCounts[0]},{gcCounts[1]},{gcCounts[2]},{GC.GetTotalMemory(false)},{GC.GetGCMemoryInfo().TotalCommittedBytes},{process.PrivateMemorySize64},{process.WorkingSet64},{process.Threads.Count},{process.HandleCount},{probe.Created},{probe.Released},{probe.Errors},{probe.Interruptions},{probe.Defects},{probe.Diagnostics}"));
 }
 GC.KeepAlive(probe);
-Console.WriteLine($"PASS actualSeconds={clock.Elapsed.TotalSeconds:F3} operations={probe.Completed} acquired={probe.Created} released={probe.Released} errors={probe.Errors}");
-return 0;
+var stopped = shouldStop();
+Console.WriteLine($"{(stopped ? "STOPPED" : "PASS")} actualSeconds={clock.Elapsed.TotalSeconds:F3} operations={probe.Completed} acquired={probe.Created} released={probe.Released} errors={probe.Errors}");
+return stopped ? 130 : 0;
 
 internal sealed class Probe
 {
@@ -132,8 +143,10 @@ internal sealed class Probe
 
     // Finish the async state machine before collecting samples; live locals are not leaks.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    internal async Task Window(TimeSpan duration)
+    internal async Task Window(TimeSpan duration, Func<bool>? shouldStop = null)
     {
+        // Drain the current run rather than adding cancelable-caller overhead to each measured operation.
+        if (shouldStop?.Invoke() == true) return;
         var clock = Stopwatch.StartNew();
         do
         {
@@ -162,7 +175,7 @@ internal sealed class Probe
             if (Created != Released) throw new InvalidOperationException($"Cleanup mismatch: {Created} acquired, {Released} released.");
             if (Diagnostics != (scenario == "fiber" ? Completed : 0) || unexpectedDiagnostics != 0)
                 throw new InvalidOperationException("Unexpected diagnostic count or content.");
-        } while (clock.Elapsed < duration);
+        } while (clock.Elapsed < duration && shouldStop?.Invoke() != true);
     }
 
     internal void Track(object value) => references[referenceAt++ % references.Length] = new WeakReference(value);

@@ -95,13 +95,24 @@ disposed; live objects are not classified as leaks. Each Host has its own 30-sec
 stop-and-join budget. Once running, SIGINT/SIGTERM follow Generic Host's
 `ApplicationStopping` notification through the same stop, join, disposal and final
 invariant checks. Exit 130 and `STOPPED` distinguish this verified early shutdown
-from a completed timed run. The short verification script sends both signals to
-isolated running processes after their first observation window. Core-only
-conditions have no OS-signal cleanup path; the watchdog remains a failure guard,
-not a graceful shutdown test. Startup precedes the measured
-windows; counts include startup, with no separate warmup. It reports its own CSV
-schema. Forced GC pauses the workload, so
-this condition does not establish uninterrupted production throughput.
+from a completed timed run.
+
+For the Host condition, startup precedes the measured windows; counts include
+startup, with no separate warmup. It reports its own CSV schema. Forced GC pauses
+the workload, so this condition does not establish uninterrupted production
+throughput.
+
+On POSIX, Core-only conditions also handle SIGINT/SIGTERM: they stop between
+public runs, after the current run and its cleanup finish. They keep each scenario's
+existing execution token, so an OS stop does not add per-operation caller
+cancellation state or change outcome classification. The final `STOPPED` counts
+and exit 130 identify an incomplete timed run. Core-only Windows signal handling
+is not covered.
+
+The short verification script sends both signals to all eight conditions in
+isolated running processes after their first observation window, checking cleanup
+before exit 130. A stuck operation is still a watchdog failure, and SIGKILL cannot
+await cleanup. Startup-signal handling is not established by these checks.
 
 These finite, sequential conditions do not establish stability under arbitrary
 business load. `host` covers two concurrent roots and bounded children; it does not
