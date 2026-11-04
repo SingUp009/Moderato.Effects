@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Breaking changes
 
+- Recompiled `TapErr(error => BuildEffect(error))` calls now run the returned effect. Use an explicit `Action<E>` when only the callback's synchronous side effects are intended.
+
 - A zero `Timeout` or `TimeoutResult` now expires without starting its body, including constant effects. An already canceled caller still gets `Interrupted`. Use a positive or infinite timeout when the body must run.
 
 - Reject overlapping union case types with MEFF008 instead of generating conversions whose patterns cannot distinguish the alternatives. This includes interface pairs that could share an implementation. Wrap alternatives in distinct records.
@@ -14,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Bound union generation and Catch analysis to 4,096 case-path segments and 256 nodes per type expression. Exceeding either limit reports MEFF007 and emits no code for that generator target, including for finite shapes. Simplify the shape or implement the required interfaces manually.
 
 ### Added
+
+- Add Host-scoped effect services with typed error handlers, asynchronous DI scopes and injectable diagnostics. Hosting uses the public Core API and preserves defect and cleanup context.
+
+- Add effect-returning `TapErr` observers, keeping the original error as context when observation fails.
 
 - Add explicit `EffectRunOptions` overloads for per-execution diagnostics, including children and cleanup, without changing the global handler or existing run signatures.
 

@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj" />
     <Project Path="src/Moderato.Effects/Moderato.Effects.csproj" />
     <Project Path="src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Moderato.Effects.Hosting.Tests/Moderato.Effects.Hosting.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.StackSafetyProbe/Moderato.Effects.StackSafetyProbe.csproj" />
     <Project Path="tests/Moderato.Effects.SourceGenerator.Tests/Moderato.Effects.SourceGenerator.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.Tests/Moderato.Effects.Tests.csproj" />

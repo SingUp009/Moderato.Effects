@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.3.26522.148" />
+    <ProjectReference Include="../../src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj" />
+    <Using Include="Xunit" />
+    <Using Include="Moderato.Results" />
+  </ItemGroup>
+</Project>

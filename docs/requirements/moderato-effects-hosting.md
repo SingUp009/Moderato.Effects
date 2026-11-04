@@ -83,7 +83,7 @@ Generic Host が OCE を正常停止として扱うのは、`ApplicationStopping
 
 ### H6. 構造化ログと ZLogger
 
-- 標準の診断実装は Microsoft の `ILogger` 経路を使う。ZLogger を選んだ場合もプロバイダーとして接続できるようにし、専用 API や独自の状態形式を必須にしない。
+- 標準の診断実装は Microsoft の `ILogger` 経路を使う。ZLogger は利用者がログプロバイダーとして選ぶ。初版は ZLogger 専用の登録口・API・状態形式を用意せず、診断実装の注入と標準 ILogger 経由で接続する。
 - `ILogger` の構造化ログとして、終了の種類、元の例外、保持されている付属情報の件数・順序・`Relation`、分かる場合の省略件数を扱えるようにする。フィールド名・EventId・レベルは未決。
 - フィールド名は実装の式やローカル変数名から自動生成せず、明示的な名前を使う。`Relation` などの値をプロバイダーへ渡す形と、JSON・テキストでの最終的な表現を区別する。
 - メッセージの文字列補間、任意のエラー値の `ToString()`、付属情報の JSON 化をログ呼び出し前に強制しない。ログ無効時は不要な整形・列挙を避ける。エラー値を無条件に全文出力しない。
@@ -164,7 +164,7 @@ QH1 では、Effect の終了分類と Host の終了状態を分ける。停止
 | ロガーが無効／失敗／Host 破棄 | 不要な整形なし、主失敗の置換なし、破棄済みロガーの保持なし |
 | 標準ログ／ZLogger | 構造化データの取得を確認し、ログ経路の割り当てを条件ごとに測る |
 
-この時点では要件の議論までを行う。未決事項を合意し、設計メモとの整合を確認してから、実装 Issue・公開 API・テストの具体化へ進む。
+要件の議論を経て Issue #372・H1/H2 の実装へ進んだ。具体化した境界の契約は節9に記録する。
 
 ## 7. 草案の検証記録
 
@@ -198,7 +198,7 @@ QH1 では、Effect の終了分類と Host の終了状態を分ける。停止
 
 ## 8. 利用者コードの形（QH5 の案）
 
-以下は実装前の利用例で、メソッド名・型名・署名は仮である。現在呼び出せる API や、コンパイルを確認した公開 API として扱わない。登録時は構成を渡すだけで、Effect 本体は起動時に実行する。
+以下の利用例をもとに H2 の API を実装する。現在は公開パッケージには含まれず、H2/H3 のレビュー・利用側検証を経て確定する。登録時は構成を渡すだけで、Effect 本体は起動時に実行する。
 
 ```csharp
 var builder = Host.CreateApplicationBuilder(args);
@@ -229,3 +229,18 @@ await builder.Build().RunAsync();
 - 診断実装の登録と、サービスの登録を分ける。診断実装の生成時に新しいサービス登録を追加する形にはしない。
 
 この形で、登録コードの量・型推論・DI の寿命・エラー処理を確認してから API を確定する。手動で DI scope の破棄例外を合成するコードや、static ハンドラーの差し替えと復元を利用者へ要求しない。
+
+## 9. H2 の具体化（2026-11-04、レビュー対象）
+
+節5の検討を次の契約で具体化する。公開済みパッケージへの追加やリリースは H3 以降であり、H2 はプロジェクト参照で検証する。
+
+- `AddEffectHostedService<E,R>` は `Effect<Unit,E,R>`、`Func<IServiceProvider,R>`、必須の `Func<E,R,CancellationToken,ValueTask>` を受け取る。同型の登録もそれぞれ独立したサービスになる。登録時に default Effect と null delegate を拒否し、本体や環境 factory は実行しない。
+- Hosting は Core の公開 API のみを使う。`TapErr<U>(Func<E,Effect<U,Never,R>>)` で Err を観測し、成功後の `UnwrapOr(Unit.Value)` で消費する。定数の回復 Effect を新たに開始しないので、ハンドラー完了後のキャンセル確認だけで処理済み Err を Interrupted に書き換えない。`OrElse` の既存の消費規則は変えない。
+- `Resource.Make` で `AsyncServiceScope` を取得・解放し、その `Use` の内側で環境を構築してルートを実行する。scope 破棄を含めて `RunExitAsync` の最終結果を得る。Host の停止時間を独自に延ばさない。
+- `EffectHostedServiceException.Exit` は元の `Die` または停止要求なしで観測した `Interrupted` を保持する。Die の元例外は `InnerException` でも取得できる。元の付属情報・Relation・省略件数は Die に残る。正常な結果を独自にログ出力せず、主の異常ログは Host の標準経路に任せる。
+- `AddEffectsHosting(options => options.Diagnostics = factory)` は `IEffectDiagnostics` を Host の Singleton として生成・所有する。省略時は `LoggerDiagnostics` を使う。複数回設定した場合は最後の設定が有効。factory の返却値が null の場合は起動時のサービス解決で拒否する。
+- factory が新規生成した診断実装の `IDisposable` / `IAsyncDisposable` は Host の DI が破棄する。既存インスタンスを借用する専用 overload は初版に用意しない。診断実装自身は借りた `ILoggerFactory` を破棄しない。非同期破棄だけを持つ実装を使う場合、Host も非同期に破棄する。
+- 接続ゲートは診断実装の呼び出しと解除を直列化する。Host 破棄時に参照を外し、実行が保持する callback が破棄済み診断実装や ILogger を呼ばないようにする。遅れて届いた診断はその時点の `EffectDiagnostics.UnobservedFailureHandler`、未設定なら `Console.Error` へ送る。このフォールバックは Host 分離の範囲外であり、Host 破棄後の外部配送や永続化を保証しない。
+- 通常の接続中も global の設定は変更しない。診断の適用範囲はこの登録が開始したルートと子であり、任意の直接実行や HTTP リクエストは含まない。
+- 標準 logger のカテゴリーは `Moderato.Effects.Hosting`。EventId 1001 `UnobservedDefect`（Error）は `FailureKind`・`SuppressedCount`・`OmittedSuppressed` と元例外、1002 `UnjoinedError`（Warning）は `FailureKind` を持つ。1003 `SuppressedFailure`（Error）は保持順に `SuppressedIndex`（0始まり）・`Relation`・`FailureKind` と分かる場合の例外を持つ。型付きエラー値を自動出力しない。無効時は付属情報を列挙しない。
+- ZLogger を使うアプリは `builder.Logging.AddZLoggerConsole()` などでプロバイダーを選ぶ。初版に専用の Hosting 登録口を追加しない。既知の非互換は呼び出し後に state を読む独自 provider との測定1例であり、すべての provider に一般化しない。
