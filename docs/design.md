@@ -1001,7 +1001,10 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 
 ## リリース後の追加機能の候補
 
-- **`Moderato.Effects.Hosting`**：長く動き続ける Effect を `BackgroundService` として動かす基底クラス。アプリの停止を CancellationToken に連動させ、Effect からは Interrupted に見えるようにする。Join しなかった子の Err を報告するハンドラー（D10）の既定を、`ILogger` に向ける。
+- **`Moderato.Effects.Hosting`**：長く動き続ける Effect を `BackgroundService` として動かすための連携。アプリの停止を実行トークンに連動させ、本体の規則で終了結果を分類する。診断実装を登録口へ渡し、その Hosting が開始した Effect と子の診断を、その Host の `ILogger` へ接続する。
+  - [要件草案](requirements/moderato-effects-hosting.md)で、停止・失敗・DI の寿命・診断ログの所有権を議論する。2026-11-04、`RunExitAsync` で分類した Die を元情報付きで Host へ異常として伝えること、ルート Err に型付きハンドラーを必須とすること、診断実装を渡す登録方法と、接続先・所有者・寿命を Host に揃えることを合意した。公開 API・本体の拡張・接続終了後の扱いは未決で、実装はまだない。現在の全体共通ハンドラーだけで Host 分離を保証するものではない。
+  - Interrupted は結果を受け取った時点の停止トークンで判定し、キャンセル済みなら正常停止、未キャンセルなら Host へ異常として伝える。初版は Host 標準の停止猶予を尊重し、自動延長や Host 破棄の独自の保留は行わない。猶予内に後始末が終わる構成は利用者の責任とする（2026-11-04 合意）。
+  - Hosting の `onError` が Die で失敗した場合は、処理しようとした元の Err を Sequential の付属情報として保持する。ハンドラーの同期・非同期で規則を変えず、既存の `OrElse` の消費規則も変更しない（2026-11-04 合意）。
 - **`Moderato.Effects.AspNetCore`**：`Result` / `Exit` を `IResult` に変換する補助（Die を ProblemDetails にする、など）。
 - **フレーム単位の時間**（R3 の `FrameProvider`、UniTask の `DelayFrame`）：今は想定していない。.NET 11 の union を前提にしているため、当面 Unity では使えない。必要になったら、`IHas<FrameProvider>` のような形で Schedule などを拡張する。
 
