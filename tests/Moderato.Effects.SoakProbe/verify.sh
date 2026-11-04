@@ -29,3 +29,5 @@ trap 'rm -f "$server_log"' EXIT
 env DOTNET_gcServer=1 timeout 30s "$@" host 0.02 0.3 > "$server_log" 2>&1 || { cat "$server_log"; exit 1; }
 cat "$server_log"
 grep -q 'gcServer=True' "$server_log"
+
+python3 "$(dirname "$0")/verify-signals.py" "${probe[@]}"
