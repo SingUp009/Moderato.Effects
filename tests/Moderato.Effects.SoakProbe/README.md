@@ -88,7 +88,13 @@ Read it separately from the process working-set observation in `working_set`.
 `host` observes live services in its windows, including in-flight scopes. Its weak
 references and exact counters are checked after all services stop and Hosts are
 disposed; live objects are not classified as leaks. Each Host has its own 30-second
-stop-and-join budget. Startup precedes the measured
+stop-and-join budget. Once running, SIGINT/SIGTERM follow Generic Host's
+`ApplicationStopping` notification through the same stop, join, disposal and final
+invariant checks. Exit 130 and `STOPPED` distinguish this verified early shutdown
+from a completed timed run. The short verification script sends both signals to
+isolated running processes after their first observation window. Core-only
+conditions have no OS-signal cleanup path; the watchdog remains a failure guard,
+not a graceful shutdown test. Startup precedes the measured
 windows; counts include startup, with no separate warmup. It reports its own CSV
 schema. Forced GC pauses the workload, so
 this condition does not establish uninterrupted production throughput.

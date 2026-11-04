@@ -12,7 +12,7 @@ internal static class HostProbe
     internal static async Task<int> Run(TimeSpan duration, TimeSpan window)
     {
         var states = new[] { new State("host-a"), new State("host-b") };
-        await RunHosts(states, duration, window);
+        var stopped = await RunHosts(states, duration, window);
         foreach (var state in states)
         {
             if (state.ScopesCreated != state.ScopesDisposed || state.DiagnosticsDisposed != 1 ||
@@ -30,11 +30,12 @@ internal static class HostProbe
             if (!collected) throw new InvalidOperationException("Stopped Host retained a sampled iteration scope.");
             Console.WriteLine($"PASS {state}");
         }
-        return 0;
+        if (stopped) Console.WriteLine("STOPPED Host lifetime request; timed run incomplete");
+        return stopped ? 130 : 0;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task RunHosts(State[] states, TimeSpan duration, TimeSpan window)
+    private static async Task<bool> RunHosts(State[] states, TimeSpan duration, TimeSpan window)
     {
         var hosts = states.Select(Build).ToArray();
         try
@@ -43,6 +44,10 @@ internal static class HostProbe
             var tasks = hosts.SelectMany(host => host.Services.GetServices<IHostedService>())
                 .Cast<BackgroundService>().Select(service => service.ExecuteTask!).ToArray();
             var firstCompleted = Task.WhenAny(tasks);
+            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(hosts.Select(host =>
+                host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping).ToArray());
+            var shutdown = Task.Delay(Timeout.InfiniteTimeSpan, stopping.Token);
+            var stopped = false;
             using var process = Process.GetCurrentProcess();
             var clock = Stopwatch.StartNew();
             long previous = 0;
@@ -56,10 +61,16 @@ internal static class HostProbe
                 var allocated = GC.GetTotalAllocatedBytes(true);
                 var collections = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
                 var delay = Task.Delay(remaining < window ? remaining : window);
-                if (await Task.WhenAny(firstCompleted, delay) == firstCompleted)
+                var completed = await Task.WhenAny(firstCompleted, shutdown, delay);
+                if (completed == firstCompleted)
                 {
                     await await firstCompleted;
                     throw new InvalidOperationException("Hosted services ended before stop was requested.");
+                }
+                if (completed == shutdown)
+                {
+                    stopped = true;
+                    break;
                 }
                 var allocationDelta = GC.GetTotalAllocatedBytes(true) - allocated;
                 var counts = Enumerable.Range(0, 3).Select(i => GC.CollectionCount(i) - collections[i]).ToArray();
@@ -87,6 +98,7 @@ internal static class HostProbe
                     .Select(service => service.ExecuteTask!)).WaitAsync(stop.Token);
             }
             Console.WriteLine($"Host run actualSeconds={clock.Elapsed.TotalSeconds:F3}");
+            return stopped;
         }
         finally
         {
