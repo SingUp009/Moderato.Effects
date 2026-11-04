@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Include structured error type names in Hosting diagnostics for unjoined and suppressed typed failures without formatting error values.
+
 - Package Hosting separately with its own XML docs, symbols, SourceLink and guide; verify a Hosting-only package consumer under JIT and Native AOT.
 
 - Add Host-scoped effect services with typed error handlers, asynchronous DI scopes and injectable diagnostics. Hosting uses the public Core API and preserves defect and cleanup context.

@@ -86,9 +86,12 @@ public class DiagnosticsTests
         Assert.Equal(3, entries[0].Fields["OmittedSuppressed"]);
         Assert.Equal(0, entries[1].Fields["SuppressedIndex"]);
         Assert.Equal(Relation.Sequential, entries[1].Fields["Relation"]);
+        Assert.Equal("Failed", entries[1].Fields["FailureKind"]);
+        Assert.Equal(nameof(SecretError), entries[1].Fields["ErrorType"]);
         Assert.Equal(1, entries[2].Fields["SuppressedIndex"]);
         Assert.Equal(Relation.Consequence, entries[2].Fields["Relation"]);
         Assert.Same(child, entries[2].Exception);
+        Assert.Null(entries[2].Fields["ErrorType"]);
     }
 
     [Fact]
@@ -123,7 +126,32 @@ public class DiagnosticsTests
         // Then
         var entry = Assert.Single(provider.Entries);
         Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal("Failed", entry.Fields["FailureKind"]);
+        Assert.Equal(nameof(SecretError), entry.Fields["ErrorType"]);
         Assert.DoesNotContain(entry.Fields.Values, value => value is SecretError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Report_NullError_EmitsNullErrorType(bool suppressed)
+    {
+        // Given
+        var provider = new RecordingProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(provider));
+        var diagnostics = new LoggerDiagnostics(factory);
+        ExitCase failure = suppressed
+            ? new Die(new IOException("root"), [new Suppressed(new Failed(null), Relation.Sequential)])
+            : new Failed(null);
+
+        // When
+        diagnostics.Report(failure);
+
+        // Then
+        var entries = provider.Entries.ToArray();
+        Assert.Equal(suppressed ? 2 : 1, entries.Length);
+        Assert.Equal("Failed", entries[^1].Fields["FailureKind"]);
+        Assert.Null(entries[^1].Fields["ErrorType"]);
     }
 
     internal static Effect<Unit, string, HostingTests.Environment> UnjoinedError()

@@ -14,7 +14,30 @@ for (var bodyFails = 0; bodyFails < 2; bodyFails++)
 }
 await CheckTypedErrorHandler(deadline.Token);
 await CheckDiagnosticOwnership(deadline.Token);
-Console.WriteLine("Hosting package works: scoped outcomes, typed errors, generators and diagnostic ownership");
+CheckDiagnosticErrorTypes();
+Console.WriteLine("Hosting package works: scoped outcomes, typed errors, generators, diagnostic ownership and error type logging");
+
+static void CheckDiagnosticErrorTypes()
+{
+    // Given
+    var provider = new RecordingLogProvider();
+    using var factory = LoggerFactory.Create(builder => builder.AddProvider(provider));
+    var diagnostics = new LoggerDiagnostics(factory);
+    var error = new UnformattableError();
+
+    // When
+    diagnostics.Report(new Failed(error));
+    diagnostics.Report(new Die(new IOException("root"), [new Suppressed(new Failed(error), Relation.Sequential)]));
+    diagnostics.Report(new Failed(null));
+
+    // Then
+    Check(provider.Entries.Count == 4, "Unexpected diagnostic log count.");
+    Check(Equals(provider.Entries[0]["FailureKind"], "Failed"), "Failure kind changed.");
+    Check(Equals(provider.Entries[0]["ErrorType"], nameof(UnformattableError)), "Unjoined error type was lost.");
+    Check(Equals(provider.Entries[2]["ErrorType"], nameof(UnformattableError)), "Suppressed error type was lost.");
+    Check(provider.Entries[3]["ErrorType"] is null, "Null errors must have a null type.");
+    Check(provider.Entries.All(entry => entry.Values.All(value => !ReferenceEquals(value, error))), "Error value was exposed.");
+}
 
 static async Task CheckScopeFailures(bool bodyFails, bool disposalFails, CancellationToken token)
 {
@@ -149,4 +172,27 @@ public sealed class RecordingDiagnostics : IEffectDiagnostics, IDisposable
     public int Disposals { get; private set; }
     public void Report(ExitCase failure) => Failures.Enqueue(failure);
     public void Dispose() => Disposals++;
+}
+
+public sealed class UnformattableError
+{
+    public override string ToString() => throw new InvalidOperationException("Error values must not be formatted.");
+}
+
+public sealed class RecordingLogProvider : ILoggerProvider
+{
+    public List<Dictionary<string, object?>> Entries { get; } = [];
+    public ILogger CreateLogger(string categoryName) => new RecordingLogger(this);
+    public void Dispose() { }
+
+    private sealed class RecordingLogger(RecordingLogProvider owner) : ILogger
+    {
+        public bool IsEnabled(LogLevel level) => true;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            _ = formatter(state, exception);
+            owner.Entries.Add(((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value));
+        }
+    }
 }
