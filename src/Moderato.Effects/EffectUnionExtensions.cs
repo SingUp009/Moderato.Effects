@@ -25,22 +25,22 @@ public static class EffectUnionExtensions
         where E : IUnionCase<E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
-        return effect.Bind<T, Never, T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, handle) =>
+        return effect.Bind<T, Never, T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, handle, context) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed);
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next.WithErrorType<E>());
     }
 
     private static Effect<T, E, R> Catch<T, E, R, TCase>(Effect<T, E, R> effect, Func<TCase, Effect<T, E, R>> handler)
         where E : IUnionCase<E, TCase>
-        => effect.Bind<T, E, T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, handle) =>
+        => effect.Bind<T, E, T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, handle, context) =>
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed);
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next);
 }

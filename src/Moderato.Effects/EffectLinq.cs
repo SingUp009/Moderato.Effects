@@ -78,7 +78,7 @@ public static class EffectLinq
 
             return projected.After(state.outcome);
         };
-        return source.Bind((next, complete), static (outcome, state) => outcome.Kind == OutcomeKind.Ok
+        return source.Bind((next, complete), static (outcome, state, _) => outcome.Kind == OutcomeKind.Ok
                 ? new EffectSelection<U, F, V, E, R>(state.next(outcome.Value))
                 : new EffectSelection<U, F, V, E, R>(outcome.WithValueType<V>()),
             static (outcome, previous, context, state) => state.complete(outcome, (previous, context)));

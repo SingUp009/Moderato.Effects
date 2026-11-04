@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Bound union generation and Catch analysis to 4,096 case-path segments and 256 nodes per type expression. Exceeding either limit reports MEFF007 and emits no code for that generator target, including for finite shapes. Simplify the shape or implement the required interfaces manually.
 
+### Added
+
+- Add explicit `EffectRunOptions` overloads for per-execution diagnostics, including children and cleanup, without changing the global handler or existing run signatures.
+
 ### Changed
 
 - Share bounded failure-context operations across outcomes, scopes, concurrency, cancellation, fibers and timeouts, and use one continuation implementation for effect operators.

@@ -46,8 +46,8 @@ internal static class Concurrent
         Effect<T, E, R>[] children, R env, RunContext context, StopOn stopOn)
     {
         var ends = new ChildEnd<T, E>[children.Length];
-        using var group = new Cancellation(context.CancellationToken);
-        var groupContext = new RunContext(group.Token);
+        using var group = new Cancellation(context);
+        var groupContext = group.Context;
         for (var i = 0; i < children.Length && !group.Token.IsCancellationRequested; i++)
         {
             Outcome<T, E> outcome;
@@ -70,8 +70,8 @@ internal static class Concurrent
         Effect<T, E, R>[] children, R env, RunContext context, Concurrency concurrency, StopOn stopOn)
     {
         var ends = new ChildEnd<T, E>[children.Length];
-        using var group = new Cancellation(context.CancellationToken);
-        var groupContext = new RunContext(group.Token);
+        using var group = new Cancellation(context);
+        var groupContext = group.Context;
         var order = 0;
         var next = -1;
         var workers = new Task[Math.Min(concurrency.MaxDegree ?? children.Length, children.Length)];

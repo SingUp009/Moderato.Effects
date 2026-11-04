@@ -40,16 +40,16 @@ internal static class Recurrence
         {
             var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Err) return outcome;
-            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
 
             var decision = await DecideAsync(policy, new RetryContext<E>(attempt, outcome.Error), env, context).ConfigureAwait(false);
-            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
+            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome, context);
             if (!decision.Value) return outcome.After(decision);
-            if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome);
+            if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
             // A retried attempt's suppressed failures are dropped, but its defects are still reported.
-            UnobservedFailures.ReportDefects(outcome.Suppressed);
-            UnobservedFailures.ReportDefects(decision.Suppressed);
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDefects(decision.Suppressed, context);
         }
     }
 
@@ -72,15 +72,15 @@ internal static class Recurrence
         {
             var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
-            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
 
             var decision = await DecideAsync(policy, new RepeatContext<T>(repetition, outcome.Value), env, context).ConfigureAwait(false);
-            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
+            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome, context);
             if (!decision.Value) return outcome.After(decision);
-            if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome);
+            if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
-            UnobservedFailures.ReportDefects(outcome.Suppressed);
-            UnobservedFailures.ReportDefects(decision.Suppressed);
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDefects(decision.Suppressed, context);
         }
     }
 
@@ -115,19 +115,19 @@ internal static class Recurrence
     }
 
     // Without this, an attempt or policy that ignores the token could run forever.
-    private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
+    private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last, RunContext context)
     {
-        UnobservedFailures.ReportDefects(decision.Suppressed);
-        return Interrupt(Outcome<bool, Never>.Interrupted(), last);
+        UnobservedFailures.ReportDefects(decision.Suppressed, context);
+        return Interrupt(Outcome<bool, Never>.Interrupted(), last, context);
     }
 
     // The policy failed, so the last attempt's outcome stays as context.
-    private static Outcome<T, E> Interrupt<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
+    private static Outcome<T, E> Interrupt<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last, RunContext context)
     {
         var failure = decision.WithTypes<T, E>();
         if (decision.Kind == OutcomeKind.Interrupted)
         {
-            UnobservedFailures.ReportDefects(last.Suppressed);
+            UnobservedFailures.ReportDefects(last.Suppressed, context);
             return failure;
         }
 

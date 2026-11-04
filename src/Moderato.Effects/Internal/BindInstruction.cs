@@ -19,12 +19,12 @@ internal class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<
 {
     private protected readonly Effect<A, B, R> source;
     private protected readonly TState state;
-    private readonly Func<Outcome<A, B>, TState, EffectSelection<C, D, T, E, R>> select;
+    private readonly Func<Outcome<A, B>, TState, RunContext, EffectSelection<C, D, T, E, R>> select;
     private readonly Func<Outcome<C, D>, Outcome<A, B>, RunContext, TState, Outcome<T, E>> project;
     private readonly bool isolate;
 
     internal BindInstruction(Effect<A, B, R> source, TState state,
-        Func<Outcome<A, B>, TState, EffectSelection<C, D, T, E, R>> select,
+        Func<Outcome<A, B>, TState, RunContext, EffectSelection<C, D, T, E, R>> select,
         Func<Outcome<C, D>, Outcome<A, B>, RunContext, TState, Outcome<T, E>> project, bool isolate)
     {
         this.source = source;
@@ -47,7 +47,7 @@ internal class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<
         var previous = await source.Run(environment, context, depth).ConfigureAwait(false);
         try
         {
-            var selected = select(previous, state);
+            var selected = select(previous, state, context);
             return selected.HasNext
                 ? project(await selected.Next.Run(environment, context, depth).ConfigureAwait(false), previous, context, state)
                 : selected.Output;
@@ -65,7 +65,7 @@ internal class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<
     {
         try
         {
-            var selected = select(previous, state);
+            var selected = select(previous, state, context);
             return selected.HasNext
                 ? Steps.Then(selected.Next.Run(environment, context, depth), (previous, context, instruction: this),
                     static (end, input) => input.instruction.project(end, input.previous, input.context, input.instruction.state))
@@ -111,7 +111,7 @@ internal class BindInstruction<A, B, C, D, T, E, R, TState> : EffectInstruction<
                 previous = input.Output;
                 try
                 {
-                    var selected = instruction.select(previous, instruction.state);
+                    var selected = instruction.select(previous, instruction.state, context);
                     if (!selected.HasNext)
                     {
                         Output = selected.Output;

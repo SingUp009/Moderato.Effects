@@ -30,15 +30,21 @@ internal class Cancellation : CancellationTokenSource
     private int state;
     private CancellationTokenRegistration parentLink;
     private object? callbackFailure;
+    private readonly Action<ExitCase>? unobservedFailureHandler;
 
-    internal Cancellation(CancellationToken parent)
-        => parentLink = parent.UnsafeRegister(static self => ((Cancellation)self!).CancelFromParent(), this);
+    internal Cancellation(RunContext parent)
+    {
+        unobservedFailureHandler = parent.UnobservedFailureHandler;
+        parentLink = parent.CancellationToken.UnsafeRegister(static self => ((Cancellation)self!).CancelFromParent(), this);
+    }
+
+    internal RunContext Context => new(Token, unobservedFailureHandler);
 
     /// <summary>A unit for the caller's token, canceled from a registration so a throwing callback stays out of the caller's <c>Cancel()</c>.</summary>
-    internal static Cancellation ForCaller(CancellationToken caller)
+    internal static Cancellation ForCaller(RunContext caller)
     {
-        var unit = new Cancellation(CancellationToken.None);
-        unit.parentLink = caller.UnsafeRegister(static self => ((Cancellation)self!).CancelForCaller(), unit);
+        var unit = new Cancellation(caller.WithCancellation(CancellationToken.None));
+        unit.parentLink = caller.CancellationToken.UnsafeRegister(static self => ((Cancellation)self!).CancelForCaller(), unit);
         return unit;
     }
 
@@ -114,7 +120,8 @@ internal class Cancellation : CancellationTokenSource
         }
 
         var failure = new CallbackFailure(ExceptionDispatchInfo.Capture(single), order);
-        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed) UnobservedFailures.Report(ExitCases.Die(failure.Dispatch));
+        if (Interlocked.CompareExchange(ref callbackFailure, failure, null) == closed)
+            UnobservedFailures.Report(ExitCases.Die(failure.Dispatch), unobservedFailureHandler);
     }
 
     /// <summary>Takes a callback's defect from the cancellation, after which defects are reported.</summary>

@@ -149,3 +149,15 @@ bench/Moderato.Effects.Benchmarks/               BenchmarkDotNet（P8）
 - CI は Moderato.Results と同じく `dotnet test -c Release` を基本にする。
 - `PublicAPI.*.txt`（公開 API の変更を検出する Analyzer）は、API が固まる P8 で入れる。P8 で入れた。最初のプレビュー版までは、すべて `PublicAPI.Unshipped.txt` にある。リリースの手順は `RELEASING.md`。
 - コードのコメントと README は英語（Moderato.Results と同じ）。設計メモと実装計画は日本語。
+
+## 3. Hosting の実装（2026-11-04）
+
+[Hosting 要件](requirements/moderato-effects-hosting.md)に基づき、次の順で進める。要件は `7c9fa20` で保存済み。各段階をテストして Claude Code の独立レビューを受け、指摘を解消してから次へ進む。設計からの逸脱が必要なら先にユーザーへ相談する。
+
+| 段階 | 対象 | 受け入れ確認 |
+|---|---|---|
+| H1 | 本体の実行単位の診断先。既存の実行 API と全体共通ハンドラーを維持し、指定した診断先を子・回復・解放・キャンセルの報告まで引き継ぐ | 実行間の分離、既存の既定動作、遅れたコールバック、深い合成、再実行。引数省略や `default` を含む既存呼び出しを曖昧にしない |
+| H2 | Hosting プロジェクト、診断の Host 寿命、サービス登録、型付き環境と Err ハンドラー、DI scope の解放と失敗集約 | 実際の Host で要件の節6を確認。同期・非同期のハンドラー失敗、元 Err の保持、同型の複数登録、停止猶予超過と接続終了後を含む |
+| H3 | パッケージ・CI・サンプル・公開 API 記録・利用ガイド・リリース手順 | 個別の未公開バージョンで pack し、利用側・Analyzer・NativeAOT と必要な性能確認を実行。公開済みの同名バージョンをローカルキャッシュへ上書きしない |
+
+開発中の Hosting は最新の本体への ProjectReference を使う。公開済み preview.2 に最新の契約がすべて入っているとは扱わない。バージョン確定・タグ・公開はリリース手順の別の段階とする。

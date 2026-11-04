@@ -128,7 +128,7 @@ public static partial class Effect
         {
             if (Interrupted(ends, context)) return InterruptedWithOthers<T, E, Exit<T, E>[], Never>(ends);
             Exit<T, E>[] exits = ends.Length == 0 ? [] : new Exit<T, E>[ends.Length];
-            for (var i = 0; i < ends.Length; i++) exits[i] = Exits.From(ends[i].Outcome);
+            for (var i = 0; i < ends.Length; i++) exits[i] = Exits.From(ends[i].Outcome, context);
             return Outcome<Exit<T, E>[], Never>.Ok(exits);
         }));
     }

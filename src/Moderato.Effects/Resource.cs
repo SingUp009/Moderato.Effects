@@ -48,7 +48,7 @@ public readonly struct Resource<T, E, R>
         static async ValueTask<Outcome<U, E>> UseAsync(
             Func<R, RunContext, Releases<R>, ValueTask<Outcome<T, E>>> acquire, Func<T, Effect<U, E, R>> use, R env, RunContext context)
         {
-            using var cancellation = new Cancellation(context.CancellationToken);
+            using var cancellation = new Cancellation(context);
             var releases = new Releases<R>(cancellation);
             var body = releases.BodyContext;
             Outcome<U, E> outcome;
@@ -131,7 +131,7 @@ public readonly struct Resource<T, E, R>
     {
         ArgumentNullException.ThrowIfNull(binder);
         return new(Acquisition.Bind<U, E, U, E, Func<T, Resource<U, E, R>>>(binder,
-            static (outcome, bind) => outcome.Kind == OutcomeKind.Ok
+            static (outcome, bind, _) => outcome.Kind == OutcomeKind.Ok
                 ? new(bind(outcome.Value).Acquisition) : new(outcome.WithValueType<U>()),
             static (next, previous, _, _) => next.After(previous), isolate: true));
     }
@@ -221,7 +221,7 @@ public static class ResourceLinq
         Resource<T, E, R> source, Func<T, Resource<U, F, R>> selector, Func<T, U, V> resultSelector,
         Func<Outcome<U, F>, Outcome<U, E>> widen)
     {
-        return new(source.Acquisition.Bind((selector, resultSelector, widen), static (first, state) => first.Kind == OutcomeKind.Ok
+        return new(source.Acquisition.Bind((selector, resultSelector, widen), static (first, state, _) => first.Kind == OutcomeKind.Ok
                 ? new EffectSelection<U, F, V, E, ResourceEnvironment<R>>(state.selector(first.Value).Acquisition)
                 : new EffectSelection<U, F, V, E, ResourceEnvironment<R>>(first.WithValueType<V>()),
             static (raw, first, context, state) =>
