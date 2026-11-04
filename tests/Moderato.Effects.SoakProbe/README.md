@@ -80,6 +80,10 @@ live heap by cumulative operations to infer allocations or leak rate. A staircas
 alone does not distinguish caches from retention bugs. Interpret trends together
 with release counts and sampled weak references; sampling does not prove that all
 objects were collected. Thread and handle counts describe this process only.
+On Linux, `private` (`Process.PrivateMemorySize64`) is backed by `VmData` in
+`/proc/<pid>/status`: a virtual data-segment size, not private resident RAM (see
+the [.NET implementation notes](https://source.dot.net/System.Diagnostics.Process/System/Diagnostics/Process.cs.html)).
+Read it separately from the process working-set observation in `working_set`.
 
 `host` observes live services in its windows, including in-flight scopes. Its weak
 references and exact counters are checked after all services stop and Hosts are
