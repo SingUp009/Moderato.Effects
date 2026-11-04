@@ -43,8 +43,17 @@ bash tests/Moderato.Effects.SoakProbe/run.sh gen 30 /tmp/soak-gen-after
 The output directory must not exist. It receives build output, the commit/status,
 SDK details, source and binary SHA256 hashes, runtime/GC metadata, CSV windows and
 the actual exit code. No output pipeline masks application failure. A process
-watchdog terminates the run after its duration plus five minutes, including a
-blocked operation. Exit 124/137 is a failure, never a completed soak.
+watchdog terminates the run after its duration plus five minutes. Exit 124/137 is
+a failure, never a completed soak.
+
+Core observation windows run on the standard thread pool and have a deadline of
+the requested window duration plus 30 seconds (31 seconds for warmup). This bounds
+a synchronous stall before the first await as well as an asynchronous stall. The
+deadline does not cancel the measured effect or its cleanup: exceeding it fails
+the process rather than claiming a successful drain. The process watchdog remains
+a fallback. Per-window scheduling/deadline overhead is included in the CSV window
+measurements; it does not add a library caller cancellation unit per operation.
+Use identical harness versions for rate and allocation comparisons.
 
 For a before/after comparison, copy the identical probe directory to a separate
 worktree pinned at the comparison commit. Record both manifests, and run them
