@@ -12,6 +12,27 @@ public class GlobalDiagnosticsCollection;
 public class DiagnosticsTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddEffectsHttp_ExistingTrackerSetting_PreservesSetting(bool enabled)
+    {
+        // Given
+        var previous = EffectTracker.EnableTracking;
+        EffectTracker.EnableTracking = enabled;
+        var services = new ServiceCollection();
+        try
+        {
+            // When
+            var result = services.AddEffectsHttp();
+
+            // Then
+            Assert.Same(services, result);
+            Assert.Equal(enabled, EffectTracker.EnableTracking);
+        }
+        finally { EffectTracker.EnableTracking = previous; }
+    }
+
+    [Theory]
     [InlineData(true, false)]
     [InlineData(false, false)]
     [InlineData(true, true)]
