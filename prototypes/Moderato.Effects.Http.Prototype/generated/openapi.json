@@ -68,10 +68,90 @@
           }
         }
       }
+    },
+    "/authorized-orders/{id}": {
+      "get": {
+        "tags": [
+          "AuthorizedOrderExample"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessDenied"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderNotFound"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PrototypeUser": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccessDenied": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "CreateOrderRequest": {
         "required": [
           "sku",
@@ -132,6 +212,22 @@
           }
         }
       },
+      "OrderNotFound": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -181,9 +277,20 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "PrototypeUser": {
+        "type": "apiKey",
+        "description": "Prototype only: alice or bob. This header does not authenticate real identities.",
+        "name": "X-Prototype-User",
+        "in": "header"
+      }
     }
   },
   "tags": [
+    {
+      "name": "AuthorizedOrderExample"
+    },
     {
       "name": "Program"
     }

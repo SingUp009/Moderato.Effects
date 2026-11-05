@@ -20,7 +20,7 @@ curl http://localhost:5000/orders -H 'Content-Type: application/json' \
   -d '{"sku":"sample","quantity":2}'
 ```
 
-最初の注文は201、同じ SKU は409、不正な数量は400。保存先はメモリだけで、再起動で消える。認証・永続化は実装していない。
+最初の注文は201、同じ SKU は409、不正な数量は400。保存先はメモリだけで、再起動で消える。永続化や実運用の認証は実装していない。
 
 生成文書のスナップショットは [generated/openapi.json](generated/openapi.json)。自己検証で取得した文書の servers だけを相対 URL `/` に正規化し、一時ポート番号による差分をなくしている。注文の201・400・409は型付き Results から生成し、共通例外ハンドラーの500は標準の ProducesProblem で明示する。検証用 endpoint は文書から除外する。独自のエラー union 列挙や OpenAPI 生成器は使用しない。
 
@@ -37,8 +37,25 @@ dotnet run -c Release --project prototypes/Moderato.Effects.Http.Prototype -- --
 - 解放中に request token を取消した Die(OCE)・Die(IOException) が中断へ丸められないこと。これは制御したトークンの競合であり、物理的なネットワーク切断試験ではない。
 - 実行中のキャンセルで解放を待つこと、解放がキャンセル不能であること、主失敗・付属失敗・Relation の保持。
 - 接続解除後の診断が本体の既存経路へ退避し、結果を変更しないこと。未観測の子のエラー値を ToString しないこと。
+- 標準認可の未認証401、業務認可の403、所有者200・見つからない404と本文スキーマ。認証を要求する操作だけが OpenAPI の security を持つこと。
 
 簡易計測は、同期完了する定数 Effect の再利用と、DI scope の生成・解決・破棄込みの費用を見る。正式なベンチマークではなく、実HTTPの処理量、非同期経路、有効・無効ロギングの全条件を網羅しない。性能の条件付き合意を満たした証拠にはまだしない。
+
+## 認可ありの例
+
+`GET /authorized-orders/{id}` は、通常の RequireAuthorization と、Effect が返す業務上の AccessDenied を分ける例。固定データの注文1は alice だけが読める。公開の POST /orders の保存データとは別の、認可を確かめるための固定データである。
+
+```sh
+curl -i http://localhost:5000/authorized-orders/1
+curl -i http://localhost:5000/authorized-orders/1 -H 'X-Prototype-User: alice'
+curl -i http://localhost:5000/authorized-orders/1 -H 'X-Prototype-User: bob'
+```
+
+順に401・200・403。存在しないIDは認証済み利用者に404を返す。`X-Prototype-User` はローカル試作専用で、実際の身元を検証しない。実サービスには使わず、適切な認証方式へ置き換える必要がある。認可の配置や、存在を隠して404へ揃えるかどうかもアプリの方針であり、この固定例を製品の既定にしない。
+
+200・404は型付き結果から記述し、業務の JSON 403は Produces<AccessDenied>(403)、標準認証の401は Produces(401)、共通異常の500は ProducesProblem(500) で明示する。手書き宣言と実応答の一致はコンパイラが保証しないため、自己検証でステータス・media type・本文スキーマを照合する。
+
+認証ヘッダーの securitySchemes と保護された操作の security は、ASP.NET Core の標準 [document/operation transformer](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/customize-openapi?view=aspnetcore-10.0) で追加する。HTTP パッケージの独自生成器ではなく、試作アプリの認証構成に対応した宣言である。公開の /orders に認証要件を付けないことも確認する。
 
 ## 今回確認する設計
 
@@ -52,6 +69,6 @@ dotnet run -c Release --project prototypes/Moderato.Effects.Http.Prototype -- --
 
 ## まだ確認していないこと
 
-SDK と OpenAPI は .NET 11 RC3。GA での互換性、NativeAOT、認証・業務認可、実際の切断やHost停止との全競合、異なる複数Host、リクエスト情報の長期保持は未検証。付属情報の保持上限超過を今回の自己検証で再現してはいない。
+SDK と OpenAPI は .NET 11 RC3。GA での互換性、NativeAOT、実運用の認証方式・認可ポリシー、実際の切断やHost停止との全競合、異なる複数Host、リクエスト情報の長期保持は未検証。付属情報の保持上限超過を今回の自己検証で再現してはいない。
 
 HttpContextAccessor を使う入口、例外の型名、診断実装は候補であり、採用ではない。接続ロック・AsyncLocal・リクエストごとのオブジェクト生成に費用がある。通常利用で最善の構成にするため、製品化前に比較し直す。ストリーミングとTrackerは対象外。

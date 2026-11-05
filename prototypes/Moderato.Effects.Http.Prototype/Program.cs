@@ -11,8 +11,13 @@ var builder = WebApplication.CreateBuilder(args.Where(arg => arg != "--verify").
 builder.Services.AddEffectsHttp();
 builder.Services.AddScoped<AppEnv>();
 builder.Services.AddSingleton<OrderStore>();
-builder.Services.AddOpenApi();
-builder.Services.AddSingleton<ObservedFailures>();
+AuthorizedOrderExample.AddServices(builder.Services);
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
+{
+    AuthorizedOrderExample.DescribeAuthentication(document);
+    return Task.CompletedTask;
+}));
+if (verify) builder.Services.AddSingleton<ObservedFailures>();
 if (verify) builder.WebHost.UseUrls("http://127.0.0.1:0");
 if (verify) builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
@@ -20,12 +25,15 @@ await using var app = builder.Build();
 app.UseExceptionHandler(errors => errors.Run(async context =>
 {
     var error = context.Features.Get<IExceptionHandlerFeature>()!.Error;
-    app.Services.GetRequiredService<ObservedFailures>().Errors.Enqueue(error);
+    if (verify) app.Services.GetRequiredService<ObservedFailures>().Errors.Enqueue(error);
     await TypedResults.Problem(statusCode: 500, title: "The request failed.").ExecuteAsync(context);
 }));
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi();
 app.MapPost("/orders", CreateOrder).ProducesProblem(500);
+AuthorizedOrderExample.Map(app);
 
 if (verify)
 {

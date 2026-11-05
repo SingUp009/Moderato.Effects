@@ -92,6 +92,7 @@ internal static class PrototypeChecks
         }
         Check(responses.TryGetProperty("500", out _), "explicit 500 metadata");
         Check(!operation.TryGetProperty("parameters", out var parameters) || parameters.GetArrayLength() == 0, "services are not HTTP parameters");
+        await CheckAuthorization(client, json.RootElement);
 
         await CheckCancellationAndCleanup(app);
         await CheckActiveCancellation(app);
@@ -101,6 +102,50 @@ internal static class PrototypeChecks
         await CheckEarlyResolution(app);
         MeasureEntry(app, output);
         Console.WriteLine($"PASS — prototype checks; OpenAPI saved to {Path.Combine(output, "openapi.json")}");
+    }
+
+    private static async Task CheckAuthorization(HttpClient client, JsonElement document)
+    {
+        // Given
+        using var aliceRequest = new HttpRequestMessage(HttpMethod.Get, "/authorized-orders/1");
+        aliceRequest.Headers.Add(PrototypeAuthentication.HEADER_NAME, "alice");
+        using var bobRequest = new HttpRequestMessage(HttpMethod.Get, "/authorized-orders/1");
+        bobRequest.Headers.Add(PrototypeAuthentication.HEADER_NAME, "bob");
+        using var missingRequest = new HttpRequestMessage(HttpMethod.Get, "/authorized-orders/99");
+        missingRequest.Headers.Add(PrototypeAuthentication.HEADER_NAME, "alice");
+        using var invalidRequest = new HttpRequestMessage(HttpMethod.Get, "/authorized-orders/1");
+        invalidRequest.Headers.Add(PrototypeAuthentication.HEADER_NAME, "unknown");
+        // When
+        using var anonymous = await client.GetAsync("/authorized-orders/1");
+        using var alice = await client.SendAsync(aliceRequest);
+        using var bob = await client.SendAsync(bobRequest);
+        using var missing = await client.SendAsync(missingRequest);
+        using var invalid = await client.SendAsync(invalidRequest);
+        // Then
+        Check(anonymous.StatusCode == HttpStatusCode.Unauthorized, "anonymous request is challenged with 401");
+        Check(invalid.StatusCode == HttpStatusCode.Unauthorized, "invalid prototype identity is challenged with 401");
+        Check(alice.StatusCode == HttpStatusCode.OK, "authorized owner receives 200");
+        Check((await alice.Content.ReadFromJsonAsync<Order>())?.Sku == "protected-sample", "authorized response contains the order");
+        Check(bob.StatusCode == HttpStatusCode.Forbidden, "business access denial returns 403");
+        Check(bob.Content.Headers.ContentType?.MediaType == "application/json", "business denial uses declared JSON media type");
+        Check((await bob.Content.ReadFromJsonAsync<AccessDenied>())?.Reason == "Access denied.", "business denial matches its body schema");
+        Check(missing.StatusCode == HttpStatusCode.NotFound, "missing order returns 404");
+
+        var operation = document.GetProperty("paths").GetProperty("/authorized-orders/{id}").GetProperty("get");
+        var responses = operation.GetProperty("responses");
+        foreach (var code in new[] { "200", "401", "403", "404", "500" })
+            Check(responses.TryGetProperty(code, out _), $"authorized OpenAPI includes {code}");
+        foreach (var (code, name) in new[] { ("200", "Order"), ("403", "AccessDenied"), ("404", "OrderNotFound") })
+        {
+            var schema = responses.GetProperty(code).GetProperty("content").GetProperty("application/json").GetProperty("schema");
+            Check(schema.GetProperty("$ref").GetString() == $"#/components/schemas/{name}", $"authorized OpenAPI {code} body matches {name}");
+        }
+        var scheme = document.GetProperty("components").GetProperty("securitySchemes").GetProperty(PrototypeAuthentication.SCHEME_NAME);
+        Check(scheme.GetProperty("type").GetString() == "apiKey" && scheme.GetProperty("name").GetString() == PrototypeAuthentication.HEADER_NAME,
+            "OpenAPI describes the prototype authentication header");
+        Check(operation.GetProperty("security")[0].TryGetProperty(PrototypeAuthentication.SCHEME_NAME, out _), "only protected operation declares authentication");
+        Check(!document.GetProperty("paths").GetProperty("/orders").GetProperty("post").TryGetProperty("security", out _),
+            "public order creation is not documented as protected");
     }
 
     private static async Task CheckEarlyResolution(WebApplication app)
