@@ -247,7 +247,7 @@ await builder.Build().RunAsync();
 
 ## 10. H3 の出荷物検証（2026-11-04）
 
-- Hosting を別 nupkg / snupkg にし、README・XML docs・SourceLink と repository commit を `tests/verify-packages.py` で検証する。生成器を重複して同梱せず、Core の package から推移的に受け取る。
+- Hosting を別 nupkg / snupkg にし、README・XML docs・SourceLink と repository commit を `tests/Moderato.Effects.PackageVerifier` で検証する。生成器を重複して同梱せず、Core の package から推移的に受け取る。
 - Core と Microsoft.Extensions.Logging への参照は NuGet の最小版指定であり、完全一致ではない。上位版を拒否する上限を付けない（[NuGet の範囲規則](https://learn.microsoft.com/en-us/nuget/concepts/package-versioning#version-ranges)）。Hosting.Abstractions は net11.0 の参照フレームワークに含まれるため、冗長な PackageReference を置かない。AddLogging のための Logging 実装 package は維持する。
 - ソース上の開発版はリリースの確定ではない。非タグ CI は固有の `-ci.<run>.<attempt>`、ローカル検証も固有の未公開版を両パッケージへ渡す。リリース PR で両方を更新し、タグとの一致を検査してから既存の承認付き公開へ進む。
 - SDK は `11.0.100-rc.3.26522.148`。RC2 付属の Native AOT compiler に対する NU1903 を実測したため、[修正済み RC3](https://github.com/advisories/GHSA-p3jp-9v83-76w9)へ更新した。NuGet の監査や IL 警告を抑制しない。

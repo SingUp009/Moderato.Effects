@@ -19,7 +19,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] `dotnet test -c Release` passes.
 - [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
-- [ ] `tests/verify-packages.py` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
+- [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
 - [ ] Review `docs/http-validation.md`, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
 - [ ] Update the English wiki, including Hosting, HTTP and any Core operator changes. Mark unreleased APIs until publication.
 
@@ -47,7 +47,7 @@ validation_version="0.1.0-local.$(git rev-parse --short HEAD).1"
 dotnet pack src/Moderato.Effects -c Release -p:Version="$validation_version" -o artifacts
 dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version="$validation_version" -o artifacts
 dotnet pack src/Moderato.Effects.Http -c Release -p:Version="$validation_version" -o artifacts
-python3 tests/verify-packages.py artifacts "$validation_version" "$(git rev-parse HEAD)"
+dotnet run --project tests/Moderato.Effects.PackageVerifier -c Release -- artifacts "$validation_version" "$(git rev-parse HEAD)"
 dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
