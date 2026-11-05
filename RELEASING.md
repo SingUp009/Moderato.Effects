@@ -22,7 +22,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
 - [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
 - [ ] Review `docs/http-validation.md`, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
-- [ ] Update the English wiki, including Hosting, HTTP and any Core operator changes. Mark unreleased APIs until publication.
+- [ ] Prepare English wiki drafts for Hosting, HTTP and Core operator changes. During previews, keep drafts locally and leave the published wiki unchanged until the stable release.
 
 Merge the PR once CI is green.
 
@@ -36,7 +36,7 @@ Merge the PR once CI is green.
 - [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and publishes it with Native AOT.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
 - [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting and https://www.nuget.org/packages/Moderato.Effects.Http. Indexing can take 5 to 15 minutes.
-- [ ] After all packages are publicly available, update the English wiki installation commands to the published version and replace its unreleased notices and index labels with the version that includes those APIs. Do not announce unpublished APIs as available before package publication.
+- [ ] For the stable release only, after all packages are publicly available, review the saved drafts against the released APIs and update the English wiki installation commands, notices and index labels. Revalidate draft examples and version references; do not apply preview-era drafts unchanged.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 
