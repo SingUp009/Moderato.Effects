@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add an opt-in Effect Tracker for active scopes, fibers and acquired resources. Snapshots contain metadata only; stack capture is separately opt-in. Disabling clears the registry, and enabling tracks future starts without retaining environments or resource values.
+
 ## [0.1.0-preview.3] - 2026-11-04
 
 ### Breaking changes
