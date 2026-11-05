@@ -21,7 +21,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
 - [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
-- [ ] Review `docs/http-validation.md`, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
+- [ ] Review the local HTTP validation notes, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
 - [ ] Prepare English wiki drafts for Hosting, HTTP and Core operator changes. During previews, keep drafts locally and leave the published wiki unchanged until the stable release.
 
 Merge the PR once CI is green.

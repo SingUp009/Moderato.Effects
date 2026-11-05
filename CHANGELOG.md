@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Validated on the .NET 11 RC3 SDK/runtime selected by `global.json`; .NET 11 GA revalidation remains outstanding.
 - The previous long-duration validation targeted commit `611ce78`. This release has unit, integration and package-consumer checks, but no long-duration validation of its final source. Current-main soak is deferred to the user's always-on PC; earlier evidence must not be treated as evidence for this version.
-- Follow-up work remains open: [#377](https://github.com/SingUp009/Moderato.Effects/issues/377) for the earlier unexplained late-run Gen slowdown, [#401](https://github.com/SingUp009/Moderato.Effects/issues/401) for disabled Tracker completion overhead, and [#403](https://github.com/SingUp009/Moderato.Effects/issues/403) for HTTP process-isolated measurements, concurrent/long-duration coverage, weak-retention verification and GA revalidation. HTTP timing observations and remaining drift are documented in [the performance report](docs/http-performance.md).
+- Follow-up work remains open: [#377](https://github.com/SingUp009/Moderato.Effects/issues/377) for the earlier unexplained late-run Gen slowdown, [#401](https://github.com/SingUp009/Moderato.Effects/issues/401) for disabled Tracker completion overhead, and [#403](https://github.com/SingUp009/Moderato.Effects/issues/403) for HTTP process-isolated measurements, concurrent/long-duration coverage, weak-retention verification and GA revalidation. HTTP timing observations and remaining drift are documented in [the performance report](https://github.com/SingUp009/Moderato.Effects/blob/v0.1.0-preview.4/docs/http-performance.md).
 
 ## [0.1.0-preview.3] - 2026-11-04
 
