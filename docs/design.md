@@ -262,7 +262,7 @@ var conn = await scope.Acquire(OpenConn<R>());
     public sealed record Failed(object Error);                     // Err の中身を、型を消して持つ（ログ用）
     ```
 
-    解放処理の中でも `exit is Die(var ex)` のようにバグの中身を取り出せる。型パラメータが必要な場面が見つかったら見直す。
+    解放処理の中でも `exit is Die(var ex)` のようにバグの中身を取り出せる。通常は直接の型パターンや網羅的な switch 式を使う。`Exit<T, E>` と同じ形の `HasValue` と4ケースの `TryGetValue` も持ち、ケースが一致しない場合は false と null を返す。default や null のケースでは `HasValue` が false となる。`Succeeded` と `Ok<T>` は別の型であり、`ExitCase.TryGetValue` に `Ok<T>` を渡すことはできない。型パラメータが必要な場面が見つかったら見直す。
     E が union のときは、`Failed` には union ではなく、union が持っている case を入れる（P3）。`exit is Failed(NotFound nf)` のように case で一致させるため。
   - **ExitCase は、利用本体が終わった時点で確定する**（G5）。解放処理の途中で別の解放処理が失敗しても、後の解放処理が受け取る ExitCase は変わらない。解放処理の失敗は別に集め、すべての解放が終わってから最終的な Exit を決める。トランザクションのように、別のリソースより先に成否を確定させたいものは、Resource を組み立てる順番で表す。
   - Gen の中では、解放処理だけを登録する `scope.Defer(exit => ...)` も使える（D11）。

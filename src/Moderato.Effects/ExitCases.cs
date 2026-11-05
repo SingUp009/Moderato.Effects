@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Moderato.Effects;
 
 /// <summary>The run ended because a defect (an unexpected exception) escaped.</summary>
@@ -24,7 +26,47 @@ public sealed record Succeeded;
 public sealed record Failed(object? Error);
 
 /// <summary>How a scope finished, untyped; passed to release actions.</summary>
-public union ExitCase(Succeeded, Failed, Die, Interrupted);
+public union ExitCase(Succeeded, Failed, Die, Interrupted)
+{
+    /// <summary>Whether this contains a non-null case.</summary>
+    public bool HasValue => Value is not null;
+
+    /// <summary>Access to the Succeeded case.</summary>
+    /// <param name="succeeded">The success case, when this is one.</param>
+    /// <returns>True if Succeeded.</returns>
+    public bool TryGetValue([NotNullWhen(true)] out Succeeded? succeeded)
+    {
+        succeeded = Value as Succeeded;
+        return succeeded is not null;
+    }
+
+    /// <summary>Access to the Failed case.</summary>
+    /// <param name="failed">The expected failure, when this is one.</param>
+    /// <returns>True if Failed.</returns>
+    public bool TryGetValue([NotNullWhen(true)] out Failed? failed)
+    {
+        failed = Value as Failed;
+        return failed is not null;
+    }
+
+    /// <summary>Access to the Die case.</summary>
+    /// <param name="die">The defect, when this is one.</param>
+    /// <returns>True if Die.</returns>
+    public bool TryGetValue([NotNullWhen(true)] out Die? die)
+    {
+        die = Value as Die;
+        return die is not null;
+    }
+
+    /// <summary>Access to the Interrupted case.</summary>
+    /// <param name="interrupted">The interruption, when this is one.</param>
+    /// <returns>True if Interrupted.</returns>
+    public bool TryGetValue([NotNullWhen(true)] out Interrupted? interrupted)
+    {
+        interrupted = Value as Interrupted;
+        return interrupted is not null;
+    }
+}
 
 /// <summary>How a suppressed failure relates to the outcome that was kept.</summary>
 public enum Relation
