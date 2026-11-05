@@ -20,18 +20,68 @@ internal static class HostProbe
             {
                 throw new InvalidOperationException($"Host ownership mismatch: {state}");
             }
-            var collected = SpinWait.SpinUntil(() =>
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-                lock (state.References) return state.References.All(static reference => reference is null || !reference.IsAlive);
-            }, TimeSpan.FromSeconds(5));
+            var collected = await WaitForCollection(state);
             if (!collected) throw new InvalidOperationException("Stopped Host retained a sampled iteration scope.");
             Console.WriteLine($"PASS {state}");
         }
         if (stopped) Console.WriteLine("STOPPED Host lifetime request; timed run incomplete");
         return stopped ? 130 : 0;
+    }
+
+    private static async Task<bool> WaitForCollection(State state)
+    {
+        // Leave the producer's inline completion stack before waiting for its locals to collect.
+        await Task.Yield();
+        return SpinWait.SpinUntil(() =>
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            lock (state.References) return state.References.All(static reference => reference is null || !reference.IsAlive);
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    internal static async Task CheckCollectionBoundary()
+    {
+        // Given
+        var state = new State("completion-control");
+        var completed = new TaskCompletionSource();
+        var producerActive = new StrongBox<int>();
+        var collection = CollectAfterCompletion(completed.Task, state, producerActive);
+        // When
+        await Task.Run(() => CompleteFromProducer(completed, state, producerActive));
+        var collected = await collection;
+        // Then
+        if (!collected) throw new InvalidOperationException("Collection ran on the producer completion stack.");
+
+        // Given
+        var retained = new object();
+        state.References[0] = new WeakReference(retained);
+        // When
+        collected = await WaitForCollection(state);
+        GC.KeepAlive(retained);
+        // Then
+        if (collected) throw new InvalidOperationException("A retained Host sample was reported as collected.");
+        Console.WriteLine("PASS Host collection controls: inline completion unwinds; retained samples remain detected");
+    }
+
+    private static async Task<bool> CollectAfterCompletion(Task completed, State state, StrongBox<int> producerActive)
+    {
+        await completed.ConfigureAwait(false);
+        if (Volatile.Read(ref producerActive.Value) != 1)
+            throw new InvalidOperationException("The completion control did not run inline.");
+        return await WaitForCollection(state);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void CompleteFromProducer(TaskCompletionSource completed, State state, StrongBox<int> producerActive)
+    {
+        var sample = new object();
+        state.References[0] = new WeakReference(sample);
+        Volatile.Write(ref producerActive.Value, 1);
+        completed.SetResult();
+        GC.KeepAlive(sample);
+        Volatile.Write(ref producerActive.Value, 0);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

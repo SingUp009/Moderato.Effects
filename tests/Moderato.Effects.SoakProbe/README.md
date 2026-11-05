@@ -100,7 +100,10 @@ Read it separately from the process working-set observation in `working_set`.
 
 `host` observes live services in its windows, including in-flight scopes. Its weak
 references and exact counters are checked after all services stop and Hosts are
-disposed; live objects are not classified as leaks. Each Host has its own 30-second
+disposed. Collection checks first leave the producer completion stack, whose
+locals can otherwise remain genuine GC roots while an inline continuation waits.
+The self-check verifies this boundary and that a deliberately retained sample is
+still detected; live objects are not classified as leaks. Each Host has its own 30-second
 stop-and-join budget. Once running, SIGINT/SIGTERM follow Generic Host's
 `ApplicationStopping` notification through the same stop, join, disposal and final
 invariant checks. Exit 130 and `STOPPED` distinguish this verified early shutdown
@@ -118,9 +121,10 @@ cancellation state or change outcome classification. The final `STOPPED` counts
 and exit 130 identify an incomplete timed run. Core-only Windows signal handling
 is not covered.
 
-The short verification script sends both signals to all eight conditions in
-isolated running processes after their first observation window, checking cleanup
-before exit 130. A stuck operation is still a watchdog failure, and SIGKILL cannot
+The short verification script invokes the C# `verify-signals` mode. It sends
+both signals to all eight conditions in isolated running processes after their
+first observation window, checking cleanup before exit 130. Its output controls
+also reject incorrect exit codes, counts and completion markers. A stuck operation is still a watchdog failure, and SIGKILL cannot
 await cleanup. Startup-signal handling is not established by these checks.
 
 These finite, sequential conditions do not establish stability under arbitrary
