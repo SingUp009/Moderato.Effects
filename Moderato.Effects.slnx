@@ -1,19 +1,23 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Moderato.Effects.Http/Moderato.Effects.Http.csproj" />
     <Project Path="src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj" />
     <Project Path="src/Moderato.Effects/Moderato.Effects.csproj" />
     <Project Path="src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Moderato.Effects.Http.Tests/Moderato.Effects.Http.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.Hosting.Tests/Moderato.Effects.Hosting.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.StackSafetyProbe/Moderato.Effects.StackSafetyProbe.csproj" />
     <Project Path="tests/Moderato.Effects.SourceGenerator.Tests/Moderato.Effects.SourceGenerator.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.Tests/Moderato.Effects.Tests.csproj" />
   </Folder>
   <Folder Name="/bench/">
+    <Project Path="bench/Moderato.Effects.Http.Benchmarks/Moderato.Effects.Http.Benchmarks.csproj" />
     <Project Path="bench/Moderato.Effects.Benchmarks/Moderato.Effects.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/samples/">
+    <Project Path="samples/Moderato.Effects.Http.Samples/Moderato.Effects.Http.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Hosting.Samples/Moderato.Effects.Hosting.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Samples/Moderato.Effects.Samples.csproj" />
   </Folder>

@@ -1,8 +1,8 @@
 # Moderato.Effects HTTP 連携の要件（草案）
 
-ASP.NET Core のエンドポイントで Effect を実行するための議論用草案。パッケージ名・公開 API は未決。2026-11-05 は要件を整理し、製品実装は .NET 11 GA 後に進める。
+ASP.NET Core のエンドポイントで Effect を実行するための要件。2026-11-05、Issue #400 で Moderato.Effects.Http のプレビュー製品化を開始した。.NET 11 GA は待たず、RC3 で検証し、GA での再検証は別途残す。
 
-本体の確認基準は main `614518d771fc1e5dbf0fc2ad71f55657d616aa5c`。[設計メモ](../design.md) の D5〜D10・D17・D18 に従う。追加の soak は利用者が帰宅後、常時起動できる PC で行う。
+製品化の基準は main `526c2ca`。[設計メモ](../design.md) の D5〜D10・D17・D18 に従う。追加の soak は利用者が帰宅後、常時起動できる PC で行う。
 
 **2026-11-05 合意した原則**：既定が最速・最善の構成となることを目指す。通常利用で最適化用オプションを探すことを要求せず、正しさ・情報保持・寿命の契約を守ったうえで不要な処理を除く。速さは測定で確認し、任意の構成・プロバイダーで最速または割り当てゼロと断定しない。詳細追跡やスタック採取は通常利用の必須コストにしない。
 
@@ -56,8 +56,8 @@ ASP.NET Core のエンドポイントで Effect を実行するための議論�
 
 | 項目 | 確認・決定が必要なこと |
 |---|---|
-| 実行入口 | 登録は AddEffectsHttp() に決定。仮称 EffectRequest の名前、解決方法、実行ごとの状態。環境そのものは保持しない案。オプションは具体的な用途が生じた場合に検討 |
-| 境界例外の製品化 | EffectHttpException と Exit プロパティの形は合意済み。製品パッケージ・名前空間・公開 API 記録、GA のミドルウェアでの再確認。試作の型を公開済みとしない |
+| 実行入口 | AddEffectsHttp() と Scoped な EffectRequest を採用。RunAsync が現在の RequestAborted を取得し、環境そのものは保持しない。オプションは具体的な用途が生じた場合に検討 |
+| 境界例外の製品化 | EffectHttpException と Exit プロパティの形は合意済み。製品名は Moderato.Effects.Http。公開 API 記録を追加。GA のミドルウェアでの再確認と公開は未完了 |
 | 診断の寿命と公開形 | 標準 ILogger 接続とログの責務分担は合意済み。接続解除と既存経路への退避は性能確認を条件に合意。具体的な所有・解除方法、Host 破棄との競合、ログのカテゴリ・レベル・構造化項目、差し替えの必要性 |
 | 応答送信 | v1.0 は通常の値が対象。応答開始後の失敗の責務と説明。ストリームの所有権・送信中の実行は次バージョンで設計する |
 | OpenAPI | Forbid・Challenge・共通の異常応答などを標準 metadata で補う方法、応答型の上限を超える場合 |
@@ -81,7 +81,7 @@ ASP.NET Core のエンドポイントで Effect を実行するための議論�
 
 ## 7. 検証記録
 
-- 製品実装は未着手。実行可能な試作は製品 main から分離した [prototype/http の 0a856d3](https://github.com/SingUp009/Moderato.Effects/tree/0a856d3/prototypes/Moderato.Effects.Http.Prototype) に保存した。試作の確認を全受け入れ条件の完了や正式 API の採用としない。
+- 製品実装は Issue #400 の feat/http-integration で進行中。公開 API は Moderato.Effects.Http の AddEffectsHttp、EffectRequest.RunAsync と EffectHttpException.Exit。受け入れ条件の検証記録は [HTTP 製品検証](../http-validation.md) に記録する。実行可能な試作は製品 main から分離した [prototype/http の 0a856d3](https://github.com/SingUp009/Moderato.Effects/tree/0a856d3/prototypes/Moderato.Effects.Http.Prototype) に保存した。試作の確認を全受け入れ条件の完了や正式 API の採用としない。
 - 試作は .NET 11 SDK 11.0.100-rc.3.26522.148、Microsoft.AspNetCore.OpenApi 11.0.0-rc.3.26522.148 でビルドし、実HTTPを含む自己検証50項目を確認した。製品の本体・Hosting の変更はない。50項目に最終完了行を加えると PASS の出力は51行になる。
 - /orders の201・400・409は標準の型付き Results から生成し、共通ハンドラーの500は ProducesProblem(500) で明示した。Produces 系の宣言と実応答の一致はコンパイラが保証しないため、生成文書と実応答を別途照合する。
 - 認可の試作は RequireAuthorization を付ける MapGroup に security と401の operation transformer をまとめ、公開ルートと分離した。業務 Err の JSON 403は Produces<AccessDenied>(403) を個別に明示した。固定ユーザー用ヘッダーは実運用の認証ではない。拒否応答は認証設定・endpoint metadata に依存するため、この例の401を任意の構成へ一般化しない。
@@ -93,12 +93,12 @@ ASP.NET Core のエンドポイントで Effect を実行するための議論�
 
 ## 8. 利用者コードの形
 
-次はアプリ側の構成例。業務型・サービス登録は省略している。`EffectRequest` は仮称。登録名 AddEffectsHttp と、EffectHttpException の Exit プロパティは合意済みだが、製品パッケージとしては未実装である。試作の再現手順は節7のリンク先を参照する。以下の文書用の抜粋そのものをコンパイル済みとは扱わない。ASP.NET Core と Moderato.Results の Ok 型は名前を区別する。
+次はアプリ側の構成例。業務型・サービス登録は省略している。製品の名前空間は Moderato.Effects.Http、実行入口は EffectRequest、登録名は AddEffectsHttp、境界例外は EffectHttpException とする。未公開 API として実装・検証中である。試作の再現手順は節7のリンク先を参照する。以下の文書用の抜粋そのものをコンパイル済みとは扱わない。ASP.NET Core と Moderato.Results の Ok 型は名前を区別する。
 
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
 using Moderato.Effects;
-using Moderato.Effects.Http.Prototype;
+using Moderato.Effects.Http;
 using Moderato.Results;
 using HttpResults = Microsoft.AspNetCore.Http.HttpResults;
 
@@ -149,6 +149,6 @@ CreateOrder(CreateOrderRequest command, AppEnv env, EffectRequest request)
 
 登録名は `AddEffectsHttp` とする。Tracker の登録・有効化や具体的なオプションは、この例では決定していない。
 
-上記の Moderato.Effects.Http.Prototype は試作の名前空間であり、製品パッケージの名前空間を決定するものではない。
+製品サンプルは samples/Moderato.Effects.Http.Samples に置き、--verify で実 HTTP と OpenAPI の整合を確認する。
 
 認可を ASP.NET Core のポリシーに置く場合と、業務 Effect の型付きエラーに含める場合を分けて例示する。ASP.NET Core の認可でもリソースに基づく判定を表せるため、認可の内容だけで配置を固定しない。上記の RequireAuthorization が業務内の認可を代替するとはしない。switch が長い場合は通常のメソッドへ切り出せる。別の実行入口や専用 DSL を、そのためだけに必須にしない。

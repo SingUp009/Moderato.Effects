@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add the separate `Moderato.Effects.Http` preview package. `AddEffectsHttp()` registers a scoped `EffectRequest` that awaits execution and cleanup with the current request token, returns typed results, and preserves defects or unexpected interruptions in `EffectHttpException.Exit`.
+- Connect HTTP unobserved failure diagnostics to standard logging, with request and Host disconnection and late-report fallback. Routing, response mapping, authentication and exception handling remain standard ASP.NET Core application code.
+- Add an executable HTTP/OpenAPI sample and HTTP-only package consumer checks, including transitive generators, analyzer errors and Native AOT. Streaming is deferred; .NET 11 GA revalidation remains outstanding.
+
 ## [0.1.0-preview.3] - 2026-11-04
 
 ### Breaking changes

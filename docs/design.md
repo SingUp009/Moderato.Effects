@@ -1007,7 +1007,7 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
   - [要件草案](requirements/moderato-effects-hosting.md)で、停止・失敗・DI の寿命・診断ログの所有権を議論する。2026-11-04、`RunExitAsync` で分類した Die を元情報付きで Host へ異常として伝えること、ルート Err に型付きハンドラーを必須とすること、診断実装を渡す登録方法と、接続先・所有者・寿命を Host に揃えることを合意した。H1 で本体の実行単位の診断先を実装し、H2 で公開 API だけを使う Hosting 連携を実装する。具体的な API・所有権・遅延診断の扱いは要件文書の節9に記録する。Hosting に本体の internal を公開せず、失敗集約を複製しない。
   - Interrupted は結果を受け取った時点の停止トークンで判定し、キャンセル済みなら正常停止、未キャンセルなら Host へ異常として伝える。初版は Host 標準の停止猶予を尊重し、自動延長や Host 破棄の独自の保留は行わない。猶予内に後始末が終わる構成は利用者の責任とする（2026-11-04 合意）。
   - Hosting の `onError` が Die で失敗した場合は、処理しようとした元の Err を Sequential の付属情報として保持する。ハンドラーの同期・非同期で規則を変えず、既存の `OrElse` の消費規則も変更しない（2026-11-04 合意）。
-- **`Moderato.Effects.AspNetCore`**：`Result` / `Exit` を `IResult` に変換する補助（Die を ProblemDetails にする、など）。
+- **`Moderato.Effects.Http`**（Issue #400、プレビュー製品化中）：標準の MapGet・MapPost・MapGroup と Scoped な環境を使い、AddEffectsHttp で EffectRequest を登録する。実行入口で取得した RequestAborted を RunExitAsync と最終 Interrupted の観測に使い、子と解放の完了を待つ。Ok・Err は Result としてアプリの TypedResults 変換へ渡す。Die と中断未要求の Interrupted は EffectHttpException.Exit に保持し、Die の元例外を InnerException へ渡す。共通例外ハンドラーと OpenAPI metadata はアプリが設定する。診断は標準 ILogger に接続し、request・Host の接続解除後は既存診断へ退避する。独自ルーター・暗黙の状態コード変換・ストリーミング・Tracker 自動有効化は含めない。詳細と性能の条件付き合意は [HTTP 要件](requirements/moderato-effects-http.md) を参照。RC3 の検証と GA の再検証は区別する。
 - **フレーム単位の時間**（R3 の `FrameProvider`、UniTask の `DelayFrame`）：今は想定していない。.NET 11 の union を前提にしているため、当面 Unity では使えない。必要になったら、`IHas<FrameProvider>` のような形で Schedule などを拡張する。
 
 ## 設計レビューで変えた点

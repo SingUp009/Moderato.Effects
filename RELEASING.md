@@ -6,9 +6,9 @@ A release is a version-bump PR followed by a tag. CI publishes the package that 
 
 On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 
-- [ ] **Version**: set `<Version>` in both `src/Moderato.Effects/Moderato.Effects.csproj` and `src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj`. CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
-- [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core and Hosting; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
-- [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in both Core and Hosting.
+- [ ] **Version**: set `<Version>` in Core, Hosting and HTTP (`src/Moderato.Effects*/Moderato.Effects*.csproj`). CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
+- [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core, Hosting and HTTP; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
+- [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in Core, Hosting and HTTP.
   - Add the plain entries to Shipped.
   - For each `*REMOVED*` entry, delete the matching line from Shipped.
   - Keep Shipped sorted, and leave Unshipped with only `#nullable enable`.
@@ -17,10 +17,11 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] **Changelog**: in `CHANGELOG.md`, rename `[Unreleased]` to the new version with today's date, add an empty `[Unreleased]` above it, and update the compare links at the bottom. Breaking changes come first, and a source-compatible but binary-breaking change is still a breaking change.
   - `Tests` is an Unreleased-only section for verification changes with no package-observable effect; remove it before renaming `[Unreleased]`. API, behavior, and allocation changes belong under the normal change types.
 - [ ] `dotnet test -c Release` passes.
-- [ ] Both samples run, including `samples/Moderato.Effects.Hosting.Samples`.
-- [ ] The Core and Hosting package consumers pass under JIT and Native AOT; the Hosting-only consumer receives the transitive generators and analyzers.
-- [ ] `tests/verify-packages.py` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for both packages.
-- [ ] Update the English wiki, including Hosting and any Core operator changes. Mark unreleased APIs until publication.
+- [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
+- [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
+- [ ] `tests/verify-packages.py` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
+- [ ] Review `docs/http-validation.md`, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
+- [ ] Update the English wiki, including Hosting, HTTP and any Core operator changes. Mark unreleased APIs until publication.
 
 Merge the PR once CI is green.
 
@@ -33,23 +34,27 @@ Merge the PR once CI is green.
   - Mark previews as **pre-release**.
 - [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and publishes it with Native AOT.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
-- [ ] Confirm the version on both https://www.nuget.org/packages/Moderato.Effects and https://www.nuget.org/packages/Moderato.Effects.Hosting. Indexing can take 5 to 15 minutes.
+- [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting and https://www.nuget.org/packages/Moderato.Effects.Http. Indexing can take 5 to 15 minutes.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 
 ## Local verification without publishing
 
-Use a unique unpublished version and the project-local package caches. The two packages use minimum-version dependencies, so upgrading Core or Microsoft.Extensions remains possible; their compatible higher versions are not pinned away.
+Use a unique unpublished version and the project-local package caches. The three packages use minimum-version dependencies, so upgrading Core or Microsoft.Extensions remains possible; their compatible higher versions are not pinned away.
 
 ```bash
 validation_version="0.1.0-local.$(git rev-parse --short HEAD).1"
 dotnet pack src/Moderato.Effects -c Release -p:Version="$validation_version" -o artifacts
 dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version="$validation_version" -o artifacts
+dotnet pack src/Moderato.Effects.Http -c Release -p:Version="$validation_version" -o artifacts
 python3 tests/verify-packages.py artifacts "$validation_version" "$(git rev-parse HEAD)"
 dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
+dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-hosting
 ./artifacts/aot-hosting/Moderato.Effects.Hosting.PackageTests
+dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-http
+./artifacts/aot-http/Moderato.Effects.Http.PackageTests
 ```
 
 Increment the suffix after changing package contents. Non-tag CI builds use a unique `-ci.<run>.<attempt>` version stored in `artifacts/version.txt`; only tag builds can reach the existing approval-gated publishing job. Use the SDK in `global.json`; RC3 replaces the vulnerable RC2 Native AOT toolchain without suppressing NuGet security checks.

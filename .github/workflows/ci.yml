@@ -63,6 +63,7 @@ jobs:
         run: |
           dotnet run --project samples/Moderato.Effects.Samples -c Release
           dotnet run --project samples/Moderato.Effects.Hosting.Samples -c Release
+          dotnet run --project samples/Moderato.Effects.Http.Samples -c Release -- --verify
 
   pack:
     needs: [lint, format, test]
@@ -78,8 +79,9 @@ jobs:
         run: |
           version=$(dotnet msbuild src/Moderato.Effects -getProperty:Version)
           hosting_version=$(dotnet msbuild src/Moderato.Effects.Hosting -getProperty:Version)
-          if [ "$version" != "$hosting_version" ]; then
-            echo "::error::Core and Hosting development versions must match"
+          http_version=$(dotnet msbuild src/Moderato.Effects.Http -getProperty:Version)
+          if [ "$version" != "$hosting_version" ] || [ "$version" != "$http_version" ]; then
+            echo "::error::Core, Hosting and HTTP development versions must match"
             exit 1
           fi
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -94,10 +96,11 @@ jobs:
           echo "$version" > artifacts/version.txt
           echo "VERSION=$version" >> "$GITHUB_ENV"
 
-      - name: Pack Core and Hosting
+      - name: Pack Core, Hosting and HTTP
         run: |
           dotnet pack src/Moderato.Effects -c Release -p:Version=$VERSION -o artifacts
           dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version=$VERSION -o artifacts
+          dotnet pack src/Moderato.Effects.Http -c Release -p:Version=$VERSION -o artifacts
           python3 tests/verify-packages.py artifacts "$VERSION" "$GITHUB_SHA"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -155,6 +158,29 @@ jobs:
         run: |
           dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-hosting
           ./aot-hosting/Moderato.Effects.Hosting.PackageTests
+
+      - name: Run a consumer referencing only the HTTP package
+        run: dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+
+      - name: Check analyzers and response contracts through the HTTP dependency
+        run: |
+          for check in Analyzers Exhaustiveness ResponseTypes; do
+            case "$check" in
+              Analyzers) expected=MEFF301 ;;
+              Exhaustiveness) expected=CS8509 ;;
+              ResponseTypes) expected=CS0029 ;;
+            esac
+            if dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:Check$check=true > http-$check.log; then
+              echo "::error::HTTP negative consumer $check built unexpectedly"
+              exit 1
+            fi
+            grep -q "error $expected" http-$check.log || { cat http-$check.log; exit 1; }
+          done
+
+      - name: Publish and run the HTTP consumer with Native AOT
+        run: |
+          dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-http
+          ./aot-http/Moderato.Effects.Http.PackageTests
 
       - name: Verify deep composition in the native package consumer
         run: |
