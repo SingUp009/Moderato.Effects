@@ -46,10 +46,10 @@ internal static class HostProbe
         // Given
         var state = new State("completion-control");
         var completed = new TaskCompletionSource();
-        var producerActive = new StrongBox<int>();
-        var collection = CollectAfterCompletion(completed.Task, state, producerActive);
+        var producerThreadId = new StrongBox<int>();
+        var collection = CollectAfterCompletion(completed.Task, state, producerThreadId);
         // When
-        await Task.Run(() => CompleteFromProducer(completed, state, producerActive));
+        await Task.Run(() => CompleteFromProducer(completed, state, producerThreadId));
         var collected = await collection;
         // Then
         if (!collected) throw new InvalidOperationException("Collection ran on the producer completion stack.");
@@ -65,23 +65,23 @@ internal static class HostProbe
         Console.WriteLine("PASS Host collection controls: inline completion unwinds; retained samples remain detected");
     }
 
-    private static async Task<bool> CollectAfterCompletion(Task completed, State state, StrongBox<int> producerActive)
+    private static async Task<bool> CollectAfterCompletion(Task completed, State state, StrongBox<int> producerThreadId)
     {
         await completed.ConfigureAwait(false);
-        if (Volatile.Read(ref producerActive.Value) != 1)
+        if (Volatile.Read(ref producerThreadId.Value) != System.Environment.CurrentManagedThreadId)
             throw new InvalidOperationException("The completion control did not run inline.");
         return await WaitForCollection(state);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void CompleteFromProducer(TaskCompletionSource completed, State state, StrongBox<int> producerActive)
+    private static void CompleteFromProducer(TaskCompletionSource completed, State state, StrongBox<int> producerThreadId)
     {
         var sample = new object();
         state.References[0] = new WeakReference(sample);
-        Volatile.Write(ref producerActive.Value, 1);
+        Volatile.Write(ref producerThreadId.Value, System.Environment.CurrentManagedThreadId);
         completed.SetResult();
         GC.KeepAlive(sample);
-        Volatile.Write(ref producerActive.Value, 0);
+        Volatile.Write(ref producerThreadId.Value, 0);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
