@@ -47,7 +47,7 @@ Each control uses a separate fresh database. The `OrderFault` cases and broker p
 | Commit succeeds, then the simulated reply is lost | Die(IOException) | 1 / 1 | Rollback attempted and fails; dispose still attempted |
 | Commit is acknowledged, then a later step fails | Die(IOException) | 1 / 1 | No second rollback; dispose attempted |
 
-The last fixture deliberately throws immediately after a successful SQLite `CommitAsync`, before the application records its acknowledgment. The fixture can inspect the physical rows; a remote client losing a real commit response may not know that state. Failed rollback is retained as sequential suppressed context while the lost-reply exception remains primary. A local Die is not evidence that data was rolled back.
+The lost-reply fixture deliberately throws immediately after a successful SQLite `CommitAsync`, before the application records its acknowledgment. The fixture can inspect the physical rows; a remote client losing a real commit response may not know that state. Failed rollback is retained as sequential suppressed context while the lost-reply exception remains primary. A local Die is not evidence that data was rolled back.
 
 This prototype leaves that case as Die, rather than deciding a product `CommitOutcomeUnknown` error type. It neither retries a transaction automatically nor treats rollback as a way to undo an already completed commit.
 
