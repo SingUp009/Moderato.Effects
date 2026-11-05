@@ -5,16 +5,20 @@ using System.Runtime.InteropServices;
 using Moderato.Effects;
 using Moderato.Results;
 
+if (args is ["verify-signals", .. var command]) return await SignalVerification.Run(command);
+
 if (args is ["self-check"])
 {
     await Probe.SelfCheck();
+    await HostProbe.CheckCollectionBoundary();
+    SignalVerification.CheckOutputControls();
     return 0;
 }
 if (args.Length != 3 || args[0] is not ("gen" or "resource" or "provide" or "bind" or "cancel" or "fiber" or "die" or "host") ||
     !double.TryParse(args[1], CultureInfo.InvariantCulture, out var minutes) || !double.IsFinite(minutes) || minutes <= 0 || minutes > 1440 ||
     !double.TryParse(args[2], CultureInfo.InvariantCulture, out var seconds) || !double.IsFinite(seconds) || seconds <= 0 || seconds > 3600)
 {
-    Console.Error.WriteLine("Usage: SoakProbe gen|resource|provide|bind|cancel|fiber|die|host <minutes: (0,1440]> <window seconds: (0,3600]>; or self-check");
+    Console.Error.WriteLine("Usage: SoakProbe gen|resource|provide|bind|cancel|fiber|die|host <minutes: (0,1440]> <window seconds: (0,3600]>; or self-check; or verify-signals <probe executable command ...>");
     return 2;
 }
 

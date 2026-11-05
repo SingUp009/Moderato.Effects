@@ -30,4 +30,4 @@ env DOTNET_gcServer=1 timeout 30s "$@" host 0.02 0.3 > "$server_log" 2>&1 || { c
 cat "$server_log"
 grep -q 'gcServer=True' "$server_log"
 
-python3 "$(dirname "$0")/verify-signals.py" "${probe[@]}"
+"${probe[@]}" verify-signals "${probe[@]}"
