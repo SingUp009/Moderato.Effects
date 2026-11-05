@@ -4,4 +4,4 @@ ASP.NET Core integration for Moderato.Effects. Register `AddEffectsHttp()`, inje
 
 Uses standard routing, dependency injection, logging, authorization and OpenAPI metadata. The first preview supports ordinary values; streaming lifetime management is deferred.
 
-See the [user guide](https://github.com/SingUp009/Moderato.Effects/wiki) and the [HTTP requirements](https://github.com/SingUp009/Moderato.Effects/blob/main/docs/requirements/moderato-effects-http.md).
+See the [user guide](https://github.com/SingUp009/Moderato.Effects/wiki).

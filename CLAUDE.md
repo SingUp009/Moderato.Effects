@@ -4,9 +4,8 @@ Effect System for C# on .NET 11 / C# 15 unions. Builds on Moderato.Results.
 
 ## Docs
 
-- `docs/design.md`: design decisions (D1–D18). Read before changing behavior; ask before deviating from it.
-- `docs/implementation-plan.md`: phases (P0–P8). Stop after each phase for review.
-- `docs/requirements/`: requirements for sibling libraries.
+- `docs/` is not in version control. Design notes (D1–D18), phase records and sibling-library requirements are kept locally, excluded through `.git/info/exclude` rather than `.gitignore`. If `docs/design.md` is present, read it before changing behavior and ask before deviating from it; if it is absent, ask rather than inferring a contract from the code alone.
+- The contracts themselves live in the code: `PublicAPI.Shipped.txt` fixes the public surface, and `why` comments in the source carry the reasons behind non-obvious behavior.
 - The user guide (English) lives in the GitHub wiki, a separate repository. Keep it in step with the API; the README only links to it.
 
 ## Code conventions
