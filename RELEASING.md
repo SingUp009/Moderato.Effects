@@ -6,7 +6,7 @@ A release is a version-bump PR followed by a tag. CI publishes the package that 
 
 On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 
-- [ ] **Version**: set `<Version>` in Core, Hosting and HTTP (`src/Moderato.Effects*/Moderato.Effects*.csproj`). CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
+- [ ] **Version**: set `<Version>` in `src/Moderato.Effects/Moderato.Effects.csproj`, `src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj` and `src/Moderato.Effects.Http/Moderato.Effects.Http.csproj`. CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
 - [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core, Hosting and HTTP; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
 - [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in Core, Hosting and HTTP.
   - Add the plain entries to Shipped.

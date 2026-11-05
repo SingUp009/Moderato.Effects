@@ -176,6 +176,8 @@ jobs:
             fi
             grep -q "error $expected" http-$check.log || { cat http-$check.log; exit 1; }
           done
+          dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:CheckExhaustiveness=true -p:TreatWarningsAsErrors=false > http-exhaustiveness-warning.log
+          grep -q "warning CS8509" http-exhaustiveness-warning.log || { cat http-exhaustiveness-warning.log; exit 1; }
 
       - name: Publish and run the HTTP consumer with Native AOT
         run: |

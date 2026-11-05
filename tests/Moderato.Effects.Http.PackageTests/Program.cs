@@ -18,13 +18,14 @@ Effect<int, AppError, AppEnv> effect = Effect<AppEnv>.Access(env => env.Resolve<
 // When
 var result = await request.RunAsync(effect, environment);
 var response = Map(result);
-var failed = await request.RunAsync(Effect<AppEnv>.Fail<AppError>(new Missing(7)), environment);
+Effect<int, AppError, AppEnv> missing = Effect<AppEnv>.Fail<AppError>(new Missing(7));
+var failed = await request.RunAsync(missing, environment);
 var errorResponse = Map(failed);
 
 // Then
-if (response is not Microsoft.AspNetCore.Http.HttpResults.Ok<int> { Value: 42 })
+if (response.Result is not Microsoft.AspNetCore.Http.HttpResults.Ok<int> { Value: 42 })
     throw new InvalidOperationException("HTTP-only package consumer lost generated environment or success.");
-if (errorResponse is not Microsoft.AspNetCore.Http.HttpResults.NotFound<Missing> { Value.Id: 7 })
+if (errorResponse.Result is not Microsoft.AspNetCore.Http.HttpResults.NotFound<Missing> { Value.Id: 7 })
     throw new InvalidOperationException("HTTP-only package consumer lost generated error union or mapping.");
 Console.WriteLine("PASS: HTTP-only package, generated environment/error union and typed responses");
 
