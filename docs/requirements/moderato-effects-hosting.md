@@ -1,8 +1,10 @@
-# Moderato.Effects.Hosting の要件（草案）
+# Moderato.Effects.Hosting の要件
 
-Moderato.Effects を .NET Generic Host の `BackgroundService` として動かすための要件を整理する。三者での議論とレビューのための草案であり、公開 API・実装・リリース時期を決定するものではない。「必要な契約」と「未決事項の推奨案」を区別する。
+Moderato.Effects を .NET Generic Host の `BackgroundService` として動かすための要件と採用した契約を記録する。Hosting パッケージは `0.1.0-preview.3` から公開済みで、`0.1.0-preview.4` にも含まれる。
 
-本体の基準は main の `bea534380d5854b0460e1ed11d14822ccc5df0da`。背景は [設計メモ](../design.md) の D6〜D10・D17・D18 と、[合成則と観測の範囲](../mathematical-contracts.md) を参照する。
+節1〜7は2026-11-04の起草・議論・検証の記録として残す。その中の「案」「未決」「未実装」は当時の状態を指し、現在の未決事項の一覧ではない。公開済み API の利用例は節8、採用した境界の契約は節9、出荷物の検証記録は節10を参照する。正式版での再検証、現行版の長時間 soak、[#377](https://github.com/SingUp009/Moderato.Effects/issues/377) 等の残件は [preview.4 の変更履歴](../../CHANGELOG.md) を参照する。過去の検証を現行版や任意のプロバイダーの保証へ広げない。
+
+起草時の本体の基準は main の `bea534380d5854b0460e1ed11d14822ccc5df0da`。背景は [設計メモ](../design.md) の D6〜D10・D17・D18 と、[合成則と観測の範囲](../mathematical-contracts.md) を参照する。
 
 ## 1. 依存の向き
 
@@ -114,6 +116,8 @@ Hosting は失敗の分類・順序・保持上限を再実装せず、本体の
 
 ## 5. 未決事項
 
+以下は起草時の論点。採用した契約は節9を参照する。
+
 実行境界の扱いを次に整理する。Die の異常伝達、Err の型付き必須ハンドラー、Interrupted の観測時の状態に基づく方針は H2 のとおり合意済みである。API の具体的な形は以下の未決事項で決める。
 
 | Effect の公開結果 | Host 境界での扱い・推奨案 |
@@ -196,9 +200,9 @@ QH1 では、Effect の終了分類と Host の終了状態を分ける。停止
 
 有効・無効の対照をプロバイダー0個で比べた初期測定と、破棄済み MemoryStream を別ケースへ再利用した初期の割り当て比較は、結論の根拠に採用しない。
 
-## 8. 利用者コードの形（QH5 の案）
+## 8. 公開済み API の利用者コード
 
-以下の利用例をもとに H2 の API を実装する。現在は公開パッケージには含まれず、H2/H3 のレビュー・利用側検証を経て確定する。登録時は構成を渡すだけで、Effect 本体は起動時に実行する。
+以下は preview.3 から公開している API を使う構成例。業務型・using・ZLogger 等のアプリ側依存の設定は省略しており、この文書用抜粋自体をコンパイル済みとは扱わない。実行可能な例は [Hosting サンプル](../../samples/Moderato.Effects.Hosting.Samples) と [パッケージ利用側検証](../../tests/Moderato.Effects.Hosting.PackageTests) を参照する。登録時は構成を渡すだけで、Effect 本体は起動時に実行する。
 
 ```csharp
 var builder = Host.CreateApplicationBuilder(args);
@@ -223,16 +227,16 @@ await builder.Build().RunAsync();
 
 - `Worker.Run()` は `Effect<Unit, WorkerError, WorkerEnvironment>` を構築する。登録時にその本体を実行しない。
 - `environment` は Hosting が作った実行用 scope 内で呼ぶ。class だけに限定せず、関数内で値型の環境を直接作れる形も保つ。生成が失敗しても確保済みの scope は解放し、本体や `onError` を呼ばず、H4 の規則で結果を決める。
-- `onError` は型付きの `WorkerError` と、その実行の環境、キャンセル用トークンを受け取る必須の非同期ハンドラーの案である。例では `ReportAsync` が `ValueTask` を返す。環境を破棄する前に完了を待つ。正常完了なら Err は処理済み、Die で失敗したら元の Err を Sequential の付属情報として保持する。キャンセルとその後の scope 解放も H4 の規則に従う。
-- 診断実装を作る factory は Host のサービスを使う。factory の生成物を Host の DI として所有・破棄できる登録形にし、配線・解除を利用者に毎回書かせない。診断実装が借りた `ILoggerFactory` や他の DI サービスを重ねて破棄しない。既存インスタンスの借用登録まで初版で用意するかは未決とする。
+- `onError` は型付きの `WorkerError` と、その実行の環境、キャンセル用トークンを受け取る必須の非同期ハンドラーである。例では `ReportAsync` が `ValueTask` を返す。環境を破棄する前に完了を待つ。正常完了なら Err は処理済み、Die で失敗したら元の Err を Sequential の付属情報として保持する。キャンセルとその後の scope 解放も H4 の規則に従う。
+- 診断実装を作る factory は Host のサービスを使う。factory の生成物を Host の DI として所有・破棄できる登録形にし、配線・解除を利用者に毎回書かせない。診断実装が借りた `ILoggerFactory` や他の DI サービスを重ねて破棄しない。既存インスタンスの借用登録用 overload は初版に用意しない。
 - 診断の factory は Host の寿命、環境の factory はサービス実行用 scope の寿命である。両方の引数が `IServiceProvider` でも解決できるサービスの寿命は同じとは限らず、診断の factory で Scoped サービスを捕捉しない。
 - 診断実装の登録と、サービスの登録を分ける。診断実装の生成時に新しいサービス登録を追加する形にはしない。
 
-この形で、登録コードの量・型推論・DI の寿命・エラー処理を確認してから API を確定する。手動で DI scope の破棄例外を合成するコードや、static ハンドラーの差し替えと復元を利用者へ要求しない。
+この形の登録・型推論・DI の寿命・エラー処理は、H2/H3 のレビューと利用側検証を経て採用した。手動で DI scope の破棄例外を合成するコードや、static ハンドラーの差し替えと復元を利用者へ要求しない。
 
-## 9. H2 の具体化（2026-11-04、レビュー対象）
+## 9. 採用した境界の契約（H2、2026-11-04）
 
-節5の検討を次の契約で具体化する。公開済みパッケージへの追加やリリースは H3 以降であり、H2 はプロジェクト参照で検証する。
+節5の当時の未決事項は、次の契約として具体化した。H2 のプロジェクト参照での検証と、H3 のパッケージ利用側検証を経て preview.3 から公開し、preview.4 でもこの契約を維持する。検証条件と限界は節7・10に記録し、新しい実装・署名の承認案とは区別する。
 
 - `AddEffectHostedService<E,R>` は `Effect<Unit,E,R>`、`Func<IServiceProvider,R>`、必須の `Func<E,R,CancellationToken,ValueTask>` を受け取る。同型の登録もそれぞれ独立したサービスになる。登録時に default Effect と null delegate を拒否し、本体や環境 factory は実行しない。
 - Hosting は Core の公開 API のみを使う。`TapErr<U>(Func<E,Effect<U,Never,R>>)` で Err を観測し、成功後の `UnwrapOr(Unit.Value)` で消費する。定数の回復 Effect を新たに開始しないので、ハンドラー完了後のキャンセル確認だけで処理済み Err を Interrupted に書き換えない。`OrElse` の既存の消費規則は変えない。
