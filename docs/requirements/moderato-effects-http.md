@@ -52,16 +52,18 @@ ASP.NET Core のエンドポイントで Effect を実行するための要件�
 - union の網羅性診断と、その診断でビルドを失敗させる設定を区別する。診断 ID・severity と正負の例を確認する。
 - HTTP 応答型の数と業務エラーケースの数は一致しない。複数ケースを同じ応答型へ写せる。`Results<...>` の引数上限をそのままエラーケース数の上限にしない。
 
-## 5. 未決事項
+## 5. 確定事項と残件
 
-| 項目 | 確認・決定が必要なこと |
-|---|---|
-| 実行入口 | AddEffectsHttp() と Scoped な EffectRequest を採用。RunAsync が現在の RequestAborted を取得し、環境そのものは保持しない。オプションは具体的な用途が生じた場合に検討 |
-| 境界例外の製品化 | EffectHttpException と Exit プロパティの形は合意済み。製品名は Moderato.Effects.Http。公開 API 記録を追加。GA のミドルウェアでの再確認と公開は未完了 |
-| 診断の寿命と公開形 | 標準 ILogger 接続とログの責務分担は合意済み。接続解除と既存経路への退避は性能確認を条件に合意。具体的な所有・解除方法、Host 破棄との競合、ログのカテゴリ・レベル・構造化項目、差し替えの必要性 |
-| 応答送信 | v1.0 は通常の値が対象。応答開始後の失敗の責務と説明。ストリームの所有権・送信中の実行は次バージョンで設計する |
-| OpenAPI | Forbid・Challenge・共通の異常応答などを標準 metadata で補う方法、応答型の上限を超える場合 |
-| 書き心地 | 入れ子 union の switch、名前が衝突する Ok 型、型推論、認可あり・なしの実例 |
+RC3 の製品検証と独立レビューを経て [PR #402](https://github.com/SingUp009/Moderato.Effects/pull/402) をマージし、`0.1.0-preview.4` の製品化を完了した。以下はその時点の判断と、プレビューで残す検証範囲である。
+
+| 項目 | 確認済み・採用した形 | 残件・制限 |
+|---|---|---|
+| 実行入口 | `AddEffectsHttp()` と Scoped な `EffectRequest` を採用。`RunAsync` が現在の `RequestAborted` を取得し、環境そのものは保持しない | オプションは具体的な用途が生じた場合に検討する |
+| 境界例外の製品化 | `EffectHttpException.Exit` に元の Die / Interrupted を保持し、公開 API 記録と preview.4 へ反映済み | GA のミドルウェアで再確認する。HTTP 応答の到達は保証しない |
+| 診断の寿命と公開形 | 標準 ILogger 接続、リクエストと Host の解除・遅延通知時の既存経路への退避、ログ無効・失敗・競合の経路を製品で確認。正常経路と診断経路の時間・割り当ては性能報告へ記録 | プロセス分離測定、同時負荷、弱参照回収、長時間検証、残る時間ドリフトと GA 再検証は [#403](https://github.com/SingUp009/Moderato.Effects/issues/403) で追跡する。任意のロガーの費用や最速・割り当てゼロは保証しない |
+| 応答送信 | v1.0 は通常の値が対象。応答開始後の失敗では共通例外ハンドラーによる応答の置換ができない経路を確認 | ストリームの所有権・送信中の実行は次バージョンで設計する。通常の応答も直列化・送信中に失敗し得る |
+| OpenAPI | 型付き `Results<...>` と標準 metadata を採用。RC3 の組込み Results は2〜6型引数。Forbid / Challenge・共通の異常応答などは実際の認証構成に合わせて Produces / operation transformer 等で補う | Produces と実応答の一致はコンパイラが保証しない。生成文書と実 HTTP を照合する。応答型数を業務エラーケース数の上限とはしない。6型を超える宣言の専用抽象は追加しない |
+| 書き心地 | 入れ子 union の switch と明示した HTTP 戻り値型での型推論、Ok の別名・完全修飾、認可あり・なしの例を確認。製品サンプルに反映 | 網羅性診断 CS8509 は既定では警告。認証スキーム・endpoint metadata・設定が異なる場合の応答を一律に一般化しない |
 
 ## 6. 受け入れ確認
 
@@ -81,20 +83,21 @@ ASP.NET Core のエンドポイントで Effect を実行するための要件�
 
 ## 7. 検証記録
 
-- 製品実装は Issue #400 の feat/http-integration で進行中。公開 API は Moderato.Effects.Http の AddEffectsHttp、EffectRequest.RunAsync と EffectHttpException.Exit。受け入れ条件の検証記録は [HTTP 製品検証](../http-validation.md) に記録する。実行可能な試作は製品 main から分離した [prototype/http の 0a856d3](https://github.com/SingUp009/Moderato.Effects/tree/0a856d3/prototypes/Moderato.Effects.Http.Prototype) に保存した。試作の確認を全受け入れ条件の完了や正式 API の採用としない。
-- 製品は Tracker マージ後の main b85a9a5 を取り込み、RC3 で全2,439テスト（HTTP38）、実HTTP/OpenAPI45確認、3パッケージのJIT/NativeAOTを確認した。既存のTracker設定は変更しない。[性能比較](../http-performance.md) と生データに費用と残るドリフトを記録し、最速・同速・HTTP割り当てゼロを保証しない。プレビューの性能判断と独立再現はレビュー対象、GA再検証と長期soakは残件とする。
+- 製品実装は Issue #400・PR #402 で完了し、preview.4 に含まれる。公開 API は Moderato.Effects.Http の AddEffectsHttp、EffectRequest.RunAsync と EffectHttpException.Exit。受け入れ条件の検証記録は [HTTP 製品検証](../http-validation.md) に記録する。実行可能な試作は製品 main から分離した [prototype/http の 0a856d3](https://github.com/SingUp009/Moderato.Effects/tree/0a856d3/prototypes/Moderato.Effects.Http.Prototype) に保存した。試作の確認を全受け入れ条件の完了や正式 API の採用としない。
+- 製品は Tracker マージ後の main b85a9a5 を取り込み、RC3 で全2,439テスト（HTTP38）、実HTTP/OpenAPI45確認、3パッケージのJIT/NativeAOTを確認した。既存のTracker設定は変更しない。[性能比較](../http-performance.md) と生データに費用と残るドリフトを記録し、最速・同速・HTTP割り当てゼロを保証しない。プレビューの性能判断と独立した clean clone での検証はレビュー済み。GA再検証と現行版の長期soakは残件とする。
 - 試作は .NET 11 SDK 11.0.100-rc.3.26522.148、Microsoft.AspNetCore.OpenApi 11.0.0-rc.3.26522.148 でビルドし、実HTTPを含む自己検証50項目を確認した。製品の本体・Hosting の変更はない。50項目に最終完了行を加えると PASS の出力は51行になる。
+- RC3 の参照 XML では組込み `Results<TResult1, ..., TResult6>` までを確認した。[標準 API 一覧](https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.http.httpresults?view=aspnetcore-10.0) にも2〜6型引数が掲載されている。これは業務エラーケース数の上限ではなく、GA の保証へ広げない。
 - /orders の201・400・409は標準の型付き Results から生成し、共通ハンドラーの500は ProducesProblem(500) で明示した。Produces 系の宣言と実応答の一致はコンパイラが保証しないため、生成文書と実応答を別途照合する。
 - 認可の試作は RequireAuthorization を付ける MapGroup に security と401の operation transformer をまとめ、公開ルートと分離した。業務 Err の JSON 403は Produces<AccessDenied>(403) を個別に明示した。固定ユーザー用ヘッダーは実運用の認証ではない。拒否応答は認証設定・endpoint metadata に依存するため、この例の401を任意の構成へ一般化しない。
-- 診断接続の解除・退避は試作で確認したが、singleton のロガーとリクエスト所有の接続の必要性は別に評価する。性能の条件付き合意は未確認であり、実HTTP・非同期・ロギングの全条件の評価を残す。
-- 本体の `Effect.cs` の ToResult は Die の元例外を投げ、Interrupted をキャンセルされた ValueTask に変換する。この変換だけでは HTTP 境界で両者を必ず区別できない。製品実装時は、本体の対象コミットでも実行・解放・診断の契約を再確認する。
-- ASP.NET Core [ExceptionHandlerMiddlewareImpl](https://github.com/dotnet/aspnetcore/blob/release/11.0/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerMiddlewareImpl.cs) の確認時の実装は、OCE または IOException と `RequestAborted.IsCancellationRequested` の組み合わせで中断分岐へ入る。例外内トークンの等価性は調べない。製品実装時は GA の対象版で再確認する。
+- 試作時点では診断接続の解除・退避のみを確認し、性能の条件付き合意は未確認だった。その後の製品では実 HTTP・同期/非同期・診断・ロギングを分けた対照を記録した。採用判断の根拠と限定は [性能比較](../http-performance.md) を参照し、試作の初期測定を製品の性能根拠へ読み替えない。
+- 本体の `Effect.cs` の ToResult は Die の元例外を投げ、Interrupted をキャンセルされた ValueTask に変換する。この変換だけでは HTTP 境界で両者を必ず区別できない。製品では RunExitAsync を使用し、実行・解放・診断の契約を RC3 で確認した。
+- ASP.NET Core [ExceptionHandlerMiddlewareImpl](https://github.com/dotnet/aspnetcore/blob/release/11.0/src/Middleware/Diagnostics/src/ExceptionHandler/ExceptionHandlerMiddlewareImpl.cs) の確認時の実装は、OCE または IOException と `RequestAborted.IsCancellationRequested` の組み合わせで中断分岐へ入る。例外内トークンの等価性は調べない。GA の対象版での再確認を残す。
 - [標準の応答型と metadata](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/responses?view=aspnetcore-10.0) を参考にする。IUnionCase の列挙で曖昧な葉を得られないことを、OpenAPI 導出一般の不可能性や Analyzer 必須の根拠にはしない。
-- レビュー担当から、参照 XML 上では ForbidHttpResult・ChallengeHttpResult に PopulateMetadata の宣言がないとの報告がある。これは生成した OpenAPI の検証ではない。標準の Produces による補完、認証スキームの実際の応答、RequireAuthorization がハンドラー実行前に返す応答を、受け入れ確認で照合する。
+- 参照 XML と RC3 の生成 OpenAPI を区別して確認した。ForbidHttpResult・ChallengeHttpResult だけで拒否応答の metadata が揃うとはせず、標準の Produces / operation transformer で実際の認証構成に合わせて補う。Produces で403を宣言したまま実応答だけ404へ変えた対照も診断なしで通ったため、宣言と実応答の一致は別途検証する。製品サンプルでも認可・業務エラー・共通異常応答を実 HTTP と照合した。
 
 ## 8. 利用者コードの形
 
-次はアプリ側の構成例。業務型・サービス登録は省略している。製品の名前空間は Moderato.Effects.Http、実行入口は EffectRequest、登録名は AddEffectsHttp、境界例外は EffectHttpException とする。未公開 API として実装・検証中である。試作の再現手順は節7のリンク先を参照する。以下の文書用の抜粋そのものをコンパイル済みとは扱わない。ASP.NET Core と Moderato.Results の Ok 型は名前を区別する。
+次はアプリ側の構成例。業務型・サービス登録は省略している。製品の名前空間は Moderato.Effects.Http、実行入口は EffectRequest、登録名は AddEffectsHttp、境界例外は EffectHttpException とする。これらは preview.4 に含まれる公開 API である。試作の再現手順は節7のリンク先を参照する。以下の文書用の抜粋そのものをコンパイル済みとは扱わない。ASP.NET Core と Moderato.Results の Ok 型は名前を区別する。
 
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
@@ -146,9 +149,9 @@ CreateOrder(CreateOrderRequest command, AppEnv env, EffectRequest request)
 
 例外ハンドラーはアプリ設定の一例であり、HTTP パッケージが自動登録するものではない。標準ミドルウェア自身のログとアプリの明示ログは、アプリで重複を調整する。この LogError は例外オブジェクトを渡すため、プロバイダーによって元例外のメッセージなどもログに含まれる。HTTP 本文へ詳細を出さないことと、ログへ出してよい情報の判断は別であり、ログの公開範囲・機密情報の扱いはアプリで定める。中断未要求の Interrupted も同じ EffectHttpException で届き、Exit.Value is Interrupted で識別できる。例では標準ミドルウェアの例外処理へ委ねている。Problem Details への変換は、応答送信の成功を保証しない。
 
-認可なしの例は通常の app.MapPost へ同じハンドラーを登録する。認可ありでは、この例とは別に通常の認証・認可サービスとポリシーを設定する必要がある。その構成に応じた拒否応答も OpenAPI へ記述する。業務認可を Effect の Err として返す実行可能な例と生成 OpenAPI は、節7の試作に保存した。製品化時は GA と実際の認証構成で再確認する。
+認可なしの例は通常の app.MapPost へ同じハンドラーを登録する。認可ありでは、この例とは別に通常の認証・認可サービスとポリシーを設定する必要がある。その構成に応じた拒否応答も OpenAPI へ記述する。業務認可を Effect の Err として返す実行可能な例と生成 OpenAPI は、節7の試作に保存した。GA と利用先の実際の認証構成での再確認は残る。
 
-登録名は `AddEffectsHttp` とする。Tracker の登録・有効化や具体的なオプションは、この例では決定していない。
+登録名は `AddEffectsHttp` とする。HTTP 登録は Tracker を自動的に有効化せず、既存の Tracker 設定を保つ。用途のないオプションは追加しない。
 
 製品サンプルは samples/Moderato.Effects.Http.Samples に置き、--verify で実 HTTP と OpenAPI の整合を確認する。
 
