@@ -1012,7 +1012,7 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 
 ### 公開済みのプレビューパッケージ
 
-Hosting と HTTP は `0.1.0-preview.4` で公開済み。以下は採用した契約であり、正式版での検証完了を意味しない。
+Hosting は `0.1.0-preview.3`、HTTP は `0.1.0-preview.4` から公開済み。以下は採用した契約であり、正式版での検証完了を意味しない。
 
 - **`Moderato.Effects.Hosting`**：長く動き続ける Effect を `BackgroundService` として動かすための連携。アプリの停止を実行トークンに連動させ、本体の規則で終了結果を分類する。診断実装を登録口へ渡し、その Hosting が開始した Effect と子の診断を、その Host の `ILogger` へ接続する。
   - [要件草案](requirements/moderato-effects-hosting.md)に、停止・失敗・DI の寿命・診断ログの所有権を記録する。2026-11-04、`RunExitAsync` で分類した Die を元情報付きで Host へ異常として伝えること、ルート Err に型付きハンドラーを必須とすること、診断実装を渡す登録方法と、接続先・所有者・寿命を Host に揃えることを合意した。H1 で本体の実行単位の診断先を実装し、H2 で公開 API だけを使う Hosting 連携を実装した。具体的な API・所有権・遅延診断の扱いは要件文書の節9に記録する。Hosting に本体の internal を公開せず、失敗集約を複製しない。
