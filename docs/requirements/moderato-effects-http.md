@@ -82,6 +82,7 @@ ASP.NET Core のエンドポイントで Effect を実行するための要件�
 ## 7. 検証記録
 
 - 製品実装は Issue #400 の feat/http-integration で進行中。公開 API は Moderato.Effects.Http の AddEffectsHttp、EffectRequest.RunAsync と EffectHttpException.Exit。受け入れ条件の検証記録は [HTTP 製品検証](../http-validation.md) に記録する。実行可能な試作は製品 main から分離した [prototype/http の 0a856d3](https://github.com/SingUp009/Moderato.Effects/tree/0a856d3/prototypes/Moderato.Effects.Http.Prototype) に保存した。試作の確認を全受け入れ条件の完了や正式 API の採用としない。
+- 製品は Tracker マージ後の main b85a9a5 を取り込み、RC3 で全2,439テスト（HTTP38）、実HTTP/OpenAPI45確認、3パッケージのJIT/NativeAOTを確認した。既存のTracker設定は変更しない。[性能比較](../http-performance.md) と生データに費用と残るドリフトを記録し、最速・同速・HTTP割り当てゼロを保証しない。プレビューの性能判断と独立再現はレビュー対象、GA再検証と長期soakは残件とする。
 - 試作は .NET 11 SDK 11.0.100-rc.3.26522.148、Microsoft.AspNetCore.OpenApi 11.0.0-rc.3.26522.148 でビルドし、実HTTPを含む自己検証50項目を確認した。製品の本体・Hosting の変更はない。50項目に最終完了行を加えると PASS の出力は51行になる。
 - /orders の201・400・409は標準の型付き Results から生成し、共通ハンドラーの500は ProducesProblem(500) で明示した。Produces 系の宣言と実応答の一致はコンパイラが保証しないため、生成文書と実応答を別途照合する。
 - 認可の試作は RequireAuthorization を付ける MapGroup に security と401の operation transformer をまとめ、公開ルートと分離した。業務 Err の JSON 403は Produces<AccessDenied>(403) を個別に明示した。固定ユーザー用ヘッダーは実運用の認証ではない。拒否応答は認証設定・endpoint metadata に依存するため、この例の401を任意の構成へ一般化しない。

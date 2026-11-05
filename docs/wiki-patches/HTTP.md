@@ -1,6 +1,6 @@
 # HTTP integration
 
-Unreleased preview API. Validated SDK/runtime versions and remaining acceptance work are recorded in [HTTP validation](https://github.com/SingUp009/Moderato.Effects/blob/feat/http-integration/docs/http-validation.md). Revalidation on .NET 11 GA is still required.
+Unreleased preview API. Validated SDK/runtime versions and remaining acceptance work are recorded in [HTTP validation](https://github.com/SingUp009/Moderato.Effects/blob/main/docs/http-validation.md). Revalidation on .NET 11 GA is still required.
 
 Install `Moderato.Effects.Http`, register `builder.Services.AddEffectsHttp()`, and register your environment and its request-owned services as scoped services. Inject `EffectRequest` alongside your environment in a standard `MapGet`, `MapPost` or `MapGroup` handler.
 
@@ -24,7 +24,7 @@ CreateOrder(CreateOrderRequest command, AppEnv env, EffectRequest request)
 }
 ```
 
-The complete [HTTP sample](https://github.com/SingUp009/Moderato.Effects/tree/feat/http-integration/samples/Moderato.Effects.Http.Samples) defines the types, services, authentication and OpenAPI transformers. Run it with `--verify` to compare generated metadata against real HTTP responses. Its trusted header authentication is for local demonstration only; use a real authentication scheme in production.
+The complete [HTTP sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Http.Samples) defines the types, services, authentication and OpenAPI transformers. Run it with `--verify` to compare generated metadata against real HTTP responses. Its trusted header authentication is for local demonstration only; use a real authentication scheme in production.
 
 `RunAsync` reads the current `HttpContext.RequestAborted` at execution entry, including middleware replacements after DI resolution. It awaits the effect, its structured children and cleanup. `Ok` and `Err` reach your explicit result mapping. A later cancellation during cleanup does not replace a settled result.
 

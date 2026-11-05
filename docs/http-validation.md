@@ -16,7 +16,7 @@ Product verification on RC3 after integrating `b85a9a5`:
 - Core, Hosting and HTTP packed as `0.1.0-local.http.ab1f73c.1`; metadata, payload, XML, symbols and SourceLink commit `ab1f73c2e711ce7e8458722d70a1c6ff29cc6993` passed verification. All three package consumers passed JIT and NativeAOT execution. Package source is unchanged by later test/document/benchmark updates.
 - HTTP-only negative builds reported MEFF301, CS8509 and CS0029 separately. A control with `TreatWarningsAsErrors=false` built successfully with warning CS8509.
 
-Performance acceptance and independent clean-clone verification are still in progress.
+The [performance report](http-performance.md) and [170-sample CSV](measurements/http-rc3.csv) record the final comparison, including residual drift. Performance acceptance and independent clean-clone verification remain subject to review.
 
 - `tests/Moderato.Effects.Http.Tests`: public registration and runner tests, sync/async exits, captured token replacement, settled results, children/cleanup, ordered suppressed context, logging and late disconnection.
 - `samples/Moderato.Effects.Http.Samples --verify`: real Kestrel requests, public/protected routes, explicit error mappings, OpenAPI schemas/security/statuses, cancellation defects, response-started failure and client disconnection.
