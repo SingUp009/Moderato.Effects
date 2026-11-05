@@ -97,6 +97,8 @@ ASP.NET Core のエンドポイントで Effect を実行するための議論�
 
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
+using Moderato.Effects;
+using Moderato.Effects.Http.Prototype;
 using Moderato.Results;
 using HttpResults = Microsoft.AspNetCore.Http.HttpResults;
 
@@ -146,5 +148,7 @@ CreateOrder(CreateOrderRequest command, AppEnv env, EffectRequest request)
 認可なしの例は通常の app.MapPost へ同じハンドラーを登録する。認可ありでは、この例とは別に通常の認証・認可サービスとポリシーを設定する必要がある。その構成に応じた拒否応答も OpenAPI へ記述する。業務認可を Effect の Err として返す実行可能な例と生成 OpenAPI は、節7の試作に保存した。製品化時は GA と実際の認証構成で再確認する。
 
 登録名は `AddEffectsHttp` とする。Tracker の登録・有効化や具体的なオプションは、この例では決定していない。
+
+上記の Moderato.Effects.Http.Prototype は試作の名前空間であり、製品パッケージの名前空間を決定するものではない。
 
 認可を ASP.NET Core のポリシーに置く場合と、業務 Effect の型付きエラーに含める場合を分けて例示する。ASP.NET Core の認可でもリソースに基づく判定を表せるため、認可の内容だけで配置を固定しない。上記の RequireAuthorization が業務内の認可を代替するとはしない。switch が長い場合は通常のメソッドへ切り出せる。別の実行入口や専用 DSL を、そのためだけに必須にしない。
