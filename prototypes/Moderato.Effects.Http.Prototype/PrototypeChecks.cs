@@ -1,12 +1,47 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Moderato.Results;
 
 namespace Moderato.Effects.Http.Prototype;
 
 internal static class PrototypeChecks
 {
+    internal static void MapEndpoints(WebApplication app)
+    {
+        app.MapGet("/prototype/die", async (AppEnv env, EffectRequest request) =>
+            await request.RunAsync(Effect<AppEnv>.Sync<int>(() => throw new OperationCanceledException("unexpected OCE")), env))
+            .ProducesProblem(500).ExcludeFromDescription();
+        app.MapGet("/prototype/cancel-die/{kind}", async (string kind, HttpContext context, AppEnv env) =>
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            context.RequestAborted = cancellation.Token;
+            var request = context.RequestServices.GetRequiredService<EffectRequest>();
+            var resource = Resource.Make(Effect<AppEnv>.Succeed(Unit.Value), (_, _) => Effect<AppEnv>.Sync<Unit>(() =>
+            {
+                cancellation.Cancel();
+                if (kind == "io") throw new IOException("unexpected IO failure");
+                throw new OperationCanceledException(cancellation.Token);
+            }));
+            return await request.RunAsync(resource.Use(_ => Effect<AppEnv>.Succeed(1)), env);
+        }).ProducesProblem(500).ExcludeFromDescription();
+        app.MapGet("/prototype/interrupted", async (AppEnv env, EffectRequest request) =>
+        {
+            Fiber<Unit, Never, AppEnv>? child = null;
+            await Scope<Never, AppEnv>.Gen(async scope =>
+            {
+                child = await scope.Fork(Effect<AppEnv>.Async<Unit>(async token =>
+                {
+                    await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+                    return Unit.Value;
+                }));
+                return Unit.Value;
+            }).RunAsync(env);
+            return await request.RunAsync(child!.Join(), env);
+        }).ProducesProblem(500).ExcludeFromDescription();
+    }
+
     internal static async Task Run(WebApplication app, string address)
     {
         using var client = new HttpClient { BaseAddress = new Uri(address) };
@@ -43,7 +78,9 @@ internal static class PrototypeChecks
         Directory.CreateDirectory(output);
         // When
         var document = await client.GetStringAsync("/openapi/v1.json");
-        await File.WriteAllTextAsync(Path.Combine(output, "openapi.json"), document);
+        var stable = JsonNode.Parse(document)!;
+        stable["servers"] = JsonNode.Parse("[{\"url\":\"/\"}]");
+        await File.WriteAllTextAsync(Path.Combine(output, "openapi.json"), stable.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
         // Then
         using var json = JsonDocument.Parse(document);
         var operation = json.RootElement.GetProperty("paths").GetProperty("/orders").GetProperty("post");
@@ -61,8 +98,52 @@ internal static class PrototypeChecks
         await CheckFailureMetadata(app);
         await CheckLateDiagnostics(app);
         await CheckUnobservedError(app);
+        await CheckEarlyResolution(app);
         MeasureEntry(app, output);
         Console.WriteLine($"PASS — prototype checks; OpenAPI saved to {Path.Combine(output, "openapi.json")}");
+    }
+
+    private static async Task CheckEarlyResolution(WebApplication app)
+    {
+        // Given
+        using var cancellation = new CancellationTokenSource();
+        var context = new DefaultHttpContext();
+        var accessor = app.Services.GetRequiredService<IHttpContextAccessor>();
+        accessor.HttpContext = context;
+        await using var services = app.Services.CreateAsyncScope();
+        var request = services.ServiceProvider.GetRequiredService<EffectRequest>();
+        var env = services.ServiceProvider.GetRequiredService<AppEnv>();
+        context.RequestAborted = cancellation.Token;
+        cancellation.Cancel();
+        try
+        {
+            // When
+            await request.RunAsync(Effect<AppEnv>.Succeed(1), env);
+            throw new InvalidOperationException("Expected cancellation.");
+        }
+        catch (OperationCanceledException error)
+        {
+            // Then
+            Check(error.CancellationToken == cancellation.Token, "early DI resolution uses current request token");
+        }
+
+        // Given
+        context.RequestAborted = CancellationToken.None;
+        var original = new InvalidOperationException("synchronous defect");
+        // When
+        var pending = request.RunAsync(Effect<AppEnv>.Sync<int>(() => throw original), env);
+        // Then
+        Check(!pending.IsCompletedSuccessfully, "synchronous defect is returned as a failed ValueTask");
+        try
+        {
+            await pending;
+            throw new InvalidOperationException("Expected defect.");
+        }
+        catch (EffectHttpException error)
+        {
+            Check(ReferenceEquals(error.InnerException, original), "await preserves synchronous defect");
+        }
+        finally { accessor.HttpContext = null; }
     }
 
     private static async Task CheckFailureMetadata(WebApplication app)

@@ -12,8 +12,7 @@ public static class HttpRegistration
         services.AddHttpContextAccessor();
         services.TryAddSingleton<HttpDiagnostics>();
         services.TryAddScoped(provider => new EffectRequest(
-            provider.GetRequiredService<IHttpContextAccessor>().HttpContext?.RequestAborted
-                ?? throw new InvalidOperationException("EffectRequest requires an active HTTP request."),
+            provider.GetRequiredService<IHttpContextAccessor>(),
             provider.GetRequiredService<HttpDiagnostics>()));
         return services;
     }
@@ -33,14 +32,14 @@ public sealed class EffectHttpInterruptedException(Interrupted interruption)
 
 public sealed class EffectRequest : IDisposable
 {
-    private readonly CancellationToken requestAborted;
+    private readonly IHttpContextAccessor accessor;
     private readonly object gate = new();
     private readonly EffectRunOptions options;
     private HttpDiagnostics? diagnostics;
 
-    internal EffectRequest(CancellationToken requestAborted, HttpDiagnostics diagnostics)
+    internal EffectRequest(IHttpContextAccessor accessor, HttpDiagnostics diagnostics)
     {
-        this.requestAborted = requestAborted;
+        this.accessor = accessor;
         this.diagnostics = diagnostics;
         options = new EffectRunOptions { UnobservedFailureHandler = Report };
     }
@@ -48,16 +47,16 @@ public sealed class EffectRequest : IDisposable
     public ValueTask<Result<T, E>> RunAsync<T, E, R>(Effect<T, E, R> effect, R environment)
     {
         lock (gate) ObjectDisposedException.ThrowIf(diagnostics is null, this);
+        var requestAborted = accessor.HttpContext?.RequestAborted
+            ?? throw new InvalidOperationException("EffectRequest requires an active HTTP request.");
         var execution = effect.RunExitAsync(environment, requestAborted, options);
-        return execution.IsCompletedSuccessfully
-            ? new(Convert(execution.Result))
-            : Await(execution);
+        return Await(execution, requestAborted);
 
-        async ValueTask<Result<T, E>> Await(ValueTask<Exit<T, E>> pending)
-            => Convert(await pending.ConfigureAwait(false));
+        async ValueTask<Result<T, E>> Await(ValueTask<Exit<T, E>> pending, CancellationToken runToken)
+            => Convert(await pending.ConfigureAwait(false), runToken);
     }
 
-    private Result<T, E> Convert<T, E>(Exit<T, E> exit)
+    private static Result<T, E> Convert<T, E>(Exit<T, E> exit, CancellationToken requestAborted)
     {
         var canceled = requestAborted.IsCancellationRequested;
         if (exit.TryGetValue(out Ok<T> ok)) return new(ok);

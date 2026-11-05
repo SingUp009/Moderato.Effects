@@ -22,7 +22,7 @@ curl http://localhost:5000/orders -H 'Content-Type: application/json' \
 
 最初の注文は201、同じ SKU は409、不正な数量は400。保存先はメモリだけで、再起動で消える。認証・永続化は実装していない。
 
-生成文書のスナップショットは [generated/openapi.json](generated/openapi.json)。注文の201・400・409は型付き Results から生成し、共通例外ハンドラーの500は標準の ProducesProblem で明示する。検証用 endpoint は文書から除外する。独自のエラー union 列挙や OpenAPI 生成器は使用しない。
+生成文書のスナップショットは [generated/openapi.json](generated/openapi.json)。自己検証で取得した文書の servers だけを相対 URL `/` に正規化し、一時ポート番号による差分をなくしている。注文の201・400・409は型付き Results から生成し、共通例外ハンドラーの500は標準の ProducesProblem で明示する。検証用 endpoint は文書から除外する。独自のエラー union 列挙や OpenAPI 生成器は使用しない。
 
 ## 自己検証
 
@@ -30,7 +30,7 @@ curl http://localhost:5000/orders -H 'Content-Type: application/json' \
 dotnet run -c Release --project prototypes/Moderato.Effects.Http.Prototype -- --verify
 ```
 
-空きローカルポートで起動し、実HTTP応答と `/openapi/v1.json` を確認して終了する。生成文書と簡易計測はプロジェクト配下 `artifacts/http-prototype/` に保存する。
+空きローカルポートで起動し、実HTTP応答と `/openapi/v1.json` を確認して終了する。生成文書と簡易計測はプロジェクト配下 `artifacts/http-prototype/` に保存する。`/prototype/*` は異常を意図的に起こす自己検証用 URL で、--verify のときだけ登録する。通常起動時には存在しない。
 
 - 201・400・409と本文スキーマ、明示した500、サービスがHTTP引数へ露出しないこと。
 - Die(OCE) と独立した Interrupted が共通例外ハンドラーへ届くこと。
@@ -42,7 +42,9 @@ dotnet run -c Release --project prototypes/Moderato.Effects.Http.Prototype -- --
 
 ## 今回確認する設計
 
-- Scoped な実行入口は標準 DI で解決する。HttpContextAccessor から取得したトークンだけを保持し、HttpContext や環境そのものは実行入口へ保存しない。
+- Scoped な実行入口は標準 DI で解決する。HttpContextAccessor を保持し、DI 解決時ではなく各 RunAsync の入口で現在のトークンを読む。その同じトークンを実行に渡し、結果分類時に取消状態を一度観測する。トークンは取消状態のスナップショットではなく CTS と結び付いているため、その後の取消も観測できる。実行中に別のトークンへ RequestAborted を差し替える操作へは追従しない。HttpContext や環境そのものは実行入口へ保存しない。
+- 正常・異常の同期完了も async ValueTask 経路で返す。入力・破棄済みの検証は同期的に失敗し得るが、Die・Interrupted の伝達形は実行の同期・非同期で変えない。
+- 単一の Result を得る注文処理は Access と FromResult の合成で遅延し、Gen の巻き戻しを通さない。記述を構築しただけでは注文を作成しない。
 - RunExitAsync の4分類を保ち、Ok・Errだけを呼び出し元へ返す。Die は元の Die を保持する非OCE・非IOExceptionの専用例外で伝える。
 - Interrupted の観測時に request token が要求済みならキャンセル伝達、未要求なら専用の非キャンセル例外を投げる。
 - request と Host の診断接続をそれぞれ破棄時に切る。診断通知時のロックは request → Host の順で、破棄はそれぞれの参照を切るだけにする。

@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:43009"
+      "url": "/"
     }
   ],
   "paths": {
@@ -59,7 +59,7 @@
           "500": {
             "description": "Internal Server Error",
             "content": {
-              "application/problem+json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }

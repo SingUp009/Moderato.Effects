@@ -26,39 +26,10 @@ app.UseExceptionHandler(errors => errors.Run(async context =>
 
 app.MapOpenApi();
 app.MapPost("/orders", CreateOrder).ProducesProblem(500);
-app.MapGet("/prototype/die", async (AppEnv env, EffectRequest request) =>
-    await request.RunAsync(Effect<AppEnv>.Sync<int>(() => throw new OperationCanceledException("unexpected OCE")), env))
-    .ProducesProblem(500).ExcludeFromDescription();
-app.MapGet("/prototype/cancel-die/{kind}", async (string kind, HttpContext context, AppEnv env) =>
-{
-    using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
-    context.RequestAborted = cancellation.Token;
-    var request = context.RequestServices.GetRequiredService<EffectRequest>();
-    var resource = Resource.Make(Effect<AppEnv>.Succeed(Unit.Value), (_, _) => Effect<AppEnv>.Sync<Unit>(() =>
-    {
-        cancellation.Cancel();
-        if (kind == "io") throw new IOException("unexpected IO failure");
-        throw new OperationCanceledException(cancellation.Token);
-    }));
-    return await request.RunAsync(resource.Use(_ => Effect<AppEnv>.Succeed(1)), env);
-}).ProducesProblem(500).ExcludeFromDescription();
-app.MapGet("/prototype/interrupted", async (AppEnv env, EffectRequest request) =>
-{
-    Fiber<Unit, Never, AppEnv>? child = null;
-    await Scope<Never, AppEnv>.Gen(async scope =>
-    {
-        child = await scope.Fork(Effect<AppEnv>.Async<Unit>(async token =>
-        {
-            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
-            return Unit.Value;
-        }));
-        return Unit.Value;
-    }).RunAsync(env);
-    return await request.RunAsync(child!.Join(), env);
-}).ProducesProblem(500).ExcludeFromDescription();
 
 if (verify)
 {
+    PrototypeChecks.MapEndpoints(app);
     await app.StartAsync();
     var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
     await PrototypeChecks.Run(app, address);
@@ -114,8 +85,11 @@ public sealed class OrderStore
 public static class Orders<R> where R : IHas<OrderStore>
 {
     public static Effect<Order, CreateOrderError, R> Create(CreateOrderRequest command)
-        => Scope<CreateOrderError, R>.Gen(scope =>
-            new ValueTask<Order>(scope.Get(scope.Env.Resolve<OrderStore>().Create(command))));
+    {
+        Effect<Result<Order, CreateOrderError>, CreateOrderError, R> read =
+            Effect<R>.Access(env => env.Resolve<OrderStore>().Create(command));
+        return read.AndThen(result => Effect<R>.FromResult(result));
+    }
 }
 
 public sealed class ObservedFailures
