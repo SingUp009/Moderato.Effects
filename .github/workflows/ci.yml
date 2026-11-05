@@ -101,7 +101,7 @@ jobs:
           dotnet pack src/Moderato.Effects -c Release -p:Version=$VERSION -o artifacts
           dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version=$VERSION -o artifacts
           dotnet pack src/Moderato.Effects.Http -c Release -p:Version=$VERSION -o artifacts
-          python3 tests/verify-packages.py artifacts "$VERSION" "$GITHUB_SHA"
+          dotnet run --project tests/Moderato.Effects.PackageVerifier -c Release -- artifacts "$VERSION" "$GITHUB_SHA"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

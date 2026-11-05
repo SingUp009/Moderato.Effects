@@ -6,6 +6,7 @@
     <Project Path="src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Moderato.Effects.PackageVerifier/Moderato.Effects.PackageVerifier.csproj" />
     <Project Path="tests/Moderato.Effects.Http.Tests/Moderato.Effects.Http.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.Hosting.Tests/Moderato.Effects.Hosting.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.StackSafetyProbe/Moderato.Effects.StackSafetyProbe.csproj" />
