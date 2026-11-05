@@ -4,7 +4,7 @@
     <IsAotCompatible>true</IsAotCompatible>
     <IsPackable>true</IsPackable>
     <PackageId>Moderato.Effects.Hosting</PackageId>
-    <Version>0.1.0-preview.3</Version>
+    <Version>0.1.0-preview.4</Version>
     <Description>Generic Host integration for Moderato.Effects with typed errors, scoped environments and injectable diagnostics.</Description>
     <PackageTags>effect;hosting;backgroundservice;dependency-injection;logging</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

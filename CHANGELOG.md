@@ -5,12 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.4] - 2026-11-05
+
 ### Added
 
-- Add the separate `Moderato.Effects.Http` preview package. `AddEffectsHttp()` registers a scoped `EffectRequest` that awaits execution and cleanup with the current request token, returns typed results, and preserves defects or unexpected interruptions in `EffectHttpException.Exit`.
-- Connect HTTP unobserved failure diagnostics to standard logging, with request and Host disconnection and late-report fallback. Routing, response mapping, authentication and exception handling remain standard ASP.NET Core application code.
-- Add an executable HTTP/OpenAPI sample and HTTP-only package consumer checks, including transitive generators, analyzer errors and Native AOT. Streaming is deferred; .NET 11 GA revalidation remains outstanding.
-- Add an opt-in Effect Tracker for active scopes, fibers and acquired resources. Snapshots contain metadata only; stack capture is separately opt-in. Disabling clears the registry, and enabling tracks future starts without retaining environments or resource values.
+- Add the separate `Moderato.Effects.Http` preview package. `AddEffectsHttp()` registers a scoped `EffectRequest` that awaits execution and cleanup with the current request token, returns typed results, and preserves defects or unexpected interruptions in `EffectHttpException.Exit`. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Connect HTTP unobserved failure diagnostics to standard logging, with request and Host disconnection and late-report fallback. Routing, response mapping, authentication and exception handling remain standard ASP.NET Core application code. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Add an executable HTTP/OpenAPI sample and HTTP-only package consumer checks, including transitive generators, analyzer errors and Native AOT. Streaming is deferred; .NET 11 GA revalidation remains outstanding. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Add an opt-in Effect Tracker for active scopes, fibers and acquired resources. Snapshots contain metadata only; stack capture is separately opt-in. Disabling clears the registry, and enabling tracks future starts without retaining environments or resource values. ([#398](https://github.com/SingUp009/Moderato.Effects/pull/398))
+
+### Changed
+
+- Store the first registered release directly and create a list only when another is added. In the measured warmed synchronous cases, this saves 88 B per run for Gen with one deferred release and Resource.Use with one acquired resource, without changing release order or failure aggregation. This does not imply zero allocation for the whole library. ([#389](https://github.com/SingUp009/Moderato.Effects/pull/389))
+
+### Validation and known limitations
+
+- Validated on the .NET 11 RC3 SDK/runtime selected by `global.json`; .NET 11 GA revalidation remains outstanding.
+- The previous long-duration validation targeted commit `611ce78`. This release has unit, integration and package-consumer checks, but no long-duration validation of its final source. Current-main soak is deferred to the user's always-on PC; earlier evidence must not be treated as evidence for this version.
+- Follow-up work remains open: [#377](https://github.com/SingUp009/Moderato.Effects/issues/377) for the earlier unexplained late-run Gen slowdown, [#401](https://github.com/SingUp009/Moderato.Effects/issues/401) for disabled Tracker completion overhead, and [#403](https://github.com/SingUp009/Moderato.Effects/issues/403) for HTTP process-isolated measurements, concurrent/long-duration coverage, weak-retention verification and GA revalidation. HTTP timing observations and remaining drift are documented in [the performance report](docs/http-performance.md).
 
 ## [0.1.0-preview.3] - 2026-11-04
 
@@ -273,7 +285,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 - Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.3...HEAD
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.4...HEAD
+[0.1.0-preview.4]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.3...v0.1.0-preview.4
 [0.1.0-preview.3]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...v0.1.0-preview.3
 [0.1.0-preview.2]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/SingUp009/Moderato.Effects/releases/tag/v0.1.0-preview.1

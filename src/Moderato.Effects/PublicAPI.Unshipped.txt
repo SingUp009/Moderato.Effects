@@ -1,17 +1,1 @@
 #nullable enable
-Moderato.Effects.EffectTracker
-Moderato.Effects.EffectTrackingKind
-Moderato.Effects.EffectTrackingKind.Fiber = 1 -> Moderato.Effects.EffectTrackingKind
-Moderato.Effects.EffectTrackingKind.Resource = 2 -> Moderato.Effects.EffectTrackingKind
-Moderato.Effects.EffectTrackingKind.Scope = 0 -> Moderato.Effects.EffectTrackingKind
-Moderato.Effects.EffectTrackingState
-Moderato.Effects.EffectTrackingState.Id.get -> long
-Moderato.Effects.EffectTrackingState.Kind.get -> Moderato.Effects.EffectTrackingKind
-Moderato.Effects.EffectTrackingState.StackTrace.get -> string?
-Moderato.Effects.EffectTrackingState.StartedAt.get -> System.DateTimeOffset
-Moderato.Effects.EffectTrackingState.TypeName.get -> string!
-static Moderato.Effects.EffectTracker.EnableStackTrace.get -> bool
-static Moderato.Effects.EffectTracker.EnableStackTrace.set -> void
-static Moderato.Effects.EffectTracker.EnableTracking.get -> bool
-static Moderato.Effects.EffectTracker.EnableTracking.set -> void
-static Moderato.Effects.EffectTracker.GetSnapshot() -> Moderato.Effects.EffectTrackingState![]!

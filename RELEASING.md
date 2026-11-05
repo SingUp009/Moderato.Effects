@@ -16,6 +16,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
   - The heading takes a `System.Version`, so a preview uses a fourth number: `0.1.0-preview.1` is `## Release 0.1.0.1`, and `0.1.0` is `## Release 0.1.0`. Do not suppress RS2007: a heading it cannot read leaves that release's rules unchecked.
 - [ ] **Changelog**: in `CHANGELOG.md`, rename `[Unreleased]` to the new version with today's date, add an empty `[Unreleased]` above it, and update the compare links at the bottom. Breaking changes come first, and a source-compatible but binary-breaking change is still a breaking change.
   - `Tests` is an Unreleased-only section for verification changes with no package-observable effect; remove it before renaming `[Unreleased]`. API, behavior, and allocation changes belong under the normal change types.
+- [ ] **Release notes**: prepare a separate body following the previous GitHub Release's heading, applicable change sections and PR-linked bullets. Include this version's validation limits; review the text before publishing.
 - [ ] `dotnet test -c Release` passes.
 - [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
@@ -30,11 +31,12 @@ Merge the PR once CI is green.
 - [ ] On GitHub, **Releases → Draft a new release**.
   - **Tag:** `v<Version>`, created on `main`.
   - **Title:** the same as the tag.
-  - **Notes:** the version's changelog section.
+  - **Notes:** the separately prepared and reviewed release notes.
   - Mark previews as **pre-release**.
 - [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and publishes it with Native AOT.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
 - [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting and https://www.nuget.org/packages/Moderato.Effects.Http. Indexing can take 5 to 15 minutes.
+- [ ] After all packages are publicly available, update the English wiki installation commands to the published version and replace its unreleased notices and index labels with the version that includes those APIs. Do not announce unpublished APIs as available before package publication.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 

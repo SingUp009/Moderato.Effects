@@ -1,8 +1,1 @@
 #nullable enable
-Moderato.Effects.Http.EffectHttpException
-Moderato.Effects.Http.EffectHttpException.Exit.get -> Moderato.Effects.ExitCase
-Moderato.Effects.Http.EffectRequest
-Moderato.Effects.Http.EffectRequest.Dispose() -> void
-Moderato.Effects.Http.EffectRequest.RunAsync<T, E, R>(Moderato.Effects.Effect<T, E, R> effect, R environment) -> System.Threading.Tasks.ValueTask<Moderato.Results.Result<T, E>>
-Moderato.Effects.Http.EffectsHttpServiceCollectionExtensions
-static Moderato.Effects.Http.EffectsHttpServiceCollectionExtensions.AddEffectsHttp(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
