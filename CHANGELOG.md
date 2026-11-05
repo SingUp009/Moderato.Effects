@@ -9,10 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Add the separate `Moderato.Effects.Http` preview package. `AddEffectsHttp()` registers a scoped `EffectRequest` that awaits execution and cleanup with the current request token, returns typed results, and preserves defects or unexpected interruptions in `EffectHttpException.Exit`.
-- Connect HTTP unobserved failure diagnostics to standard logging, with request and Host disconnection and late-report fallback. Routing, response mapping, authentication and exception handling remain standard ASP.NET Core application code.
-- Add an executable HTTP/OpenAPI sample and HTTP-only package consumer checks, including transitive generators, analyzer errors and Native AOT. Streaming is deferred; .NET 11 GA revalidation remains outstanding.
-- Add an opt-in Effect Tracker for active scopes, fibers and acquired resources. Snapshots contain metadata only; stack capture is separately opt-in. Disabling clears the registry, and enabling tracks future starts without retaining environments or resource values.
+- Add the separate `Moderato.Effects.Http` preview package. `AddEffectsHttp()` registers a scoped `EffectRequest` that awaits execution and cleanup with the current request token, returns typed results, and preserves defects or unexpected interruptions in `EffectHttpException.Exit`. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Connect HTTP unobserved failure diagnostics to standard logging, with request and Host disconnection and late-report fallback. Routing, response mapping, authentication and exception handling remain standard ASP.NET Core application code. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Add an executable HTTP/OpenAPI sample and HTTP-only package consumer checks, including transitive generators, analyzer errors and Native AOT. Streaming is deferred; .NET 11 GA revalidation remains outstanding. ([#402](https://github.com/SingUp009/Moderato.Effects/pull/402))
+- Add an opt-in Effect Tracker for active scopes, fibers and acquired resources. Snapshots contain metadata only; stack capture is separately opt-in. Disabling clears the registry, and enabling tracks future starts without retaining environments or resource values. ([#398](https://github.com/SingUp009/Moderato.Effects/pull/398))
+
+### Changed
+
+- Store the first registered release directly and create a list only when another is added. In the measured warmed synchronous cases, this saves 88 B per run for Gen with one deferred release and Resource.Use with one acquired resource, without changing release order or failure aggregation. This does not imply zero allocation for the whole library. ([#389](https://github.com/SingUp009/Moderato.Effects/pull/389))
 
 ### Validation and known limitations
 
