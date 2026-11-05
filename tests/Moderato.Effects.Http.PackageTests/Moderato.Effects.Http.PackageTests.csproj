@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Moderato.Effects.Http" Version="$(ModeratoEffectsVersion)" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
+    <Compile Remove="Misuse.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CheckExhaustiveness)' != 'true'">
+    <Compile Remove="IncompleteMapping.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CheckResponseTypes)' != 'true'">
+    <Compile Remove="InvalidResponse.cs" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,4 @@
-"""Verify the Core and Hosting artifacts produced by CI before consumer tests."""
+"""Verify the Core, Hosting and HTTP artifacts produced by CI before consumer tests."""
 
 import sys
 import xml.etree.ElementTree as ET
@@ -9,7 +9,7 @@ root, version, commit = sys.argv[1:]
 root = Path(root)
 ns = {"n": "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"}
 
-for package in ("Moderato.Effects", "Moderato.Effects.Hosting"):
+for package in ("Moderato.Effects", "Moderato.Effects.Hosting", "Moderato.Effects.Http"):
     with ZipFile(root / f"{package}.{version}.nupkg") as archive:
         metadata = ET.fromstring(archive.read(f"{package}.nuspec")).find("n:metadata", ns)
         assert metadata is not None, package
@@ -29,7 +29,11 @@ for package in ("Moderato.Effects", "Moderato.Effects.Hosting"):
             assert not analyzers, analyzers
             dependencies = {item.get("id"): item.get("version") for item in metadata.findall(".//n:dependency", ns)}
             assert dependencies["Moderato.Effects"] in (version, f"[{version},)")
-            for name in ("Microsoft.Extensions.Logging",):
+            if package == "Moderato.Effects.Http":
+                assert set(dependencies) == {"Moderato.Effects"}, dependencies
+                frameworks = metadata.findall(".//n:frameworkReference", ns)
+                assert [item.get("name") for item in frameworks] == ["Microsoft.AspNetCore.App"]
+            for name in (("Microsoft.Extensions.Logging",) if package == "Moderato.Effects.Hosting" else ()):
                 lower = "11.0.0-rc.3.26522.148"
                 assert dependencies[name] in (lower, f"[{lower},)"), dependencies[name]
     with ZipFile(root / f"{package}.{version}.snupkg") as symbols:
