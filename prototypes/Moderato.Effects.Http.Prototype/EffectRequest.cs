@@ -18,16 +18,13 @@ public static class HttpRegistration
     }
 }
 
-public sealed class EffectHttpException(Die failure)
-    : Exception("The HTTP effect ended with a defect.", failure.Exception)
+public sealed class EffectHttpException : Exception
 {
-    public Die Failure { get; } = failure;
-}
+    internal EffectHttpException(ExitCase exit)
+        : base(exit.Value is Die ? "The HTTP effect ended with a defect." : "The HTTP effect was interrupted without a request cancellation.",
+            (exit.Value as Die)?.Exception) => Exit = exit;
 
-public sealed class EffectHttpInterruptedException(Interrupted interruption)
-    : Exception("The HTTP effect was interrupted without a request cancellation.")
-{
-    public Interrupted Interruption { get; } = interruption;
+    public ExitCase Exit { get; }
 }
 
 public sealed class EffectRequest : IDisposable
@@ -65,7 +62,7 @@ public sealed class EffectRequest : IDisposable
         if (exit.TryGetValue(out Interrupted? interruption))
         {
             if (canceled) throw new OperationCanceledException(requestAborted);
-            throw new EffectHttpInterruptedException(interruption);
+            throw new EffectHttpException(interruption);
         }
         throw new InvalidOperationException("Invalid exit.");
     }

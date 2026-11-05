@@ -62,8 +62,8 @@ curl -i http://localhost:5000/authorized-orders/1 -H 'X-Prototype-User: bob'
 - Scoped な実行入口は標準 DI で解決する。HttpContextAccessor を保持し、DI 解決時ではなく各 RunAsync の入口で現在のトークンを読む。その同じトークンを実行に渡し、結果分類時に取消状態を一度観測する。トークンは取消状態のスナップショットではなく CTS と結び付いているため、その後の取消も観測できる。実行中に別のトークンへ RequestAborted を差し替える操作へは追従しない。HttpContext や環境そのものは実行入口へ保存しない。
 - 正常・異常の同期完了も async ValueTask 経路で返す。入力・破棄済みの検証は同期的に失敗し得るが、Die・Interrupted の伝達形は実行の同期・非同期で変えない。
 - 単一の Result を得る注文処理は Access と FromResult の合成で遅延し、Gen の巻き戻しを通さない。記述を構築しただけでは注文を作成しない。
-- RunExitAsync の4分類を保ち、Ok・Errだけを呼び出し元へ返す。Die は元の Die を保持する非OCE・非IOExceptionの専用例外で伝える。
-- Interrupted の観測時に request token が要求済みならキャンセル伝達、未要求なら専用の非キャンセル例外を投げる。
+- RunExitAsync の4分類を保ち、Ok・Errだけを呼び出し元へ返す。専用例外は Hosting と揃えて EffectHttpException に統一し、Exit プロパティに元の Die または Interrupted を保持する。Die の主例外は InnerException にも保持し、付属情報と省略件数は Exit の Die から参照できる。
+- Interrupted の観測時に request token が要求済みならキャンセル伝達、未要求なら EffectHttpException を投げる。後者の Exit は Interrupted のままで InnerException は null。いずれも元の分類を Die に変えない。
 - request と Host の診断接続をそれぞれ破棄時に切る。診断通知時のロックは request → Host の順で、破棄はそれぞれの参照を切るだけにする。
 - LoggerMessage と IsEnabled を使い、元のエラー値の整形を強制しない。共通の主失敗をHTTP側の診断で重複出力しない。標準ミドルウェアとアプリのログ方針は別途設定する。
 

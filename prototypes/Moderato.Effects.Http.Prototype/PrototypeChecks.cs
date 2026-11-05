@@ -68,7 +68,8 @@ internal static class PrototypeChecks
         Check(defect.StatusCode == HttpStatusCode.InternalServerError, "Die reaches exception handler");
         Check(interrupted.StatusCode == HttpStatusCode.InternalServerError, "independent interruption reaches exception handler");
         Check(observed.Errors.Any(error => error is EffectHttpException { InnerException: OperationCanceledException }), "Die(OCE) preserved");
-        Check(observed.Errors.Any(error => error is EffectHttpInterruptedException), "Interrupted classification preserved");
+        Check(observed.Errors.Any(error => error is EffectHttpException boundary
+            && boundary.Exit.Value is Interrupted && boundary.InnerException is null), "Interrupted classification preserved");
         Check(canceledDefect.StatusCode == HttpStatusCode.InternalServerError, "Die(OCE) reaches handler with request token cancelled");
         Check(canceledIo.StatusCode == HttpStatusCode.InternalServerError, "Die(IOException) reaches handler with request token cancelled");
         Check(!(await defect.Content.ReadAsStringAsync()).Contains("unexpected OCE", StringComparison.Ordinal), "no exception detail in response");
@@ -212,10 +213,11 @@ internal static class PrototypeChecks
         catch (EffectHttpException error)
         {
             // Then
+            var failure = error.Exit.Value as Die ?? throw new InvalidOperationException("Expected Die classification.");
             Check(ReferenceEquals(error.InnerException, body), "body failure remains primary");
-            Check(error.Failure.Suppressed is [{ Case.Value: Die additional, Relation: Relation.Sequential }]
+            Check(failure.Suppressed is [{ Case.Value: Die additional, Relation: Relation.Sequential }]
                 && ReferenceEquals(additional.Exception, cleanup), "suppressed cleanup and relation retained");
-            Check(error.Failure.OmittedSuppressed == 0, "omitted count retained");
+            Check(failure.OmittedSuppressed == 0, "omitted count retained");
         }
         finally { accessor.HttpContext = null; }
     }
