@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add `ExitCase.HasValue` and typed `TryGetValue` access to `Succeeded`, `Failed`, `Die` and `Interrupted`. A successful query provides a non-null case; mismatched, default and null cases return false with a null output. Direct case patterns remain available. ([#411](https://github.com/SingUp009/Moderato.Effects/issues/411))
+
 ## [0.1.0-preview.4] - 2026-11-05
 
 ### Added

@@ -27,6 +27,7 @@ await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
 await AssertImplicitUnionWidening();
 await AssertTracker();
+AssertExitCaseAccess();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
@@ -48,6 +49,38 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static void AssertExitCaseAccess()
+{
+    // Given
+    var succeeded = new Succeeded();
+    var failed = new Failed(new NotFound(2));
+    var die = new Die(new InvalidOperationException("defect"), [new Suppressed(failed, Relation.Sequential)]);
+    var interrupted = new Interrupted();
+    ExitCase[] exits = [succeeded, failed, die, interrupted, default];
+    for (var index = 0; index < exits.Length; index++)
+    {
+        var exit = exits[index];
+
+        // When
+        var hasSucceeded = exit.TryGetValue(out Succeeded? actualSucceeded);
+        var hasFailed = exit.TryGetValue(out Failed? actualFailed);
+        var hasDie = exit.TryGetValue(out Die? actualDie);
+        var hasInterrupted = exit.TryGetValue(out Interrupted? actualInterrupted);
+        var selected = exit switch { Succeeded => 0, Failed => 1, Die => 2, Interrupted => 3, null => 4 };
+
+        // Then
+        if (hasSucceeded != (index == 0) || hasFailed != (index == 1) || hasDie != (index == 2) || hasInterrupted != (index == 3)
+            || !ReferenceEquals(actualSucceeded, index == 0 ? succeeded : null)
+            || !ReferenceEquals(actualFailed, index == 1 ? failed : null)
+            || !ReferenceEquals(actualDie, index == 2 ? die : null)
+            || !ReferenceEquals(actualInterrupted, index == 3 ? interrupted : null)
+            || exit.HasValue != (index != 4) || selected != index)
+        {
+            throw new InvalidOperationException("ExitCase typed access and direct patterns must preserve cases and default.");
+        }
+    }
+}
 
 static async Task AssertTracker()
 {
