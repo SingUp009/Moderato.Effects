@@ -6,15 +6,23 @@ using Moderato.Results;
 namespace Moderato.Effects.Internal;
 
 /// <summary>The lifetime of one scope (Gen block or <c>Use</c>): its body's token, its release actions and its children's defects.</summary>
-internal sealed class Releases<R>(Cancellation bodyCancellation)
+internal sealed class Releases<R>
 {
+    private readonly Cancellation bodyCancellation;
     // The owner never escapes to user code, so it can be its own gate.
     private object? actions;
     private ImmutableArray<Outcome<Unit, Never>>.Builder? childDefects;
     private bool bodyEnded;
 
     /// <summary>The context the scope's body runs with.</summary>
-    internal RunContext BodyContext { get; } = bodyCancellation.Context;
+    internal RunContext BodyContext { get; }
+
+    internal Releases(Cancellation bodyCancellation)
+    {
+        this.bodyCancellation = bodyCancellation;
+        BodyContext = bodyCancellation.Context;
+        EffectTracker.Track(this, EffectTrackingKind.Scope);
+    }
 
     /// <summary>Records a forked child's defect and cancels the body (D10); false once the body has ended.</summary>
     internal bool TryFailFromChild(Outcome<Unit, Never> defect)
@@ -32,7 +40,11 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release) => AddAction(release);
 
     internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release)
-        => AddAction(new AcquiredRelease<T>(value, release));
+    {
+        var action = new AcquiredRelease<T>(value, release);
+        AddAction(action);
+        EffectTracker.Track(action, EffectTrackingKind.Resource);
+    }
 
     private void AddAction(object action)
     {
@@ -59,69 +71,81 @@ internal sealed class Releases<R>(Cancellation bodyCancellation)
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
     {
-        object actions;
-        lock (this)
+        try
         {
-            bodyEnded = true;
-            if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects);
-            // Any cancellation of the body may have left a callback failure.
-            body = bodyCancellation.WithCallbackFailure(body);
-            if (this.actions is null) return body;
-            actions = this.actions;
-            this.actions = null;
-        }
+            object actions;
+            lock (this)
+            {
+                bodyEnded = true;
+                if (childDefects is { Count: > 0 }) body = AfterChildDefects(body, childDefects);
+                // Any cancellation of the body may have left a callback failure.
+                body = bodyCancellation.WithCallbackFailure(body);
+                if (this.actions is null) return body;
+                actions = this.actions;
+                this.actions = null;
+            }
 
-        // Fixed before any release runs, so a failing release cannot change what later ones see.
-        var exit = ExitCases.From(body);
-        // An error that cannot be read is a defect, and the block ends with what its releases were told.
-        if (body.Kind == OutcomeKind.Err && exit.Value is Die unreadable)
+            // Fixed before any release runs, so a failing release cannot change what later ones see.
+            var exit = ExitCases.From(body);
+            // An error that cannot be read is a defect, and the block ends with what its releases were told.
+            if (body.Kind == OutcomeKind.Err && exit.Value is Die unreadable)
+            {
+                body = Outcome<T, E>.Die(ExceptionDispatchInfo.Capture(unreadable.Exception), [.. unreadable.Suppressed, .. body.Suppressed], consequential: body.Consequential, omitted: body.Omitted);
+                exit = ExitCases.From(body);
+            }
+            // Releases ignore the run's token, which would otherwise stop a rollback.
+            var context = BodyContext.WithCancellation(CancellationToken.None);
+
+            ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
+            ImmutableArray<Suppressed>.Builder? carried = null;
+            var carriedOmitted = 0;
+            for (var i = actions is List<object> multiple ? multiple.Count - 1 : 0; i >= 0; i--)
+            {
+                Outcome<Unit, Never> released;
+                try
+                {
+                    var action = actions is List<object> registered ? registered[i] : actions;
+                    var release = action is Func<ExitCase, Effect<Unit, Never, R>> callback
+                        ? callback(exit)
+                        : ((IAcquiredRelease)action).Invoke(exit);
+                    released = await release.Run(env, context).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    released = Defects.From<Unit, Never>(exception, context);
+                }
+                finally
+                {
+                    if (EffectTracker.EnableTracking)
+                        EffectTracker.Untrack(actions is List<object> registered ? registered[i] : actions);
+                }
+
+                if (released.Kind == OutcomeKind.Interrupted)
+                    released = Defects.From<Unit, Never>(new InvalidOperationException("A resource release was interrupted before completing."), context).After(released);
+
+                if (released.Kind == OutcomeKind.Die)
+                {
+                    (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(
+                        Outcome<Unit, Never>.Die(released.Defect!, released.Suppressed, omitted: released.Omitted, failureOrder: released.FailureOrder));
+                }
+                else
+                {
+                    // A successful release may still carry failures, such as a dead Race loser.
+                    if (!released.Suppressed.IsEmpty)
+                        carriedOmitted += SuppressedContext.Append(carried ??= ImmutableArray.CreateBuilder<Suppressed>(), released.Suppressed.AsSpan());
+                    carriedOmitted += released.Omitted;
+                }
+            }
+
+            var outcome = defects is null ? body : Combine(body, defects);
+            return carried is null && carriedOmitted == 0
+                ? outcome
+                : outcome.WithSuppressed(carried?.DrainToImmutable() ?? [], carriedOmitted).After(outcome);
+        }
+        finally
         {
-            body = Outcome<T, E>.Die(ExceptionDispatchInfo.Capture(unreadable.Exception), [.. unreadable.Suppressed, .. body.Suppressed], consequential: body.Consequential, omitted: body.Omitted);
-            exit = ExitCases.From(body);
+            EffectTracker.Untrack(this);
         }
-        // Releases ignore the run's token, which would otherwise stop a rollback.
-        var context = BodyContext.WithCancellation(CancellationToken.None);
-
-        ImmutableArray<Outcome<Unit, Never>>.Builder? defects = null;
-        ImmutableArray<Suppressed>.Builder? carried = null;
-        var carriedOmitted = 0;
-        for (var i = actions is List<object> multiple ? multiple.Count - 1 : 0; i >= 0; i--)
-        {
-            Outcome<Unit, Never> released;
-            try
-            {
-                var action = actions is List<object> registered ? registered[i] : actions;
-                var release = action is Func<ExitCase, Effect<Unit, Never, R>> callback
-                    ? callback(exit)
-                    : ((IAcquiredRelease)action).Invoke(exit);
-                released = await release.Run(env, context).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                released = Defects.From<Unit, Never>(exception, context);
-            }
-
-            if (released.Kind == OutcomeKind.Interrupted)
-                released = Defects.From<Unit, Never>(new InvalidOperationException("A resource release was interrupted before completing."), context).After(released);
-
-            if (released.Kind == OutcomeKind.Die)
-            {
-                (defects ??= ImmutableArray.CreateBuilder<Outcome<Unit, Never>>()).Add(
-                    Outcome<Unit, Never>.Die(released.Defect!, released.Suppressed, omitted: released.Omitted, failureOrder: released.FailureOrder));
-            }
-            else
-            {
-                // A successful release may still carry failures, such as a dead Race loser.
-                if (!released.Suppressed.IsEmpty)
-                    carriedOmitted += SuppressedContext.Append(carried ??= ImmutableArray.CreateBuilder<Suppressed>(), released.Suppressed.AsSpan());
-                carriedOmitted += released.Omitted;
-            }
-        }
-
-        var outcome = defects is null ? body : Combine(body, defects);
-        return carried is null && carriedOmitted == 0
-            ? outcome
-            : outcome.WithSuppressed(carried?.DrainToImmutable() ?? [], carriedOmitted).After(outcome);
     }
 
     /// <summary>The first child defect is the outcome, with the body's later work as context.</summary>

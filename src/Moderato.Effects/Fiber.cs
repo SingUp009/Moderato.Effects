@@ -18,21 +18,29 @@ public sealed class Fiber<T, E, R>
     {
         this.cancellation = cancellation;
         var context = cancellation.Context;
+        EffectTracker.Track(this, EffectTrackingKind.Fiber);
         task = Task.Run(async () =>
         {
-            Outcome<T, E> outcome;
             try
             {
-                outcome = await effect.Run(env, context).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                outcome = Defects.From<T, E>(exception, context);
-            }
+                Outcome<T, E> outcome;
+                try
+                {
+                    outcome = await effect.Run(env, context).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    outcome = Defects.From<T, E>(exception, context);
+                }
 
-            if (outcome.Kind == OutcomeKind.Die && !outcome.Consequential)
-                reportedToOwner = owner.TryFailFromChild(outcome.WithTypes<Unit, Never>());
-            return outcome;
+                if (outcome.Kind == OutcomeKind.Die && !outcome.Consequential)
+                    reportedToOwner = owner.TryFailFromChild(outcome.WithTypes<Unit, Never>());
+                return outcome;
+            }
+            finally
+            {
+                EffectTracker.Untrack(this);
+            }
         });
     }
 

@@ -26,6 +26,7 @@ await AssertInterruptedRelease(useResource: false);
 await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
 await AssertImplicitUnionWidening();
+await AssertTracker();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
 string[] actual =
@@ -47,6 +48,42 @@ for (var i = 0; i < expected.Length; i++)
 
 Console.WriteLine("package works: " + string.Join(", ", actual));
 return 0;
+
+static async Task AssertTracker()
+{
+    // Given
+    var before = EffectTracker.EnableTracking;
+    var capturedStacks = EffectTracker.EnableStackTrace;
+    EffectTracker.EnableTracking = true;
+    EffectTracker.EnableStackTrace = true;
+    var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(42), static (_, _) => Effect<EmptyEnvironment>.Succeed(Unit.Value));
+    var effect = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+    {
+        await scope.Acquire(resource);
+        return EffectTracker.GetSnapshot();
+    });
+    try
+    {
+        // When
+        var result = await effect.RunAsync(CancellationToken.None);
+
+        // Then
+        if (!result.TryGetOk(out var snapshot) || snapshot.Length != 2
+            || !snapshot.Any(state => state.Kind == EffectTrackingKind.Scope)
+            || !snapshot.Any(state => state.Kind == EffectTrackingKind.Resource)
+            || snapshot.Any(state => string.IsNullOrWhiteSpace(state.StackTrace))
+            || EffectTracker.GetSnapshot().Length != 0)
+        {
+            throw new InvalidOperationException("The package tracker must observe lifetimes until cleanup completes.");
+        }
+    }
+    finally
+    {
+        EffectTracker.EnableTracking = false;
+        EffectTracker.EnableStackTrace = capturedStacks;
+        EffectTracker.EnableTracking = before;
+    }
+}
 
 static async Task AssertRecursiveUnionIdentity()
 {
