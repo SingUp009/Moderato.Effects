@@ -71,7 +71,7 @@ release が受け取るのは後者である。`exit.Value is Ok<Unit>` は obje
 
 この誤った判定で commit / rollback を選ぶアプリコードを、独立したメモリ内 SQLite の対照で確認した。INSERT の Effect は両方で `Ok(1)`、release は `Succeeded` だったが、誤った判定では rollback 後に0行、`Succeeded` 判定では commit 後に1行だった。これはそのアプリ例の未確定 INSERT が rollback された証拠であり、既存データの消失や Core の不具合を示さない。また、正しいケース判定だけでは前節の release 内 commit の制限は解消しない。
 
-使用したのは Microsoft.Data.Sqlite 10.0.9 と、scratch 内だけで明示参照した SQLitePCLRaw.lib.e_sqlite3 3.53.3。外部 DB には接続していない。型付きのケース取得や不可能な pattern の扱いは [#408](https://github.com/SingUp009/Moderato.Effects/issues/408) と関連する別の API・解析器の検討事項であり、この草案では変更を決めない。
+使用したのは Microsoft.Data.Sqlite 10.0.9 と、scratch 内だけで明示参照した SQLitePCLRaw.lib.e_sqlite3 3.53.3。外部 DB には接続していない。型付きのケース取得や不可能な pattern の扱いは [#411](https://github.com/SingUp009/Moderato.Effects/issues/411)（公開面）・[#408](https://github.com/SingUp009/Moderato.Effects/issues/408)（解析器）で扱う別の検討事項であり、この草案では変更を決めない。
 
 ### ローカル Exit と物理 DB の状態
 
