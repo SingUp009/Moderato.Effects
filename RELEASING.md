@@ -35,6 +35,7 @@ Merge the PR once CI is green.
 - [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and publishes it with Native AOT.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
 - [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting and https://www.nuget.org/packages/Moderato.Effects.Http. Indexing can take 5 to 15 minutes.
+- [ ] After all packages are publicly available, update the English wiki installation commands to the published version and replace its unreleased notices and index labels with the version that includes those APIs. Do not announce unpublished APIs as available before package publication.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 
