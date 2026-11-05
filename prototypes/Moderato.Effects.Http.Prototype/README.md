@@ -53,7 +53,7 @@ curl -i http://localhost:5000/authorized-orders/1 -H 'X-Prototype-User: bob'
 
 順に401・200・403。存在しないIDは認証済み利用者に404を返す。`X-Prototype-User` はローカル試作専用で、実際の身元を検証しない。実サービスには使わず、適切な認証方式へ置き換える必要がある。認可の配置や、存在を隠して404へ揃えるかどうかもアプリの方針であり、この固定例を製品の既定にしない。
 
-200・404は型付き結果から記述し、業務の JSON 403は Produces<AccessDenied>(403)、標準認証の401は Produces(401)、共通異常の500は ProducesProblem(500) で明示する。手書き宣言と実応答の一致はコンパイラが保証しないため、自己検証でステータス・media type・本文スキーマを照合する。
+200・404は型付き結果から記述し、業務の JSON 403は Produces<AccessDenied>(403)、共通異常の500は ProducesProblem(500) で明示する。標準認証の401と security は RequireAuthorization を付ける MapGroup の operation transformer へまとめ、個々のエンドポイントに繰り返さない。手書き宣言と実応答の一致はコンパイラが保証しないため、自己検証でステータス・media type・本文スキーマを照合する。この401の宣言は試作の認証方式に対応するもので、任意の認証方式の拒否応答を一律に保証する機能ではない。
 
 認証ヘッダーの securitySchemes と保護された操作の security は、ASP.NET Core の標準 [document/operation transformer](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/customize-openapi?view=aspnetcore-10.0) で追加する。HTTP パッケージの独自生成器ではなく、試作アプリの認証構成に対応した宣言である。公開の /orders に認証要件を付けないことも確認する。
 

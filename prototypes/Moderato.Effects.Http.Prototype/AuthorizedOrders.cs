@@ -34,13 +34,11 @@ internal static class AuthorizedOrderExample
 
     internal static void Map(WebApplication app)
     {
-        var orders = app.MapGroup("/authorized-orders").RequireAuthorization();
-        orders.MapGet("/{id:int}", FindOrder)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces<AccessDenied>(StatusCodes.Status403Forbidden)
-            .ProducesProblem(500)
+        var orders = app.MapGroup("/authorized-orders").RequireAuthorization()
             .AddOpenApiOperationTransformer((operation, context, _) =>
             {
+                operation.Responses ??= new OpenApiResponses();
+                operation.Responses["401"] = new OpenApiResponse { Description = "Unauthorized" };
                 operation.Security ??= [];
                 operation.Security.Add(new OpenApiSecurityRequirement
                 {
@@ -48,6 +46,9 @@ internal static class AuthorizedOrderExample
                 });
                 return Task.CompletedTask;
             });
+        orders.MapGet("/{id:int}", FindOrder)
+            .Produces<AccessDenied>(StatusCodes.Status403Forbidden)
+            .ProducesProblem(500);
     }
 
     private static async Task<HttpResults.Results<HttpResults.Ok<Order>, HttpResults.NotFound<OrderNotFound>, HttpResults.JsonHttpResult<AccessDenied>>>
