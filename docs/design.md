@@ -996,7 +996,7 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 
 - **Q11. 追跡機能**（Issue #397）：デバッグ用に、実行中の Fiber、Scope、リソースを一覧できる機能。2026-11-05、利用者の依頼により本体での実装を進める。
   - **実装の約束（今から守る）**：Fiber、Scope、Resource の生成と終了は、それぞれ1か所の内部処理に集める。追跡機能は、そこに記録を差し込むだけで作れるようにする。追跡が無効のときの負担は、フラグを1つ確認するだけにする。
-  - **段階T1：デバッグ用の詳細一覧**。R3 の ObservableTracker と同じ位置づけで、プロセス全体の EffectTracker.EnableTracking と EnableStackTrace を明示的に有効にする。どちらも既定は無効。GUI・HTTP との関連付け・実行制御は含めない。
+  - **段階T1：デバッグ用の詳細一覧**。プロセス全体の EffectTracker.EnableTracking と EnableStackTrace を明示的に有効にする。どちらも既定は無効。GUI・HTTP との関連付け・実行制御は含めない。
     - GetSnapshot は ID 順の不変メタデータ（Id・Kind・TypeName・StartedAt・StackTrace）を返し、環境・取得値・結果・例外・コールバックを公開しない。TypeName は内部の寿命所有者の型名。StartedAt は診断用の UTC 時刻であり、単調な実行時間の計測ではない。
     - Scope は Gen と Resource.Use の実行から解放完了まで、Fiber は起動から子の実行完了まで、Resource は Make の取得成功・解放登録から解放処理の完了までを観測する。単純な Effect の実行や、Defer のコールバックを別の Resource として数えない。Fork の内部解放を Resource として二重計上しない。
     - 既存の Releases・Fiber・AcquiredRelease を ConditionalWeakTable の弱いキーとして登録し、終了点で取り除く。追跡用のフィールドを寿命所有者・Effect・Resource・RunContext に追加しない。スナップショットを保持しても対象そのものの寿命を延ばさない。
