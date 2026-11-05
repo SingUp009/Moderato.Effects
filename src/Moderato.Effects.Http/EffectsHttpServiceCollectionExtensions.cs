@@ -22,4 +22,3 @@ public static class EffectsHttpServiceCollectionExtensions
         return services;
     }
 }
-

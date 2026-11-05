@@ -10,4 +10,3 @@ public sealed class EffectHttpException : Exception
     /// <summary>The original exit, including retained failure information.</summary>
     public ExitCase Exit { get; }
 }
-
