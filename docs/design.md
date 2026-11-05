@@ -913,7 +913,7 @@ public enum Relation
 }
 ```
 
-- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は内部の実行文脈として `CancellationToken` と任意の実行単位の診断先を持つ。キャンセルの理由は各操作の `Cancellation` が保持し、トークンを切り替えても診断先は引き継ぐ。指定がなければ共通の `EffectDiagnostics.UnobservedFailureHandler` へ報告する。追跡（Q11）は未実装の拡張候補であり、現在の文脈のフィールドには含めない。
+- 中身のデリゲートは `Func<R, RunContext, ValueTask<Outcome<T, E>>>`。`RunContext` は内部の実行文脈として `CancellationToken` と任意の実行単位の診断先を持つ。キャンセルの理由は各操作の `Cancellation` が保持し、トークンを切り替えても診断先は引き継ぐ。指定がなければ共通の `EffectDiagnostics.UnobservedFailureHandler` へ報告する。追跡（Q11）は既存の寿命オブジェクトを外部の弱い登録表で観測し、RunContext のフィールドには含めない。
 - 付属情報に `Relation` を付けておくのは、将来 `Cause` の木（Sequential / Parallel）に広げるため。
 - `Relation` は合成上の関係を表し、主失敗を基準とした時刻を表さない。本体の Err の後に解放が Die で終わると、先に起きた Err が後の主失敗 Die の `Sequential` な付属情報になる。`Parallel` も観測時刻の一致を保証しない。`Consequence` は以下の観測時の規則で分類し、利用者コード内部の実際の因果関係を解析するものではない。
 
@@ -994,11 +994,18 @@ internal enum CancellationReason { Caller, Timeout, RaceLoser, SiblingFailure, P
 - **Q13. 解決済み**（2026-11-03 承認、Issue #261）：キャンセル不能な解放が Interrupted を返したら、解放の不完了を `Die(InvalidOperationException)` として扱う。残りの解放をすべて実行し、既存の D18 の順序で集約する。規則は D9・D18 に記載した。
 - **Q14. 決定済み**（Issue #257・#277・#300）：生成可能な範囲と診断を D13 に記載した。解析量の上限を超える場合は MEFF007、実行時パターンが重なる case は MEFF008 で対象の生成を止める。IUnion の実装だけを持つ型は不透明な case とする。C# の型の同一性と、生成する型名での参照可能性は別に確認する。上限で探索を打ち切って部分的な実装を生成しない。
 
-- **Q11. 追跡機能**：デバッグ用に、実行中の Fiber、Scope、リソースを一覧できる機能。機能の本体はリリース後に作る。
+- **Q11. 追跡機能**（Issue #397）：デバッグ用に、実行中の Fiber、Scope、リソースを一覧できる機能。2026-11-05、利用者の依頼により本体での実装を進める。
   - **実装の約束（今から守る）**：Fiber、Scope、Resource の生成と終了は、それぞれ1か所の内部処理に集める。追跡機能は、そこに記録を差し込むだけで作れるようにする。追跡が無効のときの負担は、フラグを1つ確認するだけにする。
-  - **公開の仕方の第一候補（リリース後に決める）**：両方を用意する。
-    - 数と区間は .NET 標準の `System.Diagnostics.Metrics` と `ActivitySource` に乗せる。`dotnet-counters` や OpenTelemetry で、本番環境でも見られる。
-    - スタックトレース付きの詳細な一覧は、R3 の `ObservableTracker` のような全体共通のスイッチで、開発時だけ有効にする。
+  - **段階T1：デバッグ用の詳細一覧**。プロセス全体の EffectTracker.EnableTracking と EnableStackTrace を明示的に有効にする。どちらも既定は無効。GUI・HTTP との関連付け・実行制御は含めない。
+    - GetSnapshot は ID 順の不変メタデータ（Id・Kind・TypeName・StartedAt・StackTrace）を返し、環境・取得値・結果・例外・コールバックを公開しない。TypeName は内部の寿命所有者の型名。StartedAt は診断用の UTC 時刻であり、単調な実行時間の計測ではない。
+    - Scope は Gen と Resource.Use の実行から解放完了まで、Fiber は起動から子の実行完了まで、Resource は Make の取得成功・解放登録から解放処理の完了までを観測する。単純な Effect の実行や、Defer のコールバックを別の Resource として数えない。Fork の内部解放を Resource として二重計上しない。
+    - 既存の Releases・Fiber・AcquiredRelease を ConditionalWeakTable の弱いキーとして登録し、終了点で取り除く。追跡用のフィールドを寿命所有者・Effect・Resource・RunContext に追加しない。スナップショットを保持しても対象そのものの寿命を延ばさない。
+    - 無効化は登録表を切り離して一覧を消す。再有効化では以後に開始したものだけを登録し、既に動いているものを遡って列挙しない。スタック採取の変更も以後の登録だけに適用する。
+    - 一覧は並行した開始・終了と競合する診断用の観測であり、実行履歴や厳密な一時点の完全な一覧ではない。追跡の失敗で本体の結果・キャンセル・解放を変更しない。スタック文字列は開始時の呼び出し箇所を示し、すべての非同期呼び出し元を復元する保証はない。
+    - 有効化による計測負荷は Timeout や Race の時間・競合結果に影響し得る。実行制御や失敗分類を書き換えないことと、時間を含めたすべての観測が同じであることは区別する。
+    - 無効時は各開始・終了点で登録表の有無を確認するだけとし、追跡メタデータ・スタック・設定用オブジェクトを作らない。追加割り当てと時間の影響は main との比較で確認する。取得数と解放数の一致と、GC 上の保持がないことは別々に検証する。
+    - **無効時の時間の費用（2026-11-05 確認）**：現実装では、ReleaseAsync に追加した Scope 終了と各解放終了の2つの追跡終了領域が、追跡無効でも実行経路と生成コードに影響する。非同期 finally の完了状態の確認、登録表の有無の確認、内側の判定用 getter 呼び出しを通り、無効時には実際の登録解除を呼ばない。開始処理だけ、Scope 終了まで、各解放終了までを段階的に追加した Gen・Defer 1件の比較で、2つの終了領域の追加は両読み込み順で遅くなった。対象の同期 Gen は main と同じ304 B/回で、寿命所有者と状態機械のフィールド数も変わらない。測定された時間差は条件で変動し、EH だけ、getter だけの費用や、任意の利用環境での固定値には分解していない。「登録表の確認だけ」は追加時間ゼロや生成コード不変の保証ではない。
+  - **段階T2：標準の観測連携（未実装）**。数と区間を System.Diagnostics.Metrics と ActivitySource に乗せ、dotnet-counters や OpenTelemetry から本番環境でも観測できる形を検討する。T1 の一覧を本番向け計測器の代わりとはしない。公開の仕方の第一候補として両方を用意する方針は維持し、T1 のレビュー後に別の段階として進める。
 
 
 ## リリース後の追加機能の候補
