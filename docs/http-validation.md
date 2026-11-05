@@ -21,7 +21,7 @@ The [performance report](http-performance.md) and [170-sample CSV](measurements/
 - `tests/Moderato.Effects.Http.Tests`: public registration and runner tests, sync/async exits, captured token replacement, settled results, children/cleanup, ordered suppressed context, logging and late disconnection.
 - `samples/Moderato.Effects.Http.Samples --verify`: real Kestrel requests, public/protected routes, explicit error mappings, OpenAPI schemas/security/statuses, cancellation defects, response-started failure and client disconnection.
 - `tests/Moderato.Effects.Http.PackageTests`: HTTP-only dependency, generated environment/error union, typed responses, negative analyzer/exhaustiveness/response-type checks (the CS8509 exhaustiveness warning fails the build because this repository enables TreatWarningsAsErrors; CS0029 response incompatibility is always an error) and JIT/NativeAOT execution.
-- `tests/verify-packages.py`: all three packages' metadata, payload, symbols/SourceLink, HTTP's Core dependency and ASP.NET shared framework reference.
+- `tests/Moderato.Effects.PackageVerifier`: all three packages' metadata, payload, symbols/SourceLink, HTTP's Core dependency and ASP.NET shared framework reference.
 
 ## Performance protocol
 
