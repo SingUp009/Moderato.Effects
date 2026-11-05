@@ -52,6 +52,17 @@ Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.get -> System.Action<
 Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.init -> void
 Moderato.Effects.EffectScheduleExtensions
 Moderato.Effects.EffectTimeExtensions
+Moderato.Effects.EffectTracker
+Moderato.Effects.EffectTrackingKind
+Moderato.Effects.EffectTrackingKind.Fiber = 1 -> Moderato.Effects.EffectTrackingKind
+Moderato.Effects.EffectTrackingKind.Resource = 2 -> Moderato.Effects.EffectTrackingKind
+Moderato.Effects.EffectTrackingKind.Scope = 0 -> Moderato.Effects.EffectTrackingKind
+Moderato.Effects.EffectTrackingState
+Moderato.Effects.EffectTrackingState.Id.get -> long
+Moderato.Effects.EffectTrackingState.Kind.get -> Moderato.Effects.EffectTrackingKind
+Moderato.Effects.EffectTrackingState.StackTrace.get -> string?
+Moderato.Effects.EffectTrackingState.StartedAt.get -> System.DateTimeOffset
+Moderato.Effects.EffectTrackingState.TypeName.get -> string!
 Moderato.Effects.EffectUnionExtensions
 Moderato.Effects.EmptyEnvironment
 Moderato.Effects.EnvironmentAttribute
@@ -262,6 +273,11 @@ static Moderato.Effects.EffectTimeExtensions.Timeout<T, E, R>(this Moderato.Effe
 static Moderato.Effects.EffectTimeExtensions.Timeout<T, R>(this Moderato.Effects.Effect<T, Moderato.Effects.Never!, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R>
 static Moderato.Effects.EffectTimeExtensions.Timeout<T, R>(this Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<T, Moderato.Effects.TimeoutError!, R>
 static Moderato.Effects.EffectTimeExtensions.TimeoutResult<T, E, R>(this Moderato.Effects.Effect<T, E, R> effect, System.TimeSpan after) -> Moderato.Effects.Effect<Moderato.Results.Result<T, Moderato.Effects.TimeoutError!>, E, R>
+static Moderato.Effects.EffectTracker.EnableStackTrace.get -> bool
+static Moderato.Effects.EffectTracker.EnableStackTrace.set -> void
+static Moderato.Effects.EffectTracker.EnableTracking.get -> bool
+static Moderato.Effects.EffectTracker.EnableTracking.set -> void
+static Moderato.Effects.EffectTracker.GetSnapshot() -> Moderato.Effects.EffectTrackingState![]!
 static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, E, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
 static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
 static Moderato.Effects.EmptyEnvironment.Value.get -> Moderato.Effects.EmptyEnvironment!
