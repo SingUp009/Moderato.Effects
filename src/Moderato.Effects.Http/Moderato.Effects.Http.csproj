@@ -9,7 +9,7 @@
     <PackageTags>effect;aspnetcore;http;dependency-injection;logging</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>https://github.com/SingUp009/Moderato.Effects/blob/v$(Version)/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/SingUp009/Moderato.Effects/releases/tag/Moderato.Effects.Http/v$(Version)</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
