@@ -14,9 +14,11 @@ await app.RunAsync(args);
 
 internal static class Commands
 {
+    #region ExitCodes
     private const int BUSINESS_ERROR_EXIT_CODE = 2;
     private const int DEFECT_EXIT_CODE = 1;
     private const int INTERRUPTED_EXIT_CODE = 130;
+    #endregion
 
     private const string ORDERS_DB = "orders.db";
 
