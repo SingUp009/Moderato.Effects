@@ -13,7 +13,7 @@
 
   <!-- Misuse.cs must fail the build with an analyzer error; it is compiled only to prove the analyzers load. -->
   <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
-    <Compile Remove="Misuse.cs" />
+    <Compile Remove="Validation/Misuse.cs" />
   </ItemGroup>
 
 </Project>

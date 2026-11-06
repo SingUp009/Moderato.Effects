@@ -9,6 +9,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.3.26522.148" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
-    <Compile Remove="Misuse.cs" />
+    <Compile Remove="Validation/Misuse.cs" />
   </ItemGroup>
 </Project>

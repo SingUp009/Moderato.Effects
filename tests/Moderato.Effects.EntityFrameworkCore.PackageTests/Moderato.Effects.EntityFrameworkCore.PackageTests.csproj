@@ -11,9 +11,9 @@
     <Compile Include="../../samples/Moderato.Effects.EntityFrameworkCore.Samples/OrdersDb.cs" Link="OrdersDb.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckErrorType)' != 'true'">
-    <Compile Remove="InvalidError.cs" />
+    <Compile Remove="Validation/InvalidError.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
-    <Compile Remove="Misuse.cs" />
+    <Compile Remove="Validation/Misuse.cs" />
   </ItemGroup>
 </Project>
