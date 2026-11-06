@@ -32,7 +32,8 @@ Unexpected database exceptions remain defects; they are not automatically retrie
 
 The sample references `src/Moderato.Effects.EntityFrameworkCore`. `WithDatabase` uses
 `EfDatabase.Transaction`, and saves use the scope-aware overload. `OrderError` includes
-`DatabaseFailure`, so an unconfirmed commit can be returned without a custom mapper.
+`DatabaseFailure`, a closed union containing constraint, unconfirmed-commit and unclassified
+database failures. An unconfirmed commit can be returned without a custom mapper.
 
 Each command runs in an owned transaction with a fresh context. There is no Outbox or
 automatic retry. An unconfirmed commit is shown as a standard database error, not retried.
