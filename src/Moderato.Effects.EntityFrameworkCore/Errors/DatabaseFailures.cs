@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Runtime.ExceptionServices;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using static SQLitePCL.raw;
 
 namespace Moderato.Effects.EntityFrameworkCore;
@@ -15,7 +16,8 @@ internal static class DatabaseFailures
 
     internal static DatabaseFailure From(Exception cause)
     {
-        var provider = cause is Microsoft.EntityFrameworkCore.DbUpdateException { InnerException: { } inner } ? inner : cause;
+        if (cause is DbUpdateConcurrencyException) return new OptimisticConcurrencyConflict(cause);
+        var provider = cause is DbUpdateException { InnerException: { } inner } ? inner : cause;
         if (provider is SqliteException { SqliteErrorCode: SQLITE_CONSTRAINT } sqlite)
         {
             return new ConstraintViolation(sqlite.SqliteExtendedErrorCode switch

@@ -136,17 +136,13 @@ public sealed class SaveChangesTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task SaveChangesAsync_UnclassifiedFailure_MapsOnlyWhenRequested(bool map, bool concurrency)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SaveChangesAsync_UnclassifiedFailure_MapsOnlyWhenRequested(bool map)
     {
         // Given
         await using var store = await Store.Open();
-        var cause = concurrency
-            ? new DbUpdateConcurrencyException("concurrency")
-            : new DbUpdateException("unclassified", new IOException("provider"));
+        var cause = new DbUpdateException("unclassified", new IOException("provider"));
         store.Probe.BeforeSave = () => throw cause;
         object? observedCase = null;
         bool Map(DatabaseFailure failure, out TestError error)

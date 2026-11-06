@@ -12,10 +12,12 @@ commit as `Err` without requiring a custom mapping callback:
 public partial union OrderError(OrderNotFound, OrderAlreadyExists, DatabaseFailure);
 ```
 
-`DatabaseFailure` is a closed union of `ConstraintViolation`, `CommitNotConfirmed` and
-`UnclassifiedDatabaseFailure`. The last case has no more specific standard case, including EF concurrency and SQLite busy
-or locked failures;
-it does not mean the commit outcome is unknown. Each case preserves the original `Cause`.
+`DatabaseFailure` is a closed union of `ConstraintViolation`, `OptimisticConcurrencyConflict`,
+`CommitNotConfirmed` and `UnclassifiedDatabaseFailure`. Each case preserves the original `Cause`.
+`OptimisticConcurrencyConflict` identifies EF's `DbUpdateConcurrencyException` independently of
+provider error codes, including stale updates and deletes. It adds no retry or conflict resolution.
+Unclassified failures have no more specific standard case, including SQLite busy or locked
+failures; they do not imply an unknown commit outcome.
 The application error contains this union as one case, so inspecting the database case uses
 one further match:
 
@@ -23,6 +25,7 @@ one further match:
 static string Describe(DatabaseFailure failure) => failure switch
 {
     ConstraintViolation constraint => $"Constraint: {constraint.Kind}",
+    OptimisticConcurrencyConflict => "The saved data changed concurrently.",
     CommitNotConfirmed => "Commit outcome could not be confirmed.",
     UnclassifiedDatabaseFailure other => other.Cause.Message,
 };
