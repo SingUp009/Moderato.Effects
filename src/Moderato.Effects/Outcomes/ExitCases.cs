@@ -3,12 +3,10 @@ using System.Diagnostics.CodeAnalysis;
 namespace Moderato.Effects;
 
 /// <summary>The run ended because a defect (an unexpected exception) escaped.</summary>
-/// <param name="Exception">The defect.</param>
 /// <param name="Suppressed">Failures alongside the defect that were not chosen as the outcome.</param>
 public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppressed)
 {
     /// <summary>Enables <c>Die(var exception)</c> patterns.</summary>
-    /// <param name="exception">The defect.</param>
     public void Deconstruct(out Exception exception) => exception = Exception;
 
     /// <summary>How many suppressed failures were left out for being too many.</summary>
@@ -31,36 +29,24 @@ public union ExitCase(Succeeded, Failed, Die, Interrupted)
     /// <summary>Whether this contains a non-null case.</summary>
     public bool HasValue => Value is not null;
 
-    /// <summary>Access to the Succeeded case.</summary>
-    /// <param name="succeeded">The success case, when this is one.</param>
-    /// <returns>True if Succeeded.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Succeeded? succeeded)
     {
         succeeded = Value as Succeeded;
         return succeeded is not null;
     }
 
-    /// <summary>Access to the Failed case.</summary>
-    /// <param name="failed">The expected failure, when this is one.</param>
-    /// <returns>True if Failed.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Failed? failed)
     {
         failed = Value as Failed;
         return failed is not null;
     }
 
-    /// <summary>Access to the Die case.</summary>
-    /// <param name="die">The defect, when this is one.</param>
-    /// <returns>True if Die.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Die? die)
     {
         die = Value as Die;
         return die is not null;
     }
 
-    /// <summary>Access to the Interrupted case.</summary>
-    /// <param name="interrupted">The interruption, when this is one.</param>
-    /// <returns>True if Interrupted.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Interrupted? interrupted)
     {
         interrupted = Value as Interrupted;

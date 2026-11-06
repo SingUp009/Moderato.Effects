@@ -21,8 +21,6 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
     private readonly object? other;
     private readonly byte state;
 
-    /// <summary>Creates an Ok exit.</summary>
-    /// <param name="ok">The value.</param>
     public Exit(Ok<T> ok)
     {
         value = ok.Value;
@@ -31,8 +29,6 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         state = STATE_OK;
     }
 
-    /// <summary>Creates an Err exit.</summary>
-    /// <param name="err">The expected error.</param>
     public Exit(Err<E> err)
     {
         value = default!;
@@ -41,8 +37,6 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         state = STATE_ERR;
     }
 
-    /// <summary>Creates a Die exit.</summary>
-    /// <param name="die">The defect.</param>
     public Exit(Die die)
     {
         ArgumentNullException.ThrowIfNull(die);
@@ -52,8 +46,6 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         state = STATE_DIE;
     }
 
-    /// <summary>Creates an Interrupted exit.</summary>
-    /// <param name="interrupted">The interruption.</param>
     public Exit(Interrupted interrupted)
     {
         ArgumentNullException.ThrowIfNull(interrupted);
@@ -76,8 +68,6 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
     public bool HasValue => state != STATE_DEFAULT;
 
     /// <summary>Non-boxing access to the Ok case.</summary>
-    /// <param name="ok">The Ok case, when this is one.</param>
-    /// <returns>True if Ok.</returns>
     public bool TryGetValue(out Ok<T> ok)
     {
         ok = new Ok<T>(value);
@@ -85,33 +75,24 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
     }
 
     /// <summary>Non-boxing access to the Err case.</summary>
-    /// <param name="err">The Err case, when this is one.</param>
-    /// <returns>True if Err.</returns>
     public bool TryGetValue(out Err<E> err)
     {
         err = new Err<E>(error);
         return state == STATE_ERR;
     }
 
-    /// <summary>Access to the Die case.</summary>
-    /// <param name="die">The Die case, when this is one.</param>
-    /// <returns>True if Die.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Die? die)
     {
         die = other as Die;
         return state == STATE_DIE;
     }
 
-    /// <summary>Access to the Interrupted case.</summary>
-    /// <param name="interrupted">The Interrupted case, when this is one.</param>
-    /// <returns>True if Interrupted.</returns>
     public bool TryGetValue([NotNullWhen(true)] out Interrupted? interrupted)
     {
         interrupted = other as Interrupted;
         return state == STATE_INTERRUPTED;
     }
 
-    /// <inheritdoc/>
     public bool Equals(Exit<T, E> other)
     {
         if (state != other.state) return false;
@@ -124,10 +105,8 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         };
     }
 
-    /// <inheritdoc/>
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is Exit<T, E> other && Equals(other);
 
-    /// <inheritdoc/>
     public override int GetHashCode() => state switch
     {
         STATE_OK => HashCode.Combine(state, value),
@@ -136,13 +115,10 @@ public readonly struct Exit<T, E> : IUnion, IEquatable<Exit<T, E>>
         _ => state,
     };
 
-    /// <summary>Compares two exits.</summary>
     public static bool operator ==(Exit<T, E> left, Exit<T, E> right) => left.Equals(right);
 
-    /// <summary>Compares two exits.</summary>
     public static bool operator !=(Exit<T, E> left, Exit<T, E> right) => !left.Equals(right);
 
-    /// <inheritdoc/>
     public override string ToString() => state switch
     {
         STATE_OK => $"Ok({value})",
