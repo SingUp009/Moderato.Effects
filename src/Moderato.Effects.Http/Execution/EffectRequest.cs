@@ -19,7 +19,6 @@ public sealed class EffectRequest : IDisposable
     }
 
     /// <summary>Awaits execution and cleanup, returning typed results or propagating an abnormal exit.</summary>
-    /// <param name="effect">The effect to execute.</param>
     /// <param name="environment">The environment, whose lifetime must cover execution and cleanup.</param>
     /// <returns>The successful value or typed error. Defects and unrequested interruptions fail with EffectHttpException.</returns>
     public ValueTask<Result<T, E>> RunAsync<T, E, R>(Effect<T, E, R> effect, R environment)

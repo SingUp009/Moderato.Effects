@@ -10,9 +10,6 @@ public static class EfDatabase<R>
 {
     /// <summary>Commits a successful body after its children and releases have completed.</summary>
     /// <param name="contexts">The borrowed context factory.</param>
-    /// <param name="environment">Builds the body's environment from the current context.</param>
-    /// <param name="body">The work to run before commit.</param>
-    /// <param name="commitFailure">Optionally maps commit failures to application errors.</param>
     /// <returns>An effect retaining unconfirmed commits in its error union.</returns>
     public static Effect<T, E, R> Transaction<TContext, T, E, RBody>(
         Func<R, IDbContextFactory<TContext>> contexts,

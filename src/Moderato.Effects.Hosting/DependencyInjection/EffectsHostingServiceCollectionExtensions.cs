@@ -9,9 +9,7 @@ namespace Moderato.Effects.Hosting;
 public static class EffectsHostingServiceCollectionExtensions
 {
     /// <summary>Configures a Host-owned diagnostic implementation.</summary>
-    /// <param name="services">The Host's services.</param>
     /// <param name="configure">Selects the diagnostic factory; the last registration wins.</param>
-    /// <returns>The service collection.</returns>
     public static IServiceCollection AddEffectsHosting(this IServiceCollection services, Action<EffectsHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -27,11 +25,8 @@ public static class EffectsHostingServiceCollectionExtensions
     }
 
     /// <summary>Runs one effect with its own asynchronous DI scope and a required typed error handler.</summary>
-    /// <param name="services">The Host's services.</param>
-    /// <param name="effect">The lazy description to run once.</param>
     /// <param name="environment">Creates its environment from execution-scoped services.</param>
     /// <param name="onError">Handles a root Err before the environment is disposed.</param>
-    /// <returns>The service collection.</returns>
     public static IServiceCollection AddEffectHostedService<E, R>(this IServiceCollection services,
         Effect<Unit, E, R> effect, Func<IServiceProvider, R> environment,
         Func<E, R, CancellationToken, ValueTask> onError)

@@ -8,8 +8,6 @@ namespace Moderato.Effects.Http;
 public static class EffectsHttpServiceCollectionExtensions
 {
     /// <summary>Connects effects to request cancellation and standard logging.</summary>
-    /// <param name="services">The application services.</param>
-    /// <returns>The service collection.</returns>
     public static IServiceCollection AddEffectsHttp(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);

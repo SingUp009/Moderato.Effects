@@ -16,14 +16,12 @@ public sealed class LoggerDiagnostics : IEffectDiagnostics
     private readonly ILogger logger;
 
     /// <summary>Uses the factory without taking ownership of it.</summary>
-    /// <param name="loggerFactory">The Host's logger factory.</param>
     public LoggerDiagnostics(ILoggerFactory loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(loggerFactory);
         logger = loggerFactory.CreateLogger("Moderato.Effects.Hosting");
     }
 
-    /// <inheritdoc/>
     public void Report(ExitCase failure)
     {
         if (failure.Value is Failed failed)
