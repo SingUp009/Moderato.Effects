@@ -69,7 +69,7 @@ The first create returns 201; repeating the SKU returns 409. Invalid input retur
 
 `Results<Created<Order>, BadRequest<ValidationError>, Conflict<DuplicateOrder>>` is ASP.NET Core's typed response union. ASP.NET Core reads this endpoint metadata to describe the response types in OpenAPI. The effect's error union is mapped explicitly at the endpoint; the integration does not infer HTTP status codes from business errors.
 
-`.ProducesProblem(500)` adds documentation for a possible response. It does not install an exception handler or produce a response. `UseExceptionHandler` above is what writes the generic 500 Problem response when an exception reaches it. Keep internal exception details out of that response.
+`.ProducesProblem(500)` adds documentation for a possible response. It does not install an exception handler or produce a response. `UseExceptionHandler` above writes the generic 500 Problem response when an exception reaches it. If the response has already started, the exception handler cannot replace it with a new 500 response. Keep internal exception details out of that response.
 
 ## Cancellation and defects
 
