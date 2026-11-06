@@ -18,7 +18,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
   - `Tests` is an Unreleased-only section for verification changes with no package-observable effect; remove it before renaming `[Unreleased]`. API, behavior, and allocation changes belong under the normal change types.
 - [ ] **Release notes**: prepare a separate body following the previous GitHub Release's heading, applicable change sections and PR-linked bullets. Include this version's validation limits; review the text before publishing.
 - [ ] `dotnet test -c Release` passes.
-- [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
+- [ ] All samples run. `dotnet run --project tests/Moderato.Effects.Http.SampleTests -c Release` passes the real HTTP/OpenAPI checks.
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the EF consumer passes under JIT. EF Native AOT is not validated. All integration-only consumers receive the transitive generators and analyzers.
 - [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all four packages.
 - [ ] Review the local HTTP validation notes, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.

@@ -1,0 +1,80 @@
+using Moderato.Effects.Internal;
+
+namespace Moderato.Effects;
+
+/// <summary>LINQ query syntax for <see cref="Effect{T, E, R}"/>, short-circuiting on the first failure; a step that cannot fail mixes with any error type.</summary>
+public static class EffectLinq
+{
+    public static Effect<U, E, R> Select<T, E, R, U>(this Effect<T, E, R> source, Func<T, U> selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return source.Map(selector);
+    }
+
+    public static Effect<U, E, R> SelectMany<T, E, R, U>(this Effect<T, E, R> source, Func<T, Effect<U, E, R>> selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return source.AndThen(selector);
+    }
+
+    public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
+        this Effect<T, E, R> source, Func<T, Effect<U, E, R>> selector, Func<T, U, V> resultSelector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome);
+    }
+
+    public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
+        this Effect<T, E, R> source, Func<T, Effect<U, Never, R>> selector, Func<T, U, V> resultSelector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome.WithErrorType<E>());
+    }
+
+    public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
+        this Effect<T, Never, R> source, Func<T, Effect<U, E, R>> selector, Func<T, U, V> resultSelector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(resultSelector);
+        Effect<T, E, R> widened = source;
+        return Bind(widened, selector, resultSelector, static outcome => outcome);
+    }
+
+    public static Effect<V, Never, R> SelectMany<T, R, U, V>(
+        this Effect<T, Never, R> source, Func<T, Effect<U, Never, R>> selector, Func<T, U, V> resultSelector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(resultSelector);
+        return Bind(source, selector, resultSelector, static outcome => outcome);
+    }
+
+    // Projects the next outcome directly, since building a Map per run would allocate.
+    private static Effect<V, E, R> Bind<T, E, R, U, F, V>(Effect<T, E, R> source,
+        Func<T, Effect<U, F, R>> next, Func<T, U, V> project, Func<Outcome<U, F>, Outcome<U, E>> widen)
+    {
+        // Kept with the query so suspended runs carry only their outcome and context.
+        Func<Outcome<U, F>, (Outcome<T, E> outcome, RunContext context), Outcome<V, E>> complete = (raw, state) =>
+        {
+            var end = widen(raw);
+            if (end.Kind != OutcomeKind.Ok) return end.WithValueType<V>().After(state.outcome);
+
+            Outcome<V, E> projected;
+            try
+            {
+                projected = Outcome<V, E>.Ok(project(state.outcome.Value, end.Value)).After(end);
+            }
+            catch (Exception exception)
+            {
+                projected = Defects.From<V, E>(exception, state.context).Replacing(end);
+            }
+
+            return projected.After(state.outcome);
+        };
+        return source.Bind((next, complete), static (outcome, state, _) => outcome.Kind == OutcomeKind.Ok
+                ? new EffectSelection<U, F, V, E, R>(state.next(outcome.Value))
+                : new EffectSelection<U, F, V, E, R>(outcome.WithValueType<V>()),
+            static (outcome, previous, context, state) => state.complete(outcome, (previous, context)));
+    }
+}

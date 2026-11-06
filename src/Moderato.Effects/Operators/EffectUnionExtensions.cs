@@ -1,0 +1,40 @@
+using Moderato.Effects.Internal;
+
+namespace Moderato.Effects;
+
+/// <summary>Operations that need the error to be a union with a given case.</summary>
+public static class EffectUnionExtensions
+{
+    /// <summary>Recovers from one case of the error union, as in <c>(NotFound nf) =&gt; ...</c>.</summary>
+    public static Effect<T, E, R> CatchCase<T, E, R, TCase>(this Effect<T, E, R> effect, Func<TCase, Effect<T, E, R>> handler)
+        where E : IUnionCase<E, TCase>
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return Catch(effect, handler);
+    }
+
+    // A separate overload, since a handler returning Effect<T, Never, R> would leave E ambiguous.
+    /// <summary>Recovers from one case of the error union with an effect that cannot fail.</summary>
+    public static Effect<T, E, R> CatchCase<T, E, R, TCase>(this Effect<T, E, R> effect, Func<TCase, Effect<T, Never, R>> handler)
+        where E : IUnionCase<E, TCase>
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        return effect.Bind<T, Never, T, E, Func<TCase, Effect<T, Never, R>>>(handler, static (outcome, handle, context) =>
+        {
+            if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
+            var recovery = handle(caught).Validate();
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            return new(recovery);
+        }, static (next, _, _, _) => next.WithErrorType<E>());
+    }
+
+    private static Effect<T, E, R> Catch<T, E, R, TCase>(Effect<T, E, R> effect, Func<TCase, Effect<T, E, R>> handler)
+        where E : IUnionCase<E, TCase>
+        => effect.Bind<T, E, T, E, Func<TCase, Effect<T, E, R>>>(handler, static (outcome, handle, context) =>
+        {
+            if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
+            var recovery = handle(caught).Validate();
+            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            return new(recovery);
+        }, static (next, _, _, _) => next);
+}

@@ -7,13 +7,13 @@
     <PackageReference Include="Moderato.Effects.EntityFrameworkCore" Version="$(ModeratoEffectsVersion)" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
-    <Compile Include="../../samples/Moderato.Effects.EntityFrameworkCore.Samples/Orders.cs" Link="Orders.cs" />
-    <Compile Include="../../samples/Moderato.Effects.EntityFrameworkCore.Samples/OrdersDb.cs" Link="OrdersDb.cs" />
+    <Compile Include="../../samples/Moderato.Effects.EntityFrameworkCore.Samples/Orders/Orders.cs" Link="Orders.cs" />
+    <Compile Include="../../samples/Moderato.Effects.EntityFrameworkCore.Samples/Orders/OrdersDb.cs" Link="OrdersDb.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckErrorType)' != 'true'">
-    <Compile Remove="InvalidError.cs" />
+    <Compile Remove="Validation/InvalidError.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
-    <Compile Remove="Misuse.cs" />
+    <Compile Remove="Validation/Misuse.cs" />
   </ItemGroup>
 </Project>

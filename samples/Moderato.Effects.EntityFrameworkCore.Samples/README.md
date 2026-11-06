@@ -26,9 +26,9 @@ Unexpected database exceptions remain defects; they are not automatically retrie
 ## What is new in this sample
 
 - `Program.cs`: ConsoleAppFramework registration, SQLite setup and result display.
-- `Orders.cs`: four application Effects and a private `WithDatabase` helper that uses
+- `Orders/Orders.cs`: four application Effects and a private `WithDatabase` helper that uses
   existing `Resource`/`Scope` APIs to dispose each command's context.
-- `OrdersDb.cs`: the ordinary EF entity, context and factory.
+- `Orders/OrdersDb.cs`: the ordinary EF entity, context and factory.
 
 The sample references `src/Moderato.Effects.EntityFrameworkCore`. `WithDatabase` uses
 `EfDatabase.Transaction`, and saves use the scope-aware overload. `OrderError` includes
