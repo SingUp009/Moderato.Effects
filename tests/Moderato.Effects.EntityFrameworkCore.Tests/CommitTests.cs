@@ -27,7 +27,7 @@ public sealed class CommitTests
 
         // Then
         Assert.True(exit.TryGetValue(out Err<TestError> err));
-        var unknown = Assert.IsType<CommitNotConfirmed>(err.Error.Value);
+        var unknown = Assert.IsType<CommitNotConfirmed>(Assert.IsType<DatabaseFailure>(err.Error.Value).Value);
         Assert.Same(failure, unknown.Cause);
         Assert.Equal(0, await store.Count());
         Assert.Equal(1, store.Probe.Rollbacks);
@@ -55,7 +55,7 @@ public sealed class CommitTests
 
         // Then
         Assert.True(exit.TryGetValue(out Err<TestError> err));
-        Assert.IsType<CommitNotConfirmed>(err.Error.Value);
+        Assert.IsType<CommitNotConfirmed>(Assert.IsType<DatabaseFailure>(err.Error.Value).Value);
         Assert.Equal(0, await store.Count());
         Assert.Equal(1, store.Probe.Disposals);
     }
@@ -143,7 +143,7 @@ public sealed class CommitTests
         store.Probe.BeforeCommit = _ => throw new IOException("unconfirmed");
         static bool Map(DatabaseFailure failure, out TestError error)
         {
-            error = new Rejected(failure is CommitNotConfirmed ? "unconfirmed" : "unexpected");
+            error = new Rejected(failure.Value is CommitNotConfirmed ? "unconfirmed" : "unexpected");
             return true;
         }
 
@@ -213,7 +213,7 @@ public sealed class CommitTests
         await using var store = await Store.Open();
         var failure = new SqliteException("post-commit hook", SQLITE_CONSTRAINT, SQLITE_CONSTRAINT_FOREIGNKEY);
         store.Probe.AfterCommit = () => throw failure;
-        DatabaseFailure? observed = null;
+        DatabaseFailure observed = default;
         bool Observe(DatabaseFailure value, out TestError error)
         {
             observed = value;
@@ -229,7 +229,7 @@ public sealed class CommitTests
             .RunExitAsync(store, TestContext.Current.CancellationToken);
 
         // Then
-        Assert.IsType<CommitNotConfirmed>(observed);
+        Assert.IsType<CommitNotConfirmed>(observed.Value);
         Assert.Same(failure, observed.Cause);
         Assert.True(exit.TryGetValue(out Die? _));
         Assert.Equal(1, await store.Count());
@@ -243,7 +243,7 @@ public sealed class CommitTests
 
     private static bool MapForeignKey(DatabaseFailure failure, out TestError error)
     {
-        if (failure is ConstraintViolation { Kind: ConstraintKind.ForeignKey })
+        if (failure.Value is ConstraintViolation { Kind: ConstraintKind.ForeignKey })
         {
             error = new Rejected("foreign key");
             return true;

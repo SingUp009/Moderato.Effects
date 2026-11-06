@@ -28,7 +28,7 @@ public static class Orders
             bool MapCreateFailure(DatabaseFailure failure, out OrderError error)
             {
                 // Orders has no unique constraint other than its primary key.
-                if (failure is ConstraintViolation { Kind: ConstraintKind.Unique })
+                if (failure.Value is ConstraintViolation { Kind: ConstraintKind.Unique })
                 {
                     error = new OrderAlreadyExists(id);
                     return true;

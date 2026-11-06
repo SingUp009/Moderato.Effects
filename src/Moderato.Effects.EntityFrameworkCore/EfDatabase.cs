@@ -78,7 +78,7 @@ public static class EfDatabase<R>
                 }).MapErr(failure =>
                 {
                     if (commitFailure is not null && commitFailure(failure, out var error)) return error;
-                    return failure is CommitNotConfirmed ? E.From(failure) : DatabaseFailures.Rethrow<E>(failure.Cause);
+                    return failure.Value is CommitNotConfirmed ? E.From(failure) : DatabaseFailures.Rethrow<E>(failure.Cause);
                 })));
         });
     }

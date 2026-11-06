@@ -27,7 +27,7 @@ internal static class DatabaseFailures
                 _ => ConstraintKind.Other,
             }, cause);
         }
-        return new DatabaseFailure(cause);
+        return new UnclassifiedDatabaseFailure(cause);
     }
 
     internal static DatabaseFailure FromCommit(Exception cause, DbTransaction transaction)

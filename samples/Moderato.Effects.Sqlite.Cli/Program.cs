@@ -50,7 +50,7 @@ internal static class Commands
                     OrderNotFound e => $"NOT_FOUND {e.Id}",
                     OrderAlreadyExists e => $"ALREADY_EXISTS {e.Id}",
                     InvalidOrder e => $"INVALID {e.Reason}",
-                    DatabaseFailure failure => $"DATABASE {failure.GetType().Name}: {failure.Cause.Message}",
+                    DatabaseFailure failure => $"DATABASE {failure.Value!.GetType().Name}: {failure.Cause.Message}",
                 });
                 Environment.ExitCode = BUSINESS_ERROR_EXIT_CODE;
                 break;

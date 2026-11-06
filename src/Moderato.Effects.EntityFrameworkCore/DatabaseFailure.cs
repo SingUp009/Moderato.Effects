@@ -1,10 +1,22 @@
 namespace Moderato.Effects.EntityFrameworkCore;
 
-/// <summary>A database failure with its original exception.</summary>
-public record DatabaseFailure
+/// <summary>A database failure or an unconfirmed commit. <c>default</c> is invalid.</summary>
+public union DatabaseFailure(ConstraintViolation, CommitNotConfirmed, UnclassifiedDatabaseFailure)
 {
-    /// <summary>Creates a failure preserving its cause.</summary>
-    public DatabaseFailure(Exception cause)
+    /// <summary>The original exception.</summary>
+    public Exception Cause => this switch
+    {
+        ConstraintViolation failure => failure.Cause,
+        CommitNotConfirmed failure => failure.Cause,
+        UnclassifiedDatabaseFailure failure => failure.Cause,
+    };
+}
+
+/// <summary>A database failure without a more specific standard case.</summary>
+public sealed record UnclassifiedDatabaseFailure
+{
+    /// <summary>Creates an unclassified failure preserving its cause.</summary>
+    public UnclassifiedDatabaseFailure(Exception cause)
     {
         ArgumentNullException.ThrowIfNull(cause);
         Cause = cause;
@@ -15,20 +27,35 @@ public record DatabaseFailure
 }
 
 /// <summary>A commit whose result could not be confirmed.</summary>
-public sealed record CommitNotConfirmed : DatabaseFailure
+public sealed record CommitNotConfirmed
 {
     /// <summary>Creates an unconfirmed commit preserving its cause.</summary>
-    public CommitNotConfirmed(Exception cause) : base(cause) { }
+    public CommitNotConfirmed(Exception cause)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        Cause = cause;
+    }
+
+    /// <summary>The original exception.</summary>
+    public Exception Cause { get; }
 }
 
 /// <summary>A constraint rejected by the database.</summary>
-public sealed record ConstraintViolation : DatabaseFailure
+public sealed record ConstraintViolation
 {
     /// <summary>Creates a constraint failure preserving its cause.</summary>
-    public ConstraintViolation(ConstraintKind kind, Exception cause) : base(cause) => Kind = kind;
+    public ConstraintViolation(ConstraintKind kind, Exception cause)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        Kind = kind;
+        Cause = cause;
+    }
 
     /// <summary>The kind reported by the provider.</summary>
     public ConstraintKind Kind { get; }
+
+    /// <summary>The original exception.</summary>
+    public Exception Cause { get; }
 }
 
 /// <summary>The reported kind of constraint violation.</summary>

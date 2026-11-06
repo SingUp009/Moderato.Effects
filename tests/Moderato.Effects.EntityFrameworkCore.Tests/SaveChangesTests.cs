@@ -50,7 +50,7 @@ public sealed class SaveChangesTests
         // Given
         await using var store = await Store.Open();
         var failure = new InvalidOperationException("mapper");
-        DatabaseFailure? observedFailure = null;
+        object? observedFailure = null;
         var body = Scope<TestError, TestDb>.Gen(async scope =>
         {
             scope.Env.Rows.Add(new Row { Id = 1, Name = null! });
@@ -58,7 +58,7 @@ public sealed class SaveChangesTests
         });
         bool Throw(DatabaseFailure observed, out TestError error)
         {
-            observedFailure = observed;
+            observedFailure = observed.Value;
             throw failure;
         }
 
@@ -70,7 +70,7 @@ public sealed class SaveChangesTests
         // Then
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Same(failure, die.Exception);
-        Assert.Contains(die.Suppressed, item => item.Case.Value is Failed { Error: DatabaseFailure { Cause: DbUpdateException } });
+        Assert.Contains(die.Suppressed, item => item.Case.Value is Failed { Error: ConstraintViolation { Cause: DbUpdateException } });
         Assert.Contains(die.Suppressed, item => item.Case.Value is Failed failed && ReferenceEquals(failed.Error, observedFailure));
         Assert.Equal(0, await store.Count());
     }
@@ -135,9 +135,50 @@ public sealed class SaveChangesTests
         Assert.Equal(0, await store.Count());
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task SaveChangesAsync_UnclassifiedFailure_MapsOnlyWhenRequested(bool map, bool concurrency)
+    {
+        // Given
+        await using var store = await Store.Open();
+        var cause = concurrency
+            ? new DbUpdateConcurrencyException("concurrency")
+            : new DbUpdateException("unclassified", new IOException("provider"));
+        store.Probe.BeforeSave = () => throw cause;
+        object? observedCase = null;
+        bool Map(DatabaseFailure failure, out TestError error)
+        {
+            observedCase = failure.Value;
+            error = new Rejected("provider");
+            return map;
+        }
+        var body = Scope<TestError, TestDb>.Gen(async scope => await scope.Env.SaveChangesAsync(scope, Map));
+        await using var db = store.CreateDbContext();
+
+        // When
+        var exit = await body.RunExitAsync(db, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Same(cause, Assert.IsType<UnclassifiedDatabaseFailure>(observedCase).Cause);
+        if (map)
+        {
+            Assert.True(exit.TryGetValue(out Err<TestError> err));
+            Assert.Equal("provider", Assert.IsType<Rejected>(err.Error.Value).Reason);
+        }
+        else
+        {
+            Assert.True(exit.TryGetValue(out Die? die));
+            Assert.Same(cause, die.Exception);
+        }
+        Assert.Equal(0, await store.Count());
+    }
+
     private static bool MapUnique(DatabaseFailure failure, out TestError error)
     {
-        if (failure is ConstraintViolation { Kind: ConstraintKind.Unique })
+        if (failure.Value is ConstraintViolation { Kind: ConstraintKind.Unique })
         {
             error = new Rejected("duplicate");
             return true;
