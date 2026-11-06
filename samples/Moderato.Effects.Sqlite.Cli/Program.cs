@@ -14,6 +14,10 @@ await app.RunAsync(args);
 
 internal static class Commands
 {
+    private const int BUSINESS_ERROR_EXIT_CODE = 2;
+    private const int DEFECT_EXIT_CODE = 1;
+    private const int INTERRUPTED_EXIT_CODE = 130;
+
     public static Task Create(int id, string name, string database = "orders.db", CancellationToken cancellationToken = default)
         => Execute(Orders.Create(id, name), database, cancellationToken);
 
@@ -48,15 +52,15 @@ internal static class Commands
                     InvalidOrder e => $"INVALID {e.Reason}",
                     DatabaseFailure failure => $"DATABASE {failure.GetType().Name}: {failure.Cause.Message}",
                 });
-                Environment.ExitCode = 2;
+                Environment.ExitCode = BUSINESS_ERROR_EXIT_CODE;
                 break;
             case Die die:
                 Console.Error.WriteLine(die.Exception);
-                Environment.ExitCode = 1;
+                Environment.ExitCode = DEFECT_EXIT_CODE;
                 break;
             case Interrupted:
                 Console.Error.WriteLine("INTERRUPTED");
-                Environment.ExitCode = 130;
+                Environment.ExitCode = INTERRUPTED_EXIT_CODE;
                 break;
         }
     }

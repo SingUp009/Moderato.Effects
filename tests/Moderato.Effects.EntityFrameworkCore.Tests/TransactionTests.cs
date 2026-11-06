@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
+using static SQLitePCL.raw;
 
 namespace Moderato.Effects.EntityFrameworkCore.Tests;
 
@@ -488,7 +489,7 @@ public sealed class TransactionTests
     {
         // Given
         await using var store = await Store.Open();
-        var failure = new SqliteException("post-commit hook", 19, 787);
+        var failure = new SqliteException("post-commit hook", SQLITE_CONSTRAINT, SQLITE_CONSTRAINT_FOREIGNKEY);
         store.Probe.AfterCommit = () => throw failure;
         DatabaseFailure? observed = null;
         bool Observe(DatabaseFailure value, out TestError error)

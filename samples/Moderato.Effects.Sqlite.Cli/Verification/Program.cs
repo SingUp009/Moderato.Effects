@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 
+const int SUCCESS_EXIT_CODE = 0;
+const int BUSINESS_ERROR_EXIT_CODE = 2;
+const int COMMAND_TIMEOUT_SECONDS = 30;
+
 var dotnet = args.Length > 0 ? args[0] : "dotnet";
 var assembly = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
     "../../../../bin/Release/net11.0/Moderato.Effects.Sqlite.Cli.dll"));
@@ -9,20 +13,20 @@ var database = Path.Combine(directory.FullName, "orders.db");
 
 try
 {
-    await Run("create", ["--id", "1", "--name", "Coffee"], 0, "OK 1: Coffee");
-    await Run("read", ["--id", "1"], 0, "OK 1: Coffee");
-    await Run("create", ["--id", "1", "--name", "Duplicate"], 2, "ALREADY_EXISTS 1");
-    await Run("update", ["--id", "1", "--name", ""], 2, "INVALID name must not be blank");
-    await Run("read", ["--id", "1"], 0, "OK 1: Coffee");
-    await Run("create", ["--id", "0", "--name", "Invalid"], 2, "INVALID id must be positive");
-    await Run("update", ["--id", "99", "--name", "Missing"], 2, "NOT_FOUND 99");
-    await Run("delete", ["--id", "99"], 2, "NOT_FOUND 99");
-    await Run("update", ["--id", "1", "--name", "Tea"], 0, "OK 1: Tea");
-    await Run("read", ["--id", "1"], 0, "OK 1: Tea");
+    await Run("create", ["--id", "1", "--name", "Coffee"], SUCCESS_EXIT_CODE, "OK 1: Coffee");
+    await Run("read", ["--id", "1"], SUCCESS_EXIT_CODE, "OK 1: Coffee");
+    await Run("create", ["--id", "1", "--name", "Duplicate"], BUSINESS_ERROR_EXIT_CODE, "ALREADY_EXISTS 1");
+    await Run("update", ["--id", "1", "--name", ""], BUSINESS_ERROR_EXIT_CODE, "INVALID name must not be blank");
+    await Run("read", ["--id", "1"], SUCCESS_EXIT_CODE, "OK 1: Coffee");
+    await Run("create", ["--id", "0", "--name", "Invalid"], BUSINESS_ERROR_EXIT_CODE, "INVALID id must be positive");
+    await Run("update", ["--id", "99", "--name", "Missing"], BUSINESS_ERROR_EXIT_CODE, "NOT_FOUND 99");
+    await Run("delete", ["--id", "99"], BUSINESS_ERROR_EXIT_CODE, "NOT_FOUND 99");
+    await Run("update", ["--id", "1", "--name", "Tea"], SUCCESS_EXIT_CODE, "OK 1: Tea");
+    await Run("read", ["--id", "1"], SUCCESS_EXIT_CODE, "OK 1: Tea");
     await CheckDatabase("SELECT COUNT(*) FROM Orders WHERE Id = 1 AND Name = 'Tea'", 1);
     await CheckDatabase("SELECT COUNT(*) FROM Orders", 1);
-    await Run("delete", ["--id", "1"], 0, "OK 1: Tea");
-    await Run("read", ["--id", "1"], 2, "NOT_FOUND 1");
+    await Run("delete", ["--id", "1"], SUCCESS_EXIT_CODE, "OK 1: Tea");
+    await Run("read", ["--id", "1"], BUSINESS_ERROR_EXIT_CODE, "NOT_FOUND 1");
     await CheckDatabase("SELECT COUNT(*) FROM Orders", 0);
     Console.WriteLine("PASS: CRUD, persistence, duplicate, validation, missing rows (12 CLI calls)");
 }
@@ -43,7 +47,7 @@ async Task Run(string command, string[] arguments, int expectedCode, string expe
     using var process = Process.Start(start) ?? throw new InvalidOperationException("CLI did not start.");
     var stdout = process.StandardOutput.ReadToEndAsync();
     var stderr = process.StandardError.ReadToEndAsync();
-    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(COMMAND_TIMEOUT_SECONDS));
     try
     {
         await process.WaitForExitAsync(timeout.Token);

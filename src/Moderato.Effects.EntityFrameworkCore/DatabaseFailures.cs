@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Runtime.ExceptionServices;
 using Microsoft.Data.Sqlite;
+using static SQLitePCL.raw;
 
 namespace Moderato.Effects.EntityFrameworkCore;
 
@@ -15,14 +16,14 @@ internal static class DatabaseFailures
     internal static DatabaseFailure From(Exception cause)
     {
         var provider = cause is Microsoft.EntityFrameworkCore.DbUpdateException { InnerException: { } inner } ? inner : cause;
-        if (provider is SqliteException { SqliteErrorCode: 19 } sqlite)
+        if (provider is SqliteException { SqliteErrorCode: SQLITE_CONSTRAINT } sqlite)
         {
             return new ConstraintViolation(sqlite.SqliteExtendedErrorCode switch
             {
-                1555 or 2067 => ConstraintKind.Unique,
-                787 => ConstraintKind.ForeignKey,
-                1299 => ConstraintKind.NotNull,
-                275 => ConstraintKind.Check,
+                SQLITE_CONSTRAINT_PRIMARYKEY or SQLITE_CONSTRAINT_UNIQUE => ConstraintKind.Unique,
+                SQLITE_CONSTRAINT_FOREIGNKEY => ConstraintKind.ForeignKey,
+                SQLITE_CONSTRAINT_NOTNULL => ConstraintKind.NotNull,
+                SQLITE_CONSTRAINT_CHECK => ConstraintKind.Check,
                 _ => ConstraintKind.Other,
             }, cause);
         }
@@ -33,7 +34,7 @@ internal static class DatabaseFailures
     {
         // An interceptor can throw a provider exception after commit; the code alone does not prove rejection.
         if (transaction is SqliteTransaction { Connection: not null }
-            && cause is SqliteException { SqliteErrorCode: 5 or 6 or 19 })
+            && cause is SqliteException { SqliteErrorCode: SQLITE_BUSY or SQLITE_LOCKED or SQLITE_CONSTRAINT })
         {
             return From(cause);
         }
