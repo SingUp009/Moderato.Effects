@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Classify EF optimistic concurrency conflicts as `OptimisticConcurrencyConflict`, preserving the original exception and existing save-mapping policy. No automatic retry or conflict resolution is added. ([#423](https://github.com/SingUp009/Moderato.Effects/issues/423))
 - Add an EF Core integration with owned transactions, scope-aware saves and standard `CommitNotConfirmed` errors. Include a ConsoleAppFramework SQLite CRUD sample and package-consumer checks. Initial database validation is limited to SQLite; retrying execution strategies, PostgreSQL, Native AOT and real network failures are not validated. ([#409](https://github.com/SingUp009/Moderato.Effects/issues/409))
 - Add `ExitCase.HasValue` and typed `TryGetValue` access to `Succeeded`, `Failed`, `Die` and `Interrupted`. A successful query provides a non-null case; mismatched, default and null cases return false with a null output. Direct case patterns remain available. ([#411](https://github.com/SingUp009/Moderato.Effects/issues/411))
 
