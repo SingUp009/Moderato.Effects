@@ -29,4 +29,15 @@ internal static class DatabaseFailures
         }
         return new DatabaseFailure(cause);
     }
+
+    internal static DatabaseFailure FromCommit(Exception cause, DbTransaction transaction)
+    {
+        // An interceptor can throw a provider exception after commit; the code alone does not prove rejection.
+        if (transaction is SqliteTransaction { Connection: not null }
+            && cause is SqliteException { SqliteErrorCode: SQLITE_BUSY or SQLITE_LOCKED or SQLITE_CONSTRAINT })
+        {
+            return From(cause);
+        }
+        return new CommitNotConfirmed(cause);
+    }
 }
