@@ -16,6 +16,7 @@ Moderato.Effects.EntityFrameworkCore.DatabaseFailure
 Moderato.Effects.EntityFrameworkCore.DatabaseFailure.Cause.get -> System.Exception!
 Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure(Moderato.Effects.EntityFrameworkCore.DatabaseFailure! original) -> void
 Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure(System.Exception! cause) -> void
+Moderato.Effects.EntityFrameworkCore.DbContextEffects
 Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>
 override Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.<Clone>$() -> Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed!
 override Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.Equals(object? obj) -> bool
@@ -36,6 +37,7 @@ static Moderato.Effects.EntityFrameworkCore.ConstraintViolation.operator !=(Mode
 static Moderato.Effects.EntityFrameworkCore.ConstraintViolation.operator ==(Moderato.Effects.EntityFrameworkCore.ConstraintViolation? left, Moderato.Effects.EntityFrameworkCore.ConstraintViolation? right) -> bool
 static Moderato.Effects.EntityFrameworkCore.DatabaseFailure.operator !=(Moderato.Effects.EntityFrameworkCore.DatabaseFailure? left, Moderato.Effects.EntityFrameworkCore.DatabaseFailure? right) -> bool
 static Moderato.Effects.EntityFrameworkCore.DatabaseFailure.operator ==(Moderato.Effects.EntityFrameworkCore.DatabaseFailure? left, Moderato.Effects.EntityFrameworkCore.DatabaseFailure? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.DbContextEffects.SaveChangesAsync<E, R>(this Microsoft.EntityFrameworkCore.DbContext! context, Moderato.Effects.Scope<E, R>! scope, Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>? saveFailure = null) -> System.Threading.Tasks.ValueTask<int>
 virtual Moderato.Effects.EntityFrameworkCore.DatabaseFailure.<Clone>$() -> Moderato.Effects.EntityFrameworkCore.DatabaseFailure!
 virtual Moderato.Effects.EntityFrameworkCore.DatabaseFailure.EqualityContract.get -> System.Type!
 virtual Moderato.Effects.EntityFrameworkCore.DatabaseFailure.Equals(Moderato.Effects.EntityFrameworkCore.DatabaseFailure? other) -> bool
