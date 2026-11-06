@@ -63,7 +63,9 @@ jobs:
         run: |
           dotnet run --project samples/Moderato.Effects.Samples -c Release
           dotnet run --project samples/Moderato.Effects.Hosting.Samples -c Release
-          dotnet run --project samples/Moderato.Effects.Http.Samples -c Release -- --verify
+
+      - name: Verify HTTP sample and OpenAPI
+        run: dotnet run --project tests/Moderato.Effects.Http.SampleTests -c Release
 
   pack:
     needs: [lint, format, test]
