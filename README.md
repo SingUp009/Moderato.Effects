@@ -58,22 +58,28 @@ Core is Native AOT compatible (`IsAotCompatible`). The package includes source g
 dotnet add package Moderato.Effects --prerelease
 ```
 
+## Packages
+
+| Package | Provides |
+|---|---|
+| `Moderato.Effects` | Core effects and the opt-in Effect Tracker |
+| `Moderato.Effects.Hosting` | .NET background service integration |
+| `Moderato.Effects.Http` | ASP.NET Core request execution |
+| `Moderato.Effects.EntityFrameworkCore` | EF Core transactions and scope-aware saves |
+
+The integration packages depend on Core; it does not need to be installed separately.
+
 ## Documentation
 
-The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderato.Effects/wiki). The [updated documentation preview](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/) includes new guides under review:
+The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderato.Effects/wiki):
 
 - [Getting started](https://github.com/SingUp009/Moderato.Effects/wiki/Getting-started)
-- [From Results to Effects](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/from-results-to-effects/)
-- [Installation](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/installation/)
 - [Adopting in an application](https://github.com/SingUp009/Moderato.Effects/wiki/Adopting-in-an-application)
 - [Gen blocks](https://github.com/SingUp009/Moderato.Effects/wiki/Gen-blocks)
 - [Operators](https://github.com/SingUp009/Moderato.Effects/wiki/Operators)
 - [Error unions](https://github.com/SingUp009/Moderato.Effects/wiki/Error-unions)
 - [Environments](https://github.com/SingUp009/Moderato.Effects/wiki/Environments)
 - [Hosting](https://github.com/SingUp009/Moderato.Effects/wiki/Hosting)
-- [HTTP and OpenAPI](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/http/)
-- [Entity Framework Core and SQLite](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/entity-framework-core/)
-- [Effect Tracker](https://moderato-effects-wiki-preview.plum-cat-8255.chatgpt.site/effect-tracker/)
 - [Resources](https://github.com/SingUp009/Moderato.Effects/wiki/Resources)
 - [Time](https://github.com/SingUp009/Moderato.Effects/wiki/Time)
 - [Concurrency](https://github.com/SingUp009/Moderato.Effects/wiki/Concurrency)
