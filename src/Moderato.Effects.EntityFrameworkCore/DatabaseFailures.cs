@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Runtime.ExceptionServices;
 using Microsoft.Data.Sqlite;
 
@@ -28,10 +29,14 @@ internal static class DatabaseFailures
         return new DatabaseFailure(cause);
     }
 
-    internal static DatabaseFailure FromCommit(Exception cause)
+    internal static DatabaseFailure FromCommit(Exception cause, DbTransaction transaction)
     {
-        // Only known rejection codes establish failure; transport errors do not establish commit outcome.
-        if (cause is SqliteException { SqliteErrorCode: 5 or 6 or 19 }) return From(cause);
+        // An interceptor can throw a provider exception after commit; the code alone does not prove rejection.
+        if (transaction is SqliteTransaction { Connection: not null }
+            && cause is SqliteException { SqliteErrorCode: 5 or 6 or 19 })
+        {
+            return From(cause);
+        }
         return new CommitNotConfirmed(cause);
     }
 }

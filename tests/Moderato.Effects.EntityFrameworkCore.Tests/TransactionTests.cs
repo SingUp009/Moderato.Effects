@@ -2,6 +2,7 @@ using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Moderato.Effects.EntityFrameworkCore.Tests;
 
@@ -419,6 +420,47 @@ public sealed class TransactionTests
     }
 
     [Fact]
+    public async Task Transaction_EnvironmentFactoryThrows_RollsBackAndDisposes()
+    {
+        // Given
+        await using var store = await Store.Open();
+        var failure = new InvalidOperationException("environment");
+        TestDb Environment(Store env, TestDb db) => throw failure;
+
+        // When
+        var exit = await EfDatabase<Store>.Transaction(
+            contexts: env => env, environment: Environment, body: Insert(1))
+            .RunExitAsync(store, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.Same(failure, die.Exception);
+        Assert.Equal(0, store.Probe.Saves);
+        Assert.Equal(1, store.Probe.Rollbacks);
+        Assert.Equal(1, store.Probe.Disposals);
+    }
+
+    [Fact]
+    public async Task Transaction_RetryingExecutionStrategy_RejectsBeforeStartingTheTransaction()
+    {
+        // Given
+        await using var store = await Store.Open(retry: true);
+
+        // When
+        var exit = await EfDatabase<Store>.Transaction(
+            contexts: env => env, environment: (_, db) => db, body: Insert(1))
+            .RunExitAsync(store, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Die? die));
+        Assert.IsType<NotSupportedException>(die.Exception);
+        Assert.Equal(0, store.Probe.Saves);
+        Assert.Equal(0, store.Probe.Commits);
+        Assert.Equal(0, store.Probe.Rollbacks);
+        Assert.Equal(1, store.Probe.Disposals);
+    }
+
+    [Fact]
     public async Task Transaction_CommitMapperThrows_RetainsTheOriginalCommitFailure()
     {
         // Given
@@ -439,6 +481,33 @@ public sealed class TransactionTests
         Assert.Contains(die.Suppressed, item => item.Case.Value is Failed { Error: CommitNotConfirmed failure }
             && ReferenceEquals(failure.Cause, original));
         Assert.Equal(0, await store.Count());
+    }
+
+    [Fact]
+    public async Task Transaction_AfterCommitHookThrowsConstraintError_DoesNotClaimACommitRejection()
+    {
+        // Given
+        await using var store = await Store.Open();
+        var failure = new SqliteException("post-commit hook", 19, 787);
+        store.Probe.AfterCommit = () => throw failure;
+        DatabaseFailure? observed = null;
+        bool Observe(DatabaseFailure value, out TestError error)
+        {
+            observed = value;
+            error = default;
+            return false;
+        }
+
+        // When
+        var exit = await EfDatabase<Store>.Transaction(
+            contexts: env => env, environment: (_, db) => db, body: Insert(1), commitFailure: Observe)
+            .RunExitAsync(store, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.IsType<CommitNotConfirmed>(observed);
+        Assert.Same(failure, observed.Cause);
+        Assert.True(exit.TryGetValue(out Die? _));
+        Assert.Equal(1, await store.Count());
     }
 
     [Fact]
@@ -619,7 +688,7 @@ public sealed class Store(SqliteConnection connection, DbContextOptions<TestDb> 
     public Probe Probe { get; } = probe;
     public TestDb CreateDbContext() => new(options, Probe);
 
-    public static async Task<Store> Open()
+    public static async Task<Store> Open(bool retry = false)
     {
         var connection = new SqliteConnection("Data Source=:memory:;Foreign Keys=True");
         await connection.OpenAsync();
@@ -630,7 +699,11 @@ public sealed class Store(SqliteConnection connection, DbContextOptions<TestDb> 
             """;
         await command.ExecuteNonQueryAsync();
         var probe = new Probe();
-        return new(connection, new DbContextOptionsBuilder<TestDb>().UseSqlite(connection).AddInterceptors(probe).Options, probe);
+        var options = new DbContextOptionsBuilder<TestDb>().UseSqlite(connection, sqlite =>
+        {
+            if (retry) sqlite.ExecutionStrategy(dependencies => new TestRetryStrategy(dependencies));
+        }).AddInterceptors(probe).Options;
+        return new(connection, options, probe);
     }
 
     public async Task<long> Count(string table = "Rows")
@@ -641,4 +714,9 @@ public sealed class Store(SqliteConnection connection, DbContextOptions<TestDb> 
     }
 
     public ValueTask DisposeAsync() => connection.DisposeAsync();
+}
+
+public sealed class TestRetryStrategy(ExecutionStrategyDependencies dependencies) : ExecutionStrategy(dependencies, 1, TimeSpan.Zero)
+{
+    protected override bool ShouldRetryOn(Exception exception) => true;
 }

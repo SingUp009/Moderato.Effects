@@ -45,6 +45,8 @@ managed SQLite dependency supports this decoder; the consuming application suppl
 SQLite provider, normally through `Microsoft.EntityFrameworkCore.Sqlite`. Other provider errors
 keep their original cause. Only SQLite's known rejection codes are recognized at commit in
 this initial implementation; other provider commit exceptions are conservatively unconfirmed.
+The SQLite transaction must still be active before a rejection code is used; an interceptor
+throwing the same code after physical commit does not establish rejection.
 This is not PostgreSQL support or exhaustive provider classification.
 
 See `samples/Moderato.Effects.Sqlite.Cli` for a runnable ConsoleAppFramework CRUD application.

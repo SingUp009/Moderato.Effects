@@ -64,6 +64,7 @@ public static class EfDatabase<R>
                 Effect<R>.FromResultAsync<T, DatabaseFailure>(async token =>
                 {
                     token.ThrowIfCancellationRequested();
+                    var transaction = lease.Transaction.GetDbTransaction();
                     try
                     {
                         await lease.Transaction.CommitAsync(token).ConfigureAwait(false);
@@ -72,7 +73,7 @@ public static class EfDatabase<R>
                     }
                     catch (Exception exception) when (exception is DbException or IOException or OperationCanceledException)
                     {
-                        return new Err<DatabaseFailure>(DatabaseFailures.FromCommit(exception));
+                        return new Err<DatabaseFailure>(DatabaseFailures.FromCommit(exception, transaction));
                     }
                 }).MapErr(failure =>
                 {
