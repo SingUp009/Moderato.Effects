@@ -20,7 +20,7 @@
     <Project Path="bench/Moderato.Effects.Benchmarks/Moderato.Effects.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/samples/">
-    <Project Path="samples/Moderato.Effects.Sqlite.Cli/Moderato.Effects.Sqlite.Cli.csproj" />
+    <Project Path="samples/Moderato.Effects.EntityFrameworkCore.Samples/Moderato.Effects.EntityFrameworkCore.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Http.Samples/Moderato.Effects.Http.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Hosting.Samples/Moderato.Effects.Hosting.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Samples/Moderato.Effects.Samples.csproj" />

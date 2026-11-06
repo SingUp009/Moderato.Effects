@@ -66,4 +66,4 @@ The SQLite transaction must still be active before a rejection code is used; an 
 throwing the same code after physical commit does not establish rejection.
 This is not PostgreSQL support or exhaustive provider classification.
 
-See `samples/Moderato.Effects.Sqlite.Cli` for a runnable ConsoleAppFramework CRUD application.
+See `samples/Moderato.Effects.EntityFrameworkCore.Samples` for a runnable ConsoleAppFramework CRUD application.

@@ -1,6 +1,6 @@
-# SQLite CRUD CLI
+# EF Core integration sample
 
-ConsoleAppFramework + EF Core SQLite + the local EF integration implementation.
+EF Core integration with owned transactions and scope-aware saves, using SQLite and ConsoleAppFramework.
 The four operations return `Effect<OrderView, OrderError, AppEnv>`.
 `T` is the order, `E` includes not-found/duplicate/invalid input and standard database failures,
 and `R` supplies a context factory.
@@ -8,10 +8,10 @@ and `R` supplies a context factory.
 From the repository root, using the .NET 11 SDK specified by `global.json`:
 
 ```sh
-dotnet run --project samples/Moderato.Effects.Sqlite.Cli -- create --id 1 --name Coffee
-dotnet run --project samples/Moderato.Effects.Sqlite.Cli -- read --id 1
-dotnet run --project samples/Moderato.Effects.Sqlite.Cli -- update --id 1 --name Tea
-dotnet run --project samples/Moderato.Effects.Sqlite.Cli -- delete --id 1
+dotnet run --project samples/Moderato.Effects.EntityFrameworkCore.Samples -- create --id 1 --name Coffee
+dotnet run --project samples/Moderato.Effects.EntityFrameworkCore.Samples -- read --id 1
+dotnet run --project samples/Moderato.Effects.EntityFrameworkCore.Samples -- update --id 1 --name Tea
+dotnet run --project samples/Moderato.Effects.EntityFrameworkCore.Samples -- delete --id 1
 ```
 
 Each command prints `OK 1: ...`. SQLite persists data in `orders.db` in the working directory.
