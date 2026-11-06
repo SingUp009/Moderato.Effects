@@ -40,3 +40,13 @@ Concurrent modification between lookup and save is not converted
 to a business error. SQLite's schema has only the order primary key as a unique constraint;
 if more unique constraints are added, the duplicate classifier must be refined.
 
+## Verify
+
+```sh
+dotnet run --project samples/Moderato.Effects.Sqlite.Cli/Verification -c Release
+```
+
+The check invokes all four actual CLI commands in separate processes against a temporary
+SQLite file, checks errors and exit codes, and queries the persisted database independently.
+It does not modify `orders.db`. Pass a dotnet executable as the optional argument to
+the verification app when the SDK is installed outside `PATH`.
