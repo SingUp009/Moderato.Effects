@@ -59,6 +59,7 @@ for item in CORE_VERSION=1.2.0 HOSTING_VERSION=0.9.0 HTTP_VERSION=0.8.0 EF_VERSI
   grep -qx "$item-ci.7.2" "$work/ci/versions.env"
 done
 [[ -z $(find "$work/ci/release" -type f -print -quit) ]]
+! grep -q '^RELEASE_PACKAGE=' "$work/ci/versions.env"
 
 for item in 'v1.2.0 Moderato.Effects 1.2.0' \
   'Moderato.Effects.Hosting/v0.9.0 Moderato.Effects.Hosting 0.9.0' \
@@ -66,6 +67,7 @@ for item in 'v1.2.0 Moderato.Effects 1.2.0' \
   'Moderato.Effects.EntityFrameworkCore/v0.7.0 Moderato.Effects.EntityFrameworkCore 0.7.0'; do
   read -r tag package version <<< "$item"
   run_pack "refs/tags/$tag" release
+  grep -qx "RELEASE_PACKAGE=$package" "$work/release/versions.env"
   [[ -f "$work/release/release/$package.$version.nupkg" ]]
   [[ -f "$work/release/release/$package.$version.snupkg" ]]
   [[ $(find "$work/release/release" -type f | wc -l) == 2 ]]
@@ -84,7 +86,8 @@ STUB_CORE_VERSION=1.2.0-preview.4 run_pack refs/heads/main prerelease
 grep -qx CORE_VERSION=1.2.0-preview.4-ci.7.2 "$work/prerelease/versions.env"
 
 for tag in v0.9.0 Moderato.Effects.Http/v0.9.0 Unknown/v1.2.0; do
-  if run_pack "refs/tags/$tag" invalid; then echo "Unexpected acceptance: $tag" >&2; exit 1; fi
+  if run_pack "refs/tags/$tag" invalid > "$work/invalid-tag.log" 2>&1; then echo "Unexpected acceptance: $tag" >&2; exit 1; fi
+  grep -q 'does not match a package ID and its declared version' "$work/invalid-tag.log"
   [[ ! -e "$work/invalid" ]]
 done
 
