@@ -45,7 +45,7 @@ public sealed class SaveChangesTests
     }
 
     [Fact]
-    public async Task SaveChangesAsync_MapperThrows_DiesAndRollsBack()
+    public async Task SaveChangesAsync_MapperThrows_DiesAndPreservesTheOriginalFailure()
     {
         // Given
         await using var store = await Store.Open();
