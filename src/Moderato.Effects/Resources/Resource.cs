@@ -38,7 +38,6 @@ public readonly struct Resource<T, E, R>
 
     /// <summary>Acquires the value, runs <paramref name="use"/> with it, then releases it however the use ended.</summary>
     /// <param name="use">Builds the work using the value, which must not escape it.</param>
-    /// <returns>An effect whose outcome is the use's outcome.</returns>
     public Effect<U, E, R> Use<U>(Func<T, Effect<U, E, R>> use)
     {
         ArgumentNullException.ThrowIfNull(use);
@@ -85,8 +84,6 @@ public readonly struct Resource<T, E, R>
     }
 
     /// <summary>Transforms the value; the release still gets the original.</summary>
-    /// <param name="mapper">Transforms the value.</param>
-    /// <returns>A resource with the transformed value.</returns>
     public Resource<U, E, R> Map<U>(Func<T, U> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
@@ -104,9 +101,6 @@ public readonly struct Resource<T, E, R>
         }));
     }
 
-    /// <summary>Transforms the acquisition error.</summary>
-    /// <param name="mapper">Transforms the error.</param>
-    /// <returns>A resource with the transformed error.</returns>
     public Resource<T, F, R> MapErr<F>(Func<E, F> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
@@ -125,8 +119,6 @@ public readonly struct Resource<T, E, R>
     }
 
     /// <summary>Acquires a dependent second resource; release order is reversed.</summary>
-    /// <param name="binder">Builds the second resource from this one's value.</param>
-    /// <returns>A resource for the second value.</returns>
     public Resource<U, E, R> AndThen<U>(Func<T, Resource<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
@@ -137,7 +129,6 @@ public readonly struct Resource<T, E, R>
     }
 
     /// <summary>Widens the acquisition error to a union that has it as a case.</summary>
-    /// <returns>A resource with the union as its error.</returns>
     public Resource<T, F, R> Widen<F>() where F : IUnionCase<F, E> => MapErr(static error => F.From(error));
 }
 
@@ -145,9 +136,7 @@ public readonly struct Resource<T, E, R>
 public static class Resource
 {
     /// <summary>A resource acquired by <paramref name="acquire"/> and released by <paramref name="release"/>.</summary>
-    /// <param name="acquire">Acquires the value.</param>
     /// <param name="release">Releases the value, given how the use ended, with an uncanceled token.</param>
-    /// <returns>The resource.</returns>
     public static Resource<T, E, R> Make<T, E, R>(Effect<T, E, R> acquire, Func<T, ExitCase, Effect<Unit, Never, R>> release)
     {
         ArgumentNullException.ThrowIfNull(release);
@@ -166,21 +155,18 @@ public static class Resource
 /// <summary>LINQ query syntax for <see cref="Resource{T, E, R}"/>, releasing in reverse order of acquisition.</summary>
 public static class ResourceLinq
 {
-    /// <summary><c>select</c></summary>
     public static Resource<U, E, R> Select<T, E, R, U>(this Resource<T, E, R> source, Func<T, U> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
         return source.Map(selector);
     }
 
-    /// <summary><c>from … from</c></summary>
     public static Resource<U, E, R> SelectMany<T, E, R, U>(this Resource<T, E, R> source, Func<T, Resource<U, E, R>> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
         return source.AndThen(selector);
     }
 
-    /// <summary><c>from … from … select</c></summary>
     public static Resource<V, E, R> SelectMany<T, E, R, U, V>(
         this Resource<T, E, R> source, Func<T, Resource<U, E, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -189,7 +175,6 @@ public static class ResourceLinq
         return SelectManyCore(source, selector, resultSelector, static outcome => outcome);
     }
 
-    /// <summary><c>from … from … select</c> where the second resource cannot fail.</summary>
     public static Resource<V, E, R> SelectMany<T, E, R, U, V>(
         this Resource<T, E, R> source, Func<T, Resource<U, Never, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -198,7 +183,6 @@ public static class ResourceLinq
         return SelectManyCore(source, selector, resultSelector, static outcome => outcome.WithErrorType<E>());
     }
 
-    /// <summary><c>from … from … select</c> where the first resource cannot fail.</summary>
     public static Resource<V, E, R> SelectMany<T, E, R, U, V>(
         this Resource<T, Never, R> source, Func<T, Resource<U, E, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -208,7 +192,6 @@ public static class ResourceLinq
         return SelectManyCore(widened, selector, resultSelector, static outcome => outcome);
     }
 
-    /// <summary><c>from … from … select</c> where neither resource can fail.</summary>
     public static Resource<V, Never, R> SelectMany<T, R, U, V>(
         this Resource<T, Never, R> source, Func<T, Resource<U, Never, R>> selector, Func<T, U, V> resultSelector)
     {
