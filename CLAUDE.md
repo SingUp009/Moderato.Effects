@@ -37,3 +37,20 @@ dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*
 `tests/Moderato.Effects.PackageTests` is not in the solution: CI runs it against the packed `.nupkg` (see the `package` job in `.github/workflows/ci.yml`). To run it locally, `dotnet pack src/Moderato.Effects -c Release -o artifacts` first and pass `-p:ModeratoEffectsVersion=<Version>`.
 
 `src/Moderato.Effects/PublicAPI.Unshipped.txt` tracks the public API; add new members there (RS0016). Release steps are in `RELEASING.md`.
+## Commit messages
+
+```
+<optional emoji> [optional issue-number] <type>(scope): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+`✨ #12 feat(auth): add login feature`
+
+- Type, scope and description are required. Issue number is strongly recommended — omit it only when there is no issue, or for a hotfix. Emoji, body and footer are optional.
+- Type: `fix` (user-facing bug, SemVer PATCH), `feat` (user-facing feature, SemVer MINOR), `build`, `ci`, `docs`, `perf`, `refactor`, `test`, `style`, `chore`.
+- Scope names the changed capability in one word. **If one word cannot name it, the commit does too much and should be split.**
+- Breaking changes carry `BREAKING CHANGE:` in the footer, or `!` right after the type/scope: `💥 #32 feat(db)!: allow provided config object to extend other configs`.
+- Emoji come from [gitmoji](https://gitmoji.dev/).
