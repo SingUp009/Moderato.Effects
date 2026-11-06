@@ -5,9 +5,6 @@ namespace Moderato.Effects;
 
 public readonly partial struct Effect<T, E, R>
 {
-    /// <summary>Transforms the value; an Err passes through.</summary>
-    /// <param name="mapper">Transforms the value.</param>
-    /// <returns>An effect with the transformed value.</returns>
     public Effect<U, E, R> Map<U>(Func<T, U> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
@@ -16,9 +13,6 @@ public readonly partial struct Effect<T, E, R>
             : outcome.WithValueType<U>()));
     }
 
-    /// <summary>Transforms the error; an Ok passes through.</summary>
-    /// <param name="mapper">Transforms the error.</param>
-    /// <returns>An effect with the transformed error.</returns>
     public Effect<T, F, R> MapErr<F>(Func<E, F> mapper)
     {
         ArgumentNullException.ThrowIfNull(mapper);
@@ -27,9 +21,6 @@ public readonly partial struct Effect<T, E, R>
             : outcome.WithErrorType<F>()));
     }
 
-    /// <summary>Continues with the next effect unless this one fails.</summary>
-    /// <param name="binder">Builds the next effect from the value.</param>
-    /// <returns>The next effect's outcome.</returns>
     public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
@@ -37,8 +28,6 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Runs a check on the value and keeps the value if the check succeeds.</summary>
-    /// <param name="check">Builds the check from the value.</param>
-    /// <returns>An effect with the original value, or the check's failure.</returns>
     public Effect<T, E, R> AndThrough<U>(Func<T, Effect<U, E, R>> check)
     {
         ArgumentNullException.ThrowIfNull(check);
@@ -49,8 +38,6 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Recovers from the error with the next effect.</summary>
-    /// <param name="binder">Builds the recovery from the error.</param>
-    /// <returns>The recovery's outcome.</returns>
     public Effect<T, F, R> OrElse<F>(Func<E, Effect<T, F, R>> binder)
     {
         ArgumentNullException.ThrowIfNull(binder);
@@ -63,9 +50,6 @@ public readonly partial struct Effect<T, E, R>
         }, static (next, _, _, _) => next);
     }
 
-    /// <summary>Runs a side effect on the value.</summary>
-    /// <param name="action">The side effect.</param>
-    /// <returns>An effect with the same outcome.</returns>
     public Effect<T, E, R> Tap(Action<T> action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -76,9 +60,6 @@ public readonly partial struct Effect<T, E, R>
         });
     }
 
-    /// <summary>Runs a side effect on the error.</summary>
-    /// <param name="action">The side effect.</param>
-    /// <returns>An effect with the same outcome.</returns>
     public Effect<T, E, R> TapErr(Action<E> action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -90,7 +71,6 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Runs an effect on the error, retaining the error if observation fails.</summary>
-    /// <param name="action">Builds the observation effect.</param>
     /// <returns>An effect with the original outcome when observation succeeds.</returns>
     public Effect<T, E, R> TapErr<U>(Func<E, Effect<U, Never, R>> action)
     {
@@ -112,10 +92,6 @@ public readonly partial struct Effect<T, E, R>
         });
     }
 
-    /// <summary>Folds the value and the error into one value.</summary>
-    /// <param name="ok">Folds the value.</param>
-    /// <param name="err">Folds the error.</param>
-    /// <returns>An effect that cannot fail.</returns>
     public Effect<U, Never, R> Match<U>(Func<T, U> ok, Func<E, U> err)
     {
         ArgumentNullException.ThrowIfNull(ok);
@@ -128,15 +104,9 @@ public readonly partial struct Effect<T, E, R>
         }));
     }
 
-    /// <summary>Replaces the error with a fallback value.</summary>
-    /// <param name="fallback">The value to use on an Err.</param>
-    /// <returns>An effect that cannot fail.</returns>
     public Effect<T, Never, R> UnwrapOr(T fallback)
         => Then<T, Never, T>(fallback, static (outcome, _, context, value) => new(Recover(outcome, static (fallback, _) => fallback, value, context)));
 
-    /// <summary>Replaces the error with a value built from it.</summary>
-    /// <param name="fallback">Builds the value from the error.</param>
-    /// <returns>An effect that cannot fail.</returns>
     public Effect<T, Never, R> UnwrapOrElse(Func<E, T> fallback)
     {
         ArgumentNullException.ThrowIfNull(fallback);
@@ -144,7 +114,6 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Makes the error a value to match on instead of short-circuiting.</summary>
-    /// <returns>An effect that cannot fail, whose value is the result.</returns>
     public Effect<Result<T, E>, Never, R> Attempt() => Then<Result<T, E>, Never, Unit>(Unit.Value, static (outcome, _, context, _) => new(outcome.Kind switch
     {
         OutcomeKind.Ok => Outcome<Result<T, E>, Never>.Ok(new Result<T, E>(new Ok<T>(outcome.Value))).After(outcome),
@@ -153,8 +122,6 @@ public readonly partial struct Effect<T, E, R>
     }));
 
     /// <summary>Handles one case and narrows the error to the <c>[RestOf&lt;E&gt;]</c> union of the remaining cases.</summary>
-    /// <param name="handler">Builds the recovery from the case.</param>
-    /// <returns>An effect whose error is the rest of the union.</returns>
     public Effect<T, F, R> Catch<TCase, F>(Func<TCase, Effect<T, F, R>> handler) where F : IUnionRest<F, E, TCase>
     {
         ArgumentNullException.ThrowIfNull(handler);
@@ -169,12 +136,9 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Widens the error to a union that has it as a case.</summary>
-    /// <returns>An effect with the union as its error.</returns>
     public Effect<T, F, R> Widen<F>() where F : IUnionCase<F, E> => MapErr(static error => F.From(error));
 
     /// <summary>Runs with an environment built from a wider one.</summary>
-    /// <param name="build">Builds this effect's environment from the outer one.</param>
-    /// <returns>An effect for the outer environment.</returns>
     public Effect<T, E, R2> Provide<R2>(Func<R2, R> build)
     {
         ArgumentNullException.ThrowIfNull(build);
@@ -182,7 +146,6 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Runs with an environment that provides at least what this effect needs.</summary>
-    /// <returns>An effect for the wider environment.</returns>
     public Effect<T, E, R2> WidenEnv<R2>() where R2 : R
     {
         var effect = Validate();
@@ -194,11 +157,9 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>A resource running the effect as a fiber, canceled and awaited on release (in a Gen block, use <see cref="Scope{E, R}.Fork{T, F}"/>).</summary>
-    /// <returns>The resource of the running fiber.</returns>
     public Resource<Fiber<T, E, R>, Never, R> Fork() => Fiber<T, E, R>.Fork(this);
 
     /// <summary>Starts the effect on the thread pool, so CPU-bound work does not hold up the caller.</summary>
-    /// <returns>The same effect, started on the thread pool.</returns>
     public Effect<T, E, R> OnThreadPool()
     {
         var effect = Validate();

@@ -5,21 +5,18 @@ namespace Moderato.Effects;
 /// <summary>LINQ query syntax for <see cref="Effect{T, E, R}"/>, short-circuiting on the first failure; a step that cannot fail mixes with any error type.</summary>
 public static class EffectLinq
 {
-    /// <summary><c>select</c></summary>
     public static Effect<U, E, R> Select<T, E, R, U>(this Effect<T, E, R> source, Func<T, U> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
         return source.Map(selector);
     }
 
-    /// <summary><c>from … from</c></summary>
     public static Effect<U, E, R> SelectMany<T, E, R, U>(this Effect<T, E, R> source, Func<T, Effect<U, E, R>> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
         return source.AndThen(selector);
     }
 
-    /// <summary><c>from … from … select</c></summary>
     public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
         this Effect<T, E, R> source, Func<T, Effect<U, E, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -28,7 +25,6 @@ public static class EffectLinq
         return Bind(source, selector, resultSelector, static outcome => outcome);
     }
 
-    /// <summary><c>from … from … select</c> where the second step cannot fail.</summary>
     public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
         this Effect<T, E, R> source, Func<T, Effect<U, Never, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -37,7 +33,6 @@ public static class EffectLinq
         return Bind(source, selector, resultSelector, static outcome => outcome.WithErrorType<E>());
     }
 
-    /// <summary><c>from … from … select</c> where the first step cannot fail.</summary>
     public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
         this Effect<T, Never, R> source, Func<T, Effect<U, E, R>> selector, Func<T, U, V> resultSelector)
     {
@@ -47,7 +42,6 @@ public static class EffectLinq
         return Bind(widened, selector, resultSelector, static outcome => outcome);
     }
 
-    /// <summary><c>from … from … select</c> where neither step can fail.</summary>
     public static Effect<V, Never, R> SelectMany<T, R, U, V>(
         this Effect<T, Never, R> source, Func<T, Effect<U, Never, R>> selector, Func<T, U, V> resultSelector)
     {

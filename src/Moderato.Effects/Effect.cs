@@ -79,18 +79,12 @@ public readonly partial struct Effect<T, E, R>
     public static implicit operator Effect<T, E, R>(Result<T, E> result) => Effect<R>.FromResult(result);
 
     /// <summary>Runs the effect, rethrowing defects as thrown and the caller's cancellation as <see cref="OperationCanceledException"/>.</summary>
-    /// <param name="environment">The services the effect needs.</param>
     /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
-    /// <returns>The value, or the expected error.</returns>
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = RUN_OPTIONS_JUSTIFICATION)]
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken = default)
         => RunResult(environment, new RunContext(cancellationToken));
 
     /// <summary>Runs the effect with diagnostics scoped to this execution.</summary>
-    /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run.</param>
-    /// <param name="options">The run's diagnostic settings.</param>
-    /// <returns>The value, or the expected error.</returns>
     public ValueTask<Result<T, E>> RunAsync(R environment, CancellationToken cancellationToken, EffectRunOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -119,18 +113,12 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Runs the effect and returns how it ended, without throwing.</summary>
-    /// <param name="environment">The services the effect needs.</param>
     /// <param name="cancellationToken">Cancels the run, which sees a token derived from it.</param>
-    /// <returns>Ok, Err, Die or Interrupted.</returns>
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = RUN_OPTIONS_JUSTIFICATION)]
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken = default)
         => RunExit(environment, new RunContext(cancellationToken));
 
     /// <summary>Runs the effect with scoped diagnostics and returns how it ended.</summary>
-    /// <param name="environment">The services the effect needs.</param>
-    /// <param name="cancellationToken">Cancels the run.</param>
-    /// <param name="options">The run's diagnostic settings.</param>
-    /// <returns>Ok, Err, Die or Interrupted.</returns>
     public ValueTask<Exit<T, E>> RunExitAsync(R environment, CancellationToken cancellationToken, EffectRunOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

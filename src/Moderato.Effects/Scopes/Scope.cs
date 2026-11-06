@@ -9,8 +9,6 @@ using Moderato.Results;
 namespace Moderato.Effects;
 
 /// <summary>The handle a Gen block runs effects with, used only in its own block from one flow at a time.</summary>
-/// <typeparam name="E">The error the block can fail with.</typeparam>
-/// <typeparam name="R">The environment the block runs with.</typeparam>
 public sealed class Scope<E, R>
 {
     private readonly RunContext context;
@@ -41,8 +39,6 @@ public sealed class Scope<E, R>
     public CancellationToken CancellationToken => context.CancellationToken;
 
     /// <summary>An effect that runs the block each time it runs.</summary>
-    /// <param name="body">The block.</param>
-    /// <returns>An effect whose value is what the block returns.</returns>
     public static Effect<T, E, R> Gen<T>(Func<Scope<E, R>, ValueTask<T>> body)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -50,25 +46,18 @@ public sealed class Scope<E, R>
     }
 
     /// <summary>Runs an effect and returns its value; an Err ends the block.</summary>
-    /// <param name="effect">The effect.</param>
-    /// <returns>The value.</returns>
     public ValueTask<T> Run<T>(Effect<T, E, R> effect)
         => Step(effect, static (effect, scope) => effect.Run(scope.Env, scope.context));
 
     /// <summary>Acquires a resource, released in reverse order when the block ends; an Err ends the block.</summary>
-    /// <param name="resource">The resource.</param>
-    /// <returns>The value.</returns>
     public ValueTask<T> Acquire<T>(Resource<T, E, R> resource)
         => Step(resource, static (resource, scope) => resource.Acquire(scope.Env, scope.context, scope.releases));
 
     /// <summary>Starts the effect as a fiber that the block cancels and awaits when it ends.</summary>
-    /// <param name="effect">The effect.</param>
     /// <returns>The fiber; get its outcome with <c>scope.Run(fiber.Join())</c>.</returns>
     public ValueTask<Fiber<T, F, R>> Fork<T, F>(Effect<T, F, R> effect) => Acquire<Fiber<T, F, R>>(effect.Fork());
 
     /// <summary>Returns the value of a result; an Err ends the block.</summary>
-    /// <param name="result">The result.</param>
-    /// <returns>The value.</returns>
     public T Get<T>(Result<T, E> result)
     {
         Enter();
@@ -86,7 +75,6 @@ public sealed class Scope<E, R>
     }
 
     /// <summary>Ends the block with the error; write <c>throw scope.Fail(error)</c> for flow analysis.</summary>
-    /// <param name="error">The error.</param>
     /// <returns>Never returns.</returns>
     [DoesNotReturn]
     public Exception Fail(E error)
@@ -106,7 +94,6 @@ public sealed class Scope<E, R>
     }
 
     /// <summary>Registers a release action that runs when the block ends, in reverse order.</summary>
-    /// <param name="release">Builds the release from how the block ended.</param>
     public void Defer(Func<ExitCase, Effect<Unit, Never, R>> release)
     {
         ArgumentNullException.ThrowIfNull(release);
@@ -469,9 +456,6 @@ public sealed class Scope<E, R>
 public static class ScopeExtensions
 {
     /// <summary>Runs an effect whose error ∈ the scope's error union; an Err ends the block.</summary>
-    /// <param name="scope">The scope.</param>
-    /// <param name="effect">The effect.</param>
-    /// <returns>The value.</returns>
     public static ValueTask<T> Run<T, E, ECase, R>(this Scope<E, R> scope, Effect<T, ECase, R> effect)
         where E : IUnionCase<E, ECase>
     {
@@ -480,9 +464,6 @@ public static class ScopeExtensions
     }
 
     /// <summary>Acquires a resource whose error ∈ the scope's error union; an Err ends the block.</summary>
-    /// <param name="scope">The scope.</param>
-    /// <param name="resource">The resource.</param>
-    /// <returns>The value.</returns>
     public static ValueTask<T> Acquire<T, E, ECase, R>(this Scope<E, R> scope, Resource<T, ECase, R> resource)
         where E : IUnionCase<E, ECase>
     {
@@ -491,9 +472,6 @@ public static class ScopeExtensions
     }
 
     /// <summary>Returns the value of a result whose error ∈ the scope's error union; an Err ends the block.</summary>
-    /// <param name="scope">The scope.</param>
-    /// <param name="result">The result.</param>
-    /// <returns>The value.</returns>
     public static T Get<T, E, ECase, R>(this Scope<E, R> scope, Result<T, ECase> result)
         where E : IUnionCase<E, ECase>
     {
