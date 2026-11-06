@@ -18,7 +18,7 @@ binary=tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/Moderato.Effects.Soa
   git rev-parse HEAD
   git status --short
   dotnet --info
-  sha256sum tests/Moderato.Effects.SoakProbe/*.cs tests/Moderato.Effects.SoakProbe/*.csproj tests/Moderato.Effects.SoakProbe/*.sh
+  sha256sum tests/Moderato.Effects.SoakProbe/Program.cs tests/Moderato.Effects.SoakProbe/Hosting/*.cs tests/Moderato.Effects.SoakProbe/Signals/*.cs tests/Moderato.Effects.SoakProbe/*.csproj tests/Moderato.Effects.SoakProbe/*.sh
   sha256sum tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/*.dll tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/*.runtimeconfig.json
 } > "$output/manifest.txt"
 set +e
