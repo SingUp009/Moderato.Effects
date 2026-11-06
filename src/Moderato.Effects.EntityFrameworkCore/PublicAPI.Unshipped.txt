@@ -1,0 +1,51 @@
+#nullable enable
+Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed
+Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.<Clone>$() -> Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed!
+Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.Cause.get -> System.Exception!
+Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.CommitNotConfirmed(System.Exception! cause) -> void
+Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.Equals(Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed? other) -> bool
+Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintKind.Check = 4 -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintKind.ForeignKey = 2 -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintKind.NotNull = 3 -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintKind.Other = 0 -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintKind.Unique = 1 -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation.<Clone>$() -> Moderato.Effects.EntityFrameworkCore.ConstraintViolation!
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation.Cause.get -> System.Exception!
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation.ConstraintViolation(Moderato.Effects.EntityFrameworkCore.ConstraintKind kind, System.Exception! cause) -> void
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation.Equals(Moderato.Effects.EntityFrameworkCore.ConstraintViolation? other) -> bool
+Moderato.Effects.EntityFrameworkCore.ConstraintViolation.Kind.get -> Moderato.Effects.EntityFrameworkCore.ConstraintKind
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.Cause.get -> System.Exception!
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure() -> void
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure(Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed! value) -> void
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure(Moderato.Effects.EntityFrameworkCore.ConstraintViolation! value) -> void
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.DatabaseFailure(Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure! value) -> void
+Moderato.Effects.EntityFrameworkCore.DatabaseFailure.Value.get -> object?
+Moderato.Effects.EntityFrameworkCore.DbContextEffects
+Moderato.Effects.EntityFrameworkCore.EfDatabase<R>
+Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>
+Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure
+Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.<Clone>$() -> Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure!
+Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.Cause.get -> System.Exception!
+Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.Equals(Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure? other) -> bool
+Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.UnclassifiedDatabaseFailure(System.Exception! cause) -> void
+override Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.Equals(object? obj) -> bool
+override Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.GetHashCode() -> int
+override Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.ToString() -> string!
+override Moderato.Effects.EntityFrameworkCore.ConstraintViolation.Equals(object? obj) -> bool
+override Moderato.Effects.EntityFrameworkCore.ConstraintViolation.GetHashCode() -> int
+override Moderato.Effects.EntityFrameworkCore.ConstraintViolation.ToString() -> string!
+override Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.Equals(object? obj) -> bool
+override Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.GetHashCode() -> int
+override Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.ToString() -> string!
+static Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.operator !=(Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed? left, Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed.operator ==(Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed? left, Moderato.Effects.EntityFrameworkCore.CommitNotConfirmed? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.ConstraintViolation.operator !=(Moderato.Effects.EntityFrameworkCore.ConstraintViolation? left, Moderato.Effects.EntityFrameworkCore.ConstraintViolation? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.ConstraintViolation.operator ==(Moderato.Effects.EntityFrameworkCore.ConstraintViolation? left, Moderato.Effects.EntityFrameworkCore.ConstraintViolation? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.DbContextEffects.SaveChangesAsync<E, R>(this Microsoft.EntityFrameworkCore.DbContext! context, Moderato.Effects.Scope<E, R>! scope, Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>? saveFailure = null) -> System.Threading.Tasks.ValueTask<int>
+static Moderato.Effects.EntityFrameworkCore.EfDatabase<R>.Transaction<TContext, T, E, RBody>(System.Func<R, Microsoft.EntityFrameworkCore.IDbContextFactory<TContext!>!>! contexts, System.Func<R, TContext!, RBody>! environment, Moderato.Effects.Effect<T, E, RBody> body, Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>? commitFailure = null) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.operator !=(Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure? left, Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure? right) -> bool
+static Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure.operator ==(Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure? left, Moderato.Effects.EntityFrameworkCore.UnclassifiedDatabaseFailure? right) -> bool
+virtual Moderato.Effects.EntityFrameworkCore.TryMapDatabaseFailure<E>.Invoke(Moderato.Effects.EntityFrameworkCore.DatabaseFailure failure, out E error) -> bool

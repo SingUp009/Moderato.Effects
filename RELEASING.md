@@ -6,9 +6,9 @@ A release is a version-bump PR followed by a tag. CI publishes the package that 
 
 On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 
-- [ ] **Version**: set `<Version>` in `src/Moderato.Effects/Moderato.Effects.csproj`, `src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj` and `src/Moderato.Effects.Http/Moderato.Effects.Http.csproj`. CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
-- [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core, Hosting and HTTP; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
-- [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in Core, Hosting and HTTP.
+- [ ] **Version**: set `<Version>` in `src/Moderato.Effects/Moderato.Effects.csproj`, `src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj`, `src/Moderato.Effects.Http/Moderato.Effects.Http.csproj` and `src/Moderato.Effects.EntityFrameworkCore/Moderato.Effects.EntityFrameworkCore.csproj`. CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
+- [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core, Hosting, HTTP and EF; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
+- [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in Core, Hosting, HTTP and EF.
   - Add the plain entries to Shipped.
   - For each `*REMOVED*` entry, delete the matching line from Shipped.
   - Keep Shipped sorted, and leave Unshipped with only `#nullable enable`.
@@ -19,10 +19,10 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] **Release notes**: prepare a separate body following the previous GitHub Release's heading, applicable change sections and PR-linked bullets. Include this version's validation limits; review the text before publishing.
 - [ ] `dotnet test -c Release` passes.
 - [ ] All samples run, including `samples/Moderato.Effects.Http.Samples -c Release -- --verify` for real HTTP/OpenAPI checks.
-- [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the Hosting-only and HTTP-only consumers receive the transitive generators and analyzers.
-- [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all three packages.
+- [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the EF consumer passes under JIT. EF Native AOT is not validated. All integration-only consumers receive the transitive generators and analyzers.
+- [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all four packages.
 - [ ] Review the local HTTP validation notes, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
-- [ ] Prepare English wiki drafts for Hosting, HTTP and Core operator changes. During previews, keep drafts locally and leave the published wiki unchanged until the stable release.
+- [ ] Prepare English wiki drafts for Hosting, HTTP, EF and Core operator changes. During previews, keep drafts locally and leave the published wiki unchanged until the stable release.
 
 Merge the PR once CI is green.
 
@@ -33,26 +33,28 @@ Merge the PR once CI is green.
   - **Title:** the same as the tag.
   - **Notes:** the separately prepared and reviewed release notes.
   - Mark previews as **pre-release**.
-- [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and publishes it with Native AOT.
+- [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and exercises supported consumers with Native AOT. EF currently has JIT checks only.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
-- [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting and https://www.nuget.org/packages/Moderato.Effects.Http. Indexing can take 5 to 15 minutes.
+- [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting, https://www.nuget.org/packages/Moderato.Effects.Http and https://www.nuget.org/packages/Moderato.Effects.EntityFrameworkCore. Indexing can take 5 to 15 minutes.
 - [ ] For the stable release only, after all packages are publicly available, review the saved drafts against the released APIs and update the English wiki installation commands, notices and index labels. Revalidate draft examples and version references; do not apply preview-era drafts unchanged.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 
 ## Local verification without publishing
 
-Use a unique unpublished version and the project-local package caches. The three packages use minimum-version dependencies, so upgrading Core or Microsoft.Extensions remains possible; their compatible higher versions are not pinned away.
+Use a unique unpublished version and the project-local package caches. The packages use minimum-version dependencies, so upgrading Core or Microsoft.Extensions remains possible; their compatible higher versions are not pinned away.
 
 ```bash
 validation_version="0.1.0-local.$(git rev-parse --short HEAD).1"
 dotnet pack src/Moderato.Effects -c Release -p:Version="$validation_version" -o artifacts
 dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version="$validation_version" -o artifacts
 dotnet pack src/Moderato.Effects.Http -c Release -p:Version="$validation_version" -o artifacts
+dotnet pack src/Moderato.Effects.EntityFrameworkCore -c Release -p:Version="$validation_version" -o artifacts
 dotnet run --project tests/Moderato.Effects.PackageVerifier -c Release -- artifacts "$validation_version" "$(git rev-parse HEAD)"
 dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
+dotnet run --project tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
 dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-hosting
 ./artifacts/aot-hosting/Moderato.Effects.Hosting.PackageTests
 dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-http

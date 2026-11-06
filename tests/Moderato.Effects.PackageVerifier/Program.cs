@@ -16,7 +16,7 @@ var source = Encoding.UTF8.GetBytes($"https://raw.githubusercontent.com/SingUp00
 
 try
 {
-    foreach (var package in new[] { "Moderato.Effects", "Moderato.Effects.Hosting", "Moderato.Effects.Http" })
+    foreach (var package in new[] { "Moderato.Effects", "Moderato.Effects.Hosting", "Moderato.Effects.Http", "Moderato.Effects.EntityFrameworkCore" })
     {
         using var archive = ZipFile.OpenRead(Path.Combine(root, $"{package}.{version}.nupkg"));
         using var nuspec = archive.GetEntry($"{package}.nuspec")?.Open()
@@ -50,10 +50,18 @@ try
                 var frameworks = metadata.Descendants(ns + "frameworkReference").Select(item => (string?)item.Attribute("name"));
                 Check(frameworks.SequenceEqual(["Microsoft.AspNetCore.App"]), $"{package}: unexpected framework references.");
             }
-            else
+            else if (package == "Moderato.Effects.Hosting")
             {
                 Check(dependencies.TryGetValue("Microsoft.Extensions.Logging", out var loggingVersion)
                     && IsMinimum(loggingVersion, "11.0.0-rc.3.26522.148"), $"{package}: unexpected logging dependency.");
+            }
+            else
+            {
+                Check(dependencies.Count == 3, $"{package}: unexpected package dependencies.");
+                Check(dependencies.TryGetValue("Microsoft.EntityFrameworkCore.Relational", out var efVersion)
+                    && IsMinimum(efVersion, "10.0.9"), $"{package}: unexpected EF dependency.");
+                Check(dependencies.TryGetValue("Microsoft.Data.Sqlite.Core", out var sqliteVersion)
+                    && IsMinimum(sqliteVersion, "10.0.9"), $"{package}: unexpected SQLite dependency.");
             }
         }
 
