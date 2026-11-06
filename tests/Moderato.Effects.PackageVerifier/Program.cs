@@ -2,21 +2,27 @@ using System.IO.Compression;
 using System.Text;
 using System.Xml.Linq;
 
-if (args.Length != 3)
+if (args.Length != 6)
 {
-    Console.Error.WriteLine("Usage: Moderato.Effects.PackageVerifier <artifacts> <version> <commit>");
+    Console.Error.WriteLine("Usage: Moderato.Effects.PackageVerifier <artifacts> <core-version> <hosting-version> <http-version> <ef-version> <commit>");
     return 1;
 }
 
 var root = args[0];
-var version = args[1];
-var commit = args[2];
+var coreVersionExpected = args[1];
+var commit = args[5];
 XNamespace ns = "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd";
 var source = Encoding.UTF8.GetBytes($"https://raw.githubusercontent.com/SingUp009/Moderato.Effects/{commit}/");
 
 try
 {
-    foreach (var package in new[] { "Moderato.Effects", "Moderato.Effects.Hosting", "Moderato.Effects.Http", "Moderato.Effects.EntityFrameworkCore" })
+    foreach (var (package, version) in new[]
+    {
+        ("Moderato.Effects", args[1]),
+        ("Moderato.Effects.Hosting", args[2]),
+        ("Moderato.Effects.Http", args[3]),
+        ("Moderato.Effects.EntityFrameworkCore", args[4]),
+    })
     {
         using var archive = ZipFile.OpenRead(Path.Combine(root, $"{package}.{version}.nupkg"));
         using var nuspec = archive.GetEntry($"{package}.nuspec")?.Open()
@@ -43,7 +49,7 @@ try
             var dependencies = metadata.Descendants(ns + "dependency").ToDictionary(
                 item => (string?)item.Attribute("id") ?? throw new InvalidDataException($"{package}: dependency without ID."),
                 item => (string?)item.Attribute("version"));
-            Check(dependencies.TryGetValue("Moderato.Effects", out var coreVersion) && IsMinimum(coreVersion, version), $"{package}: unexpected Core dependency.");
+            Check(dependencies.TryGetValue("Moderato.Effects", out var coreVersion) && IsMinimum(coreVersion, coreVersionExpected), $"{package}: unexpected Core dependency.");
             if (package == "Moderato.Effects.Http")
             {
                 Check(dependencies.Count == 1, $"{package}: unexpected package dependencies.");
