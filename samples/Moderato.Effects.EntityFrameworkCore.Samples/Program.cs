@@ -18,16 +18,18 @@ internal static class Commands
     private const int DEFECT_EXIT_CODE = 1;
     private const int INTERRUPTED_EXIT_CODE = 130;
 
-    public static Task Create(int id, string name, string database = "orders.db", CancellationToken cancellationToken = default)
+    private const string ORDERS_DB = "orders.db";
+
+    public static Task Create(int id, string name, string database = ORDERS_DB, CancellationToken cancellationToken = default)
         => Execute(Orders.Create(id, name), database, cancellationToken);
 
-    public static Task Read(int id, string database = "orders.db", CancellationToken cancellationToken = default)
+    public static Task Read(int id, string database = ORDERS_DB, CancellationToken cancellationToken = default)
         => Execute(Orders.Read(id), database, cancellationToken);
 
-    public static Task Update(int id, string name, string database = "orders.db", CancellationToken cancellationToken = default)
+    public static Task Update(int id, string name, string database = ORDERS_DB, CancellationToken cancellationToken = default)
         => Execute(Orders.Update(id, name), database, cancellationToken);
 
-    public static Task Delete(int id, string database = "orders.db", CancellationToken cancellationToken = default)
+    public static Task Delete(int id, string database = ORDERS_DB, CancellationToken cancellationToken = default)
         => Execute(Orders.Delete(id), database, cancellationToken);
 
     private static async Task Execute(Effect<OrderView, OrderError, AppEnv> effect, string database, CancellationToken cancellationToken)
@@ -36,7 +38,9 @@ internal static class Commands
         var options = new DbContextOptionsBuilder<OrdersDb>().UseSqlite(connection.ToString()).Options;
         var env = new AppEnv(new OrdersDbFactory(options));
         await using (var db = await env.Contexts.CreateDbContextAsync(cancellationToken))
+        {
             await db.Database.EnsureCreatedAsync(cancellationToken);
+        }
 
         var exit = await effect.RunExitAsync(env, cancellationToken);
         switch (exit)
