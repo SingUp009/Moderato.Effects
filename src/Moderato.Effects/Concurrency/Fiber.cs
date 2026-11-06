@@ -4,9 +4,6 @@ using Moderato.Results;
 namespace Moderato.Effects;
 
 /// <summary>Forked work that its parent's scope cancels and awaits when it ends; its defect fails the parent, and its Err shows only through <see cref="Join"/> or, if unjoined, the run's diagnostic handler.</summary>
-/// <typeparam name="T">The value.</typeparam>
-/// <typeparam name="E">The error.</typeparam>
-/// <typeparam name="R">The environment.</typeparam>
 public sealed class Fiber<T, E, R>
 {
     private readonly Cancellation cancellation;
@@ -45,7 +42,6 @@ public sealed class Fiber<T, E, R>
     }
 
     /// <summary>Waits for the fiber and takes on its outcome; canceling the wait leaves the fiber running, and a defect that failed the parent comes without the suppressed failures the parent already keeps.</summary>
-    /// <returns>An effect with the fiber's outcome.</returns>
     public Effect<T, E, R> Join() => new((_, context) => JoinAsync(context));
 
     internal static Resource<Fiber<T, E, R>, Never, R> Fork(Effect<T, E, R> effect)

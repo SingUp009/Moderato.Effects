@@ -26,92 +26,36 @@ public static partial class Effect
         }));
     }
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2), E, R> All<T1, T2, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3), E, R> All<T1, T2, T3, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="effect4">Effect 4.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3, T4), E, R> All<T1, T2, T3, T4, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="effect4">Effect 4.</param>
-    /// <param name="effect5">Effect 5.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3, T4, T5), E, R> All<T1, T2, T3, T4, T5, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Effect<T5, E, R> effect5, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4), Box(effect5)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!, (T5)values[4]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="effect4">Effect 4.</param>
-    /// <param name="effect5">Effect 5.</param>
-    /// <param name="effect6">Effect 6.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3, T4, T5, T6), E, R> All<T1, T2, T3, T4, T5, T6, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Effect<T5, E, R> effect5, Effect<T6, E, R> effect6, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4), Box(effect5), Box(effect6)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!, (T5)values[4]!, (T6)values[5]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="effect4">Effect 4.</param>
-    /// <param name="effect5">Effect 5.</param>
-    /// <param name="effect6">Effect 6.</param>
-    /// <param name="effect7">Effect 7.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3, T4, T5, T6, T7), E, R> All<T1, T2, T3, T4, T5, T6, T7, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Effect<T5, E, R> effect5, Effect<T6, E, R> effect6, Effect<T7, E, R> effect7, Concurrency concurrency = default)
         => All([Box(effect1), Box(effect2), Box(effect3), Box(effect4), Box(effect5), Box(effect6), Box(effect7)], concurrency).Map(static values => ((T1)values[0]!, (T2)values[1]!, (T3)values[2]!, (T4)values[3]!, (T5)values[4]!, (T6)values[5]!, (T7)values[6]!));
 
-    /// <summary>Runs the effects and pairs their values, like <see cref="All{T, E, R}(IEnumerable{Effect{T, E, R}}, Concurrency)"/>.</summary>
-    /// <param name="effect1">Effect 1.</param>
-    /// <param name="effect2">Effect 2.</param>
-    /// <param name="effect3">Effect 3.</param>
-    /// <param name="effect4">Effect 4.</param>
-    /// <param name="effect5">Effect 5.</param>
-    /// <param name="effect6">Effect 6.</param>
-    /// <param name="effect7">Effect 7.</param>
-    /// <param name="effect8">Effect 8.</param>
-    /// <param name="concurrency">How they run; sequential by default.</param>
-    /// <returns>An effect whose value holds every value, in argument order.</returns>
     [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = CONCURRENCY_JUSTIFICATION)]
     [SuppressMessage("ApiDesign", "RS0027:API with optional parameter(s) should have the most parameters amongst its public overloads", Justification = CONCURRENCY_JUSTIFICATION)]
     public static Effect<(T1, T2, T3, T4, T5, T6, T7, T8), E, R> All<T1, T2, T3, T4, T5, T6, T7, T8, E, R>(Effect<T1, E, R> effect1, Effect<T2, E, R> effect2, Effect<T3, E, R> effect3, Effect<T4, E, R> effect4, Effect<T5, E, R> effect5, Effect<T6, E, R> effect6, Effect<T7, E, R> effect7, Effect<T8, E, R> effect8, Concurrency concurrency = default)
@@ -180,9 +124,6 @@ public static partial class Effect
     }
 
     /// <summary>Takes the first effect to succeed and cancels the other; if both fail the first failure wins, and a defect ends the race.</summary>
-    /// <param name="first">One effect.</param>
-    /// <param name="second">The other effect.</param>
-    /// <returns>An effect with the winner's value.</returns>
     public static Effect<T, E, R> Race<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
         Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];
@@ -194,9 +135,6 @@ public static partial class Effect
     }
 
     /// <summary>Takes the first effect to finish, Ok or not, and cancels the other; a loser's defect still outranks it.</summary>
-    /// <param name="first">One effect.</param>
-    /// <param name="second">The other effect.</param>
-    /// <returns>An effect with the outcome of the first to finish.</returns>
     public static Effect<T, E, R> RaceFirst<T, E, R>(Effect<T, E, R> first, Effect<T, E, R> second)
     {
         Effect<T, E, R>[] runs = [first.Validate(), second.Validate()];

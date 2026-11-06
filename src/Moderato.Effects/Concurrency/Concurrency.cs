@@ -22,7 +22,6 @@ public readonly struct Concurrency : IEquatable<Concurrency>
 
     /// <summary>Parallel, with at most <paramref name="maxDegree"/> effects running at the same time.</summary>
     /// <param name="maxDegree">The limit, ≥ 1.</param>
-    /// <returns>The limited concurrency.</returns>
     public Concurrency WithMaxDegree(int maxDegree)
     {
         if (!IsParallel) throw new InvalidOperationException("Sequential runs one at a time already. Use Concurrency.Parallel.WithMaxDegree(n).");
@@ -30,16 +29,12 @@ public readonly struct Concurrency : IEquatable<Concurrency>
         return new(maxDegree);
     }
 
-    /// <inheritdoc/>
     public bool Equals(Concurrency other) => maxDegree == other.maxDegree;
 
-    /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is Concurrency other && Equals(other);
 
-    /// <inheritdoc/>
     public override int GetHashCode() => maxDegree;
 
-    /// <inheritdoc/>
     public override string ToString() => maxDegree switch
     {
         0 => "Sequential",
@@ -47,9 +42,7 @@ public readonly struct Concurrency : IEquatable<Concurrency>
         var n => $"Parallel(max {n})",
     };
 
-    /// <summary>Equality.</summary>
     public static bool operator ==(Concurrency left, Concurrency right) => left.Equals(right);
 
-    /// <summary>Inequality.</summary>
     public static bool operator !=(Concurrency left, Concurrency right) => !left.Equals(right);
 }
