@@ -89,6 +89,11 @@ Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Die! value) -> void
 Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Failed! value) -> void
 Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Interrupted! value) -> void
 Moderato.Effects.ExitCase.ExitCase(Moderato.Effects.Succeeded! value) -> void
+Moderato.Effects.ExitCase.HasValue.get -> bool
+Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Die? die) -> bool
+Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Failed? failed) -> bool
+Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Interrupted? interrupted) -> bool
+Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Succeeded? succeeded) -> bool
 Moderato.Effects.ExitCase.Value.get -> object?
 Moderato.Effects.ExposeAttribute<T>
 Moderato.Effects.ExposeAttribute<T>.ExposeAttribute() -> void
