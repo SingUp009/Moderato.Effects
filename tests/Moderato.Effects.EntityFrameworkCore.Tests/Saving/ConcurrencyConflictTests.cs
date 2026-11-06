@@ -1,4 +1,6 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using static SQLitePCL.raw;
 
 namespace Moderato.Effects.EntityFrameworkCore.Tests;
 
@@ -100,6 +102,35 @@ public sealed class ConcurrencyConflictTests
         var conflict = Assert.IsType<OptimisticConcurrencyConflict>(observed);
         Assert.IsType<DbUpdateConcurrencyException>(conflict.Cause);
         Assert.Contains(die.Suppressed, item => item.Case.Value is Failed failed && ReferenceEquals(conflict, failed.Error));
+        Assert.Equal(0, await store.Count());
+    }
+
+    [Fact]
+    public async Task SaveChangesAsync_ConcurrencyExceptionWrappingConstraint_PrioritizesTheEFClassification()
+    {
+        // Given
+        await using var store = await Store.Open();
+        var inner = new SqliteException("inner provider", SQLITE_CONSTRAINT, SQLITE_CONSTRAINT_UNIQUE);
+        var cause = new DbUpdateConcurrencyException("concurrency", inner);
+        store.Probe.BeforeSave = () => throw cause;
+        object? observed = null;
+        bool Map(DatabaseFailure failure, out TestError error)
+        {
+            observed = failure.Value;
+            error = new Rejected("concurrent change");
+            return true;
+        }
+        await using var db = store.CreateDbContext();
+        var body = Scope<TestError, TestDb>.Gen(async scope => await scope.Env.SaveChangesAsync(scope, Map));
+
+        // When
+        var exit = await body.RunExitAsync(db, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Err<TestError> err));
+        Assert.Equal("concurrent change", Assert.IsType<Rejected>(err.Error.Value).Reason);
+        Assert.Same(cause, Assert.IsType<OptimisticConcurrencyConflict>(observed).Cause);
+        Assert.Same(inner, cause.InnerException);
         Assert.Equal(0, await store.Count());
     }
 }
