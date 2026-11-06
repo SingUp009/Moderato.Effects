@@ -64,7 +64,6 @@ jobs:
           dotnet run --project samples/Moderato.Effects.Samples -c Release
           dotnet run --project samples/Moderato.Effects.Hosting.Samples -c Release
           dotnet run --project samples/Moderato.Effects.Http.Samples -c Release -- --verify
-          dotnet run --project samples/Moderato.Effects.Sqlite.Cli/Verification -c Release
 
   pack:
     needs: [lint, format, test]

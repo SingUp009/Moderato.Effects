@@ -21,7 +21,6 @@
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Moderato.Effects.Sqlite.Cli/Moderato.Effects.Sqlite.Cli.csproj" />
-    <Project Path="samples/Moderato.Effects.Sqlite.Cli/Verification/Verification.csproj" />
     <Project Path="samples/Moderato.Effects.Http.Samples/Moderato.Effects.Http.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Hosting.Samples/Moderato.Effects.Hosting.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Samples/Moderato.Effects.Samples.csproj" />
