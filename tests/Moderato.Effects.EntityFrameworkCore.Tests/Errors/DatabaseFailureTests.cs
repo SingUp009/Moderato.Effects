@@ -57,6 +57,7 @@ public sealed class DatabaseFailureTests
         Assert.Equal("unclassified", failure switch
         {
             ConstraintViolation => "constraint",
+            OptimisticConcurrencyConflict => "optimistic concurrency",
             CommitNotConfirmed => "unconfirmed commit",
             UnclassifiedDatabaseFailure => "unclassified",
         });
@@ -107,5 +108,35 @@ public sealed class DatabaseFailureTests
 
         // Then
         Assert.Equal("cause", Assert.IsType<ArgumentNullException>(exception).ParamName);
+    }
+
+    [Fact]
+    public void OptimisticConcurrencyConflict_NullCause_ThrowsArgumentNullException()
+    {
+        // Given
+        Exception cause = null!;
+
+        // When
+        var exception = Assert.Throws<ArgumentNullException>(() => new OptimisticConcurrencyConflict(cause));
+
+        // Then
+        Assert.Equal("cause", exception.ParamName);
+    }
+
+    [Fact]
+    public void DatabaseFailure_OptimisticConcurrencyConflict_PreservesTheNestedCaseAndCause()
+    {
+        // Given
+        var cause = new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException("conflict");
+        var conflict = new OptimisticConcurrencyConflict(cause);
+        DatabaseFailure failure = conflict;
+
+        // When
+        TestError error = failure;
+
+        // Then
+        var nested = Assert.IsType<DatabaseFailure>(error.Value);
+        Assert.Same(conflict, nested.Value);
+        Assert.Same(cause, nested.Cause);
     }
 }

@@ -1,11 +1,12 @@
 namespace Moderato.Effects.EntityFrameworkCore;
 
 /// <summary>A database failure or an unconfirmed commit. <c>default</c> is invalid.</summary>
-public union DatabaseFailure(ConstraintViolation, CommitNotConfirmed, UnclassifiedDatabaseFailure)
+public union DatabaseFailure(ConstraintViolation, OptimisticConcurrencyConflict, CommitNotConfirmed, UnclassifiedDatabaseFailure)
 {
     public Exception Cause => this switch
     {
         ConstraintViolation failure => failure.Cause,
+        OptimisticConcurrencyConflict failure => failure.Cause,
         CommitNotConfirmed failure => failure.Cause,
         UnclassifiedDatabaseFailure failure => failure.Cause,
     };
@@ -15,6 +16,18 @@ public union DatabaseFailure(ConstraintViolation, CommitNotConfirmed, Unclassifi
 public sealed record UnclassifiedDatabaseFailure
 {
     public UnclassifiedDatabaseFailure(Exception cause)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        Cause = cause;
+    }
+
+    public Exception Cause { get; }
+}
+
+/// <summary>An EF save rejected by optimistic concurrency checks.</summary>
+public sealed record OptimisticConcurrencyConflict
+{
+    public OptimisticConcurrencyConflict(Exception cause)
     {
         ArgumentNullException.ThrowIfNull(cause);
         Cause = cause;
