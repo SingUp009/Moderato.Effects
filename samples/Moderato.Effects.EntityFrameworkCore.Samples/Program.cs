@@ -56,6 +56,7 @@ internal static class Commands
                     OrderNotFound e => $"NOT_FOUND {e.Id}",
                     OrderAlreadyExists e => $"ALREADY_EXISTS {e.Id}",
                     InvalidOrder e => $"INVALID {e.Reason}",
+                    DatabaseFailure { Value: OptimisticConcurrencyConflict } => "CONFLICT: the order could not be saved after a concurrent change.",
                     DatabaseFailure failure => $"DATABASE {failure.Value!.GetType().Name}: {failure.Cause.Message}",
                 });
                 Environment.ExitCode = BUSINESS_ERROR_EXIT_CODE;

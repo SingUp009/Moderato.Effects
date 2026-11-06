@@ -32,11 +32,14 @@ Unexpected database exceptions remain defects; they are not automatically retrie
 
 The sample references `src/Moderato.Effects.EntityFrameworkCore`. `WithDatabase` uses
 `EfDatabase.Transaction`, and saves use the scope-aware overload. `OrderError` includes
-`DatabaseFailure`, a closed union containing constraint, unconfirmed-commit and unclassified
-database failures. An unconfirmed commit can be returned without a custom mapper.
+`DatabaseFailure`, a closed union containing constraint, optimistic-concurrency, unconfirmed-commit
+and unclassified database failures. An unconfirmed commit can be returned without a custom mapper.
 
 Each command runs in an owned transaction with a fresh context. There is no Outbox or
 automatic retry. An unconfirmed commit is shown as a standard database error, not retried.
-Concurrent modification between lookup and save is not converted
-to a business error. SQLite's schema has only the order primary key as a unique constraint;
-if more unique constraints are added, the duplicate classifier must be refined.
+Updates and deletes map EF-reported `OptimisticConcurrencyConflict` to the standard error case,
+which the CLI displays as `CONFLICT`. Other unmapped save exceptions remain defects.
+This sample configures no concurrency token; detecting stale values requires EF concurrency
+configuration. SQLite may report a concurrent writer as busy/locked rather than an optimistic
+conflict. SQLite's schema has only the order primary key as a unique constraint; if more unique
+constraints are added, the duplicate classifier must be refined.

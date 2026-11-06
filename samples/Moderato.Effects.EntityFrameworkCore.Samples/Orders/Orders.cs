@@ -61,7 +61,7 @@ public static class Orders
                 .SingleOrDefaultAsync(order => order.Id == id, scope.CancellationToken)
                 ?? throw scope.Fail(new OrderNotFound(id));
             order.Name = name;
-            await db.SaveChangesAsync(scope);
+            await db.SaveChangesAsync(scope, MapConcurrencyFailure);
             return new OrderView(order.Id, order.Name);
         });
 
@@ -72,7 +72,7 @@ public static class Orders
                 .SingleOrDefaultAsync(order => order.Id == id, scope.CancellationToken)
                 ?? throw scope.Fail(new OrderNotFound(id));
             db.Orders.Remove(order);
-            await db.SaveChangesAsync(scope);
+            await db.SaveChangesAsync(scope, MapConcurrencyFailure);
             return new OrderView(order.Id, order.Name);
         });
 
@@ -82,6 +82,17 @@ public static class Orders
             contexts: env => env.Contexts,
             environment: (_, db) => new OrderDb(db),
             body: Scope<OrderError, OrderDb>.Gen(scope => body(scope.Env.Context, scope)));
+
+    private static bool MapConcurrencyFailure(DatabaseFailure failure, out OrderError error)
+    {
+        if (failure.Value is OptimisticConcurrencyConflict)
+        {
+            error = failure;
+            return true;
+        }
+        error = default;
+        return false;
+    }
 
     private static void Validate(int id, string name, Scope<OrderError, OrderDb> scope)
     {
