@@ -50,13 +50,24 @@ Results are [Moderato.Results](https://github.com/SingUp009/Moderato.Results) `R
 - .NET 11 SDK (`11.0.100-rc.3` or later), `net11.0`
 - C# 15
 
-The library is Native AOT compatible (`IsAotCompatible`). The package includes source generators and analyzers.
+Core is Native AOT compatible (`IsAotCompatible`). The package includes source generators and analyzers.
 
 ## Installation
 
 ```
 dotnet add package Moderato.Effects --prerelease
 ```
+
+## Packages
+
+| Package | Provides |
+|---|---|
+| `Moderato.Effects` | Core effects and the opt-in Effect Tracker |
+| `Moderato.Effects.Hosting` | .NET background service integration |
+| `Moderato.Effects.Http` | ASP.NET Core request execution |
+| `Moderato.Effects.EntityFrameworkCore` | EF Core transactions and scope-aware saves |
+
+The integration packages depend on Core; it does not need to be installed separately.
 
 ## Documentation
 
@@ -68,7 +79,7 @@ The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderat
 - [Operators](https://github.com/SingUp009/Moderato.Effects/wiki/Operators)
 - [Error unions](https://github.com/SingUp009/Moderato.Effects/wiki/Error-unions)
 - [Environments](https://github.com/SingUp009/Moderato.Effects/wiki/Environments)
-- [Hosting (unreleased)](https://github.com/SingUp009/Moderato.Effects/wiki/Hosting)
+- [Hosting](https://github.com/SingUp009/Moderato.Effects/wiki/Hosting)
 - [Resources](https://github.com/SingUp009/Moderato.Effects/wiki/Resources)
 - [Time](https://github.com/SingUp009/Moderato.Effects/wiki/Time)
 - [Concurrency](https://github.com/SingUp009/Moderato.Effects/wiki/Concurrency)

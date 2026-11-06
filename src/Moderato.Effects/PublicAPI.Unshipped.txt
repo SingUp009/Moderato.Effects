@@ -1,6 +1,1 @@
 #nullable enable
-Moderato.Effects.ExitCase.HasValue.get -> bool
-Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Die? die) -> bool
-Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Failed? failed) -> bool
-Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Interrupted? interrupted) -> bool
-Moderato.Effects.ExitCase.TryGetValue(out Moderato.Effects.Succeeded? succeeded) -> bool
