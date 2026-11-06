@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup Condition="'$(ValidationPackageSuffix)' != ''">
+    <PackageVersion>$(Version)-$(ValidationPackageSuffix)</PackageVersion>
+  </PropertyGroup>
+</Project>
