@@ -59,6 +59,11 @@ jobs:
           dotnet format style tests/Moderato.Effects.SoakProbe --verify-no-changes --severity warn --no-restore
           bash tests/Moderato.Effects.SoakProbe/verify.sh dotnet tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/Moderato.Effects.SoakProbe.dll
 
+      - name: Verify the tutorial
+        run: |
+          dotnet build tutorial/Moderato.Effects.Tutorial -c Release
+          bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
+
       - name: Run the samples
         run: |
           dotnet run --project samples/Moderato.Effects.Samples -c Release
