@@ -1,0 +1,30 @@
+{
+  "name": "Moderato.Effects",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "prepare": "panda codegen"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.1.4",
+    "@astrojs/starlight": "^0.42.9",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "astro": "^7.4.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.3",
+    "starlight-theme-nord": "^0.1.4"
+  },
+  "devDependencies": {
+    "@pandacss/dev": "^2.5.0",
+    "@pandacss/preset-base": "^2.5.0",
+    "@pandacss/preset-panda": "^2.5.0",
+    "@pandacss/vite": "^2.5.0"
+  }
+}

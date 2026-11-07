@@ -1,0 +1,83 @@
+---
+import { Code, LinkButton } from '@astrojs/starlight/components';
+import { css } from '../../styled-system/css';
+
+const program = `using Moderato.Effects;
+using Moderato.Results;
+
+var hello = Effect.Gen(
+    async (Scope<Never, EmptyEnvironment> scope) =>
+    {
+        await Console.Out.WriteLineAsync("Hello!");
+        return 42;
+    });
+
+await hello.RunAsync();`;
+---
+
+<div class:list={['landing-hero', css({
+    display: 'grid',
+    alignItems: 'center',
+    gap: '2.5rem',
+    paddingBlock: 'clamp(2rem, 5vw, 4rem)',
+    '@media (min-width: 60rem)': {
+        gridTemplateColumns: '0.95fr 1.05fr',
+    },
+})]}>
+    <div class={css({ minWidth: 0 })}>
+        <h1 id="_top" class={css({
+            display: 'grid',
+            gap: '0.35rem',
+            color: 'var(--sl-color-white)',
+            fontSize: 'clamp(2.5rem, 4vw, 3.5rem)',
+            fontWeight: 650,
+            letterSpacing: '-0.04em',
+            lineHeight: 1.12,
+        })}>
+            <span class={css({
+                color: 'var(--sl-color-text-accent)',
+                fontSize: 'clamp(2rem, 3.6vw, 3rem)',
+            })}>Moderato.Effects</span>
+            <span>Effect system<br />for C#</span>
+        </h1>
+        <p class={css({
+            maxWidth: '35ch',
+            marginTop: '1.5rem',
+            color: 'var(--sl-color-gray-2)',
+            fontSize: '1.125rem',
+            lineHeight: 1.65,
+        })}>
+            Asynchronous work with typed errors, explicit dependencies, and managed resource lifetimes.
+        </p>
+        <div class={css({
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            marginTop: '1.75rem',
+        })}>
+            <LinkButton href="/tutorial/01-results/" icon="right-arrow">Start the tutorial</LinkButton>
+            <LinkButton href="/getting-started/" variant="secondary">Getting started</LinkButton>
+            <LinkButton href="https://github.com/SingUp009/Moderato.Effects" variant="secondary">
+                View on GitHub
+            </LinkButton>
+        </div>
+        <div class={css({ maxWidth: '24rem', marginTop: '1.5rem' })}>
+            <Code
+                code="dotnet add package Moderato.Effects"
+                lang="sh"
+                frame="none"
+            />
+        </div>
+    </div>
+    <div class={css({
+        minWidth: 0,
+        borderRadius: '0.75rem',
+        boxShadow: 'var(--sl-shadow-md)',
+    })}>
+        <Code
+            code={program}
+            lang="csharp"
+            title="Program.cs"
+        />
+    </div>
+</div>
