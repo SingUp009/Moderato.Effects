@@ -31,14 +31,16 @@ internal class Cancellation : CancellationTokenSource
     private CancellationTokenRegistration parentLink;
     private object? callbackFailure;
     private readonly Action<ExitCase>? unobservedFailureHandler;
+    private readonly EffectObservation? observation;
 
     internal Cancellation(RunContext parent)
     {
         unobservedFailureHandler = parent.UnobservedFailureHandler;
+        observation = parent.Observation;
         parentLink = parent.CancellationToken.UnsafeRegister(static self => ((Cancellation)self!).CancelFromParent(), this);
     }
 
-    internal RunContext Context => new(Token, unobservedFailureHandler);
+    internal RunContext Context => new(Token, unobservedFailureHandler, observation);
 
     /// <summary>A unit for the caller's token, canceled from a registration so a throwing callback stays out of the caller's <c>Cancel()</c>.</summary>
     internal static Cancellation ForCaller(RunContext caller)

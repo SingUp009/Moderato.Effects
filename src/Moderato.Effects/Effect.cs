@@ -94,6 +94,7 @@ public readonly partial struct Effect<T, E, R>
     private ValueTask<Result<T, E>> RunResult(R environment, RunContext context)
     {
         Validate();
+        if (EffectObservation.Enabled) return RunResultObserved(environment, context);
         var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
         if (constant.HasValue) return new(constant);
@@ -128,6 +129,7 @@ public readonly partial struct Effect<T, E, R>
     private ValueTask<Exit<T, E>> RunExit(R environment, RunContext context)
     {
         Validate();
+        if (EffectObservation.Enabled) return RunExitObserved(environment, context);
         var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
         if (constant.HasValue) return new(ToExit(Steps.FromResult(constant, context), context));

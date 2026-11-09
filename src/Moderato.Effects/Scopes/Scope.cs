@@ -278,6 +278,7 @@ public sealed class Scope<E, R>
 
     private async ValueTask<Outcome<T, E>> RunBodyAsync<T>(Func<Scope<E, R>, ValueTask<T>> body)
     {
+        using var observation = releases.Observation?.Activate();
         T value = default!;
         Exception? thrown = null;
         try

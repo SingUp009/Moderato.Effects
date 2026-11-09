@@ -14,10 +14,12 @@ public sealed class Fiber<T, E, R>
     private Fiber(Effect<T, E, R> effect, R env, Releases<R> owner, Cancellation cancellation)
     {
         this.cancellation = cancellation;
-        var context = cancellation.Context;
+        var observation = EffectObservation.Begin("fiber", owner.BodyContext);
+        var context = cancellation.Context.WithObservation(observation);
         EffectTracker.Track(this, EffectTrackingKind.Fiber);
         task = Task.Run(async () =>
         {
+            using var active = observation?.Activate();
             try
             {
                 Outcome<T, E> outcome;
@@ -32,6 +34,7 @@ public sealed class Fiber<T, E, R>
 
                 if (outcome.Kind == OutcomeKind.Die && !outcome.Consequential)
                     reportedToOwner = owner.TryFailFromChild(outcome.WithTypes<Unit, Never>());
+                observation?.Finish(outcome);
                 return outcome;
             }
             finally

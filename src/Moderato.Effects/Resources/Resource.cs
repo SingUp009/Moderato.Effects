@@ -49,6 +49,7 @@ public readonly struct Resource<T, E, R>
         {
             using var cancellation = new Cancellation(context);
             var releases = new Releases<R>(cancellation);
+            using var observation = releases.Observation?.Activate();
             var body = releases.BodyContext;
             Outcome<U, E> outcome;
             Outcome<T, E> acquired;
