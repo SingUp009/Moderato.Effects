@@ -35,9 +35,9 @@ var documents = packages.SelectMany(package => XDocument.Load(Path.Combine(AppCo
 foreach (var assembly in assemblies)
 {
     var index = new StringBuilder($"# {assembly.Name}\n\n");
-    foreach (var type in types.Where(type => SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, assembly)).OrderBy(PageName, StringComparer.OrdinalIgnoreCase))
+    foreach (var type in types.Where(type => SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, assembly)).OrderBy(type => type.GetDocumentationCommentId()![2..].Replace('`', '-'), StringComparer.OrdinalIgnoreCase))
     {
-        index.AppendLine($"- [`{Label(type)}`]({PageName(type)})");
+        index.AppendLine($"- [`{Label(type)}`]({Uri.EscapeDataString(PageName(type))})");
         var page = new StringBuilder($"# `{Label(type)}`\n\nNamespace: `{type.ContainingNamespace}`\n\n");
         WriteDocumentation(page, type);
         var modifier = type.IsStatic ? "static " : type.TypeKind == TypeKind.Class && type.IsSealed ? "sealed " : type.TypeKind == TypeKind.Class && type.IsAbstract ? "abstract " : "";
@@ -92,14 +92,14 @@ bool IsPublicMember(ISymbol member) => member.DeclaredAccessibility == Accessibi
     (member is not IMethodSymbol method || method.MethodKind is MethodKind.Constructor or MethodKind.Ordinary or MethodKind.Conversion or MethodKind.UserDefinedOperator) &&
     (member.CanBeReferencedByName || member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.Conversion or MethodKind.UserDefinedOperator });
 
-string PageName(INamedTypeSymbol type) => type.GetDocumentationCommentId()![2..].Replace('`', '-');
+string PageName(INamedTypeSymbol type) => type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat).Replace('<', '[').Replace('>', ']');
 string Label(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
 string Link(ISymbol symbol)
 {
     var type = symbol as INamedTypeSymbol ?? symbol.ContainingType;
     return type is not null && packages.Contains(type.ContainingAssembly.Name, StringComparer.Ordinal)
-        ? $"[`{Label(symbol)}`]({PageName(type.OriginalDefinition)})"
+        ? $"[`{Label(symbol)}`]({Uri.EscapeDataString(PageName(type.OriginalDefinition))})"
         : $"`{Label(symbol)}`";
 }
 
