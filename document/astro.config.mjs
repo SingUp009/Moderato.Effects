@@ -5,6 +5,7 @@ import react from '@astrojs/react';
 import pandacss from '@pandacss/vite';
 
 export default defineConfig({
+  site: 'https://moderato-effects.009singup.workers.dev',
   vite: { plugins: [pandacss()] },
   integrations: [
     starlight({
