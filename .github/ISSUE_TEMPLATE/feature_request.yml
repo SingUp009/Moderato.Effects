@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an API or behavior that would solve a problem.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe your use case and what is difficult with the current API. Mention the relevant package or feature.
+    validations:
+      required: true
+  - type: textarea
+    id: usage
+    attributes:
+      label: Proposed usage
+      description: A short code example or description of the desired behavior helps. It is fine if you do not have a specific API in mind.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: If you have tried a workaround or another library, describe what works and what is missing.

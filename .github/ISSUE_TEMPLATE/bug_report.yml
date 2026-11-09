@@ -1,0 +1,52 @@
+name: Bug report
+description: Report incorrect behavior, a crash, or a regression.
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - Moderato.Effects
+        - Moderato.Effects.Hosting
+        - Moderato.Effects.Http
+        - Moderato.Effects.EntityFrameworkCore
+        - Source generators or analyzers
+        - Other or unsure
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and environment
+      description: Include each affected package version, the SDK, target framework, operating system, and whether you use JIT or Native AOT. For a source build, include the commit.
+      placeholder: |
+        Packages and versions:
+        dotnet --info:
+        Target framework:
+        JIT or Native AOT:
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Share the smallest runnable code or reproduction repository, with the commands or steps to trigger the problem. For timing-sensitive failures, include the event order and frequency.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      placeholder: |
+        Expected:
+
+        Actual:
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Logs or diagnostics
+      description: Include relevant exceptions, stack traces, analyzer IDs, or benchmark results when available.
+      render: text
