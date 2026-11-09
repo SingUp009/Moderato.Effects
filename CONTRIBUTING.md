@@ -37,7 +37,7 @@ dotnet run -c Release --project samples/Moderato.Effects.Samples
 
 ### Documentation and tutorial changes
 
-The website source is in [document/src/content/docs](document/src/content/docs/). Use the Node.js version selected by the document workflow in [.github/workflows](.github/workflows/). To preview edits with hot reload:
+The website source is in [document/src/content/docs](document/src/content/docs/). Use Node.js 26, matching the site's tested build environment. To preview edits with hot reload:
 
 ```sh
 cd document
