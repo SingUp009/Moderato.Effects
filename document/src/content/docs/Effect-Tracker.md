@@ -70,6 +70,10 @@ The default capacity is 2,048 records. Completed entries can be evicted, and new
 
 The [Tracking sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Tracking.Samples) provides a read-only Blazor screen for execution recordings. Build it from source with the SDK selected by `global.json`.
 
+[![The local viewer showing an active SHA256 resource, its ownership, elapsed time and trace correlation.](/effect-tracker/demo.png)](/effect-tracker/demo.png)
+
+This capture uses a slowly uploaded request so the resource remains active while it is inspected. Select the image to view it at full size.
+
 ```sh
 dotnet watch --project samples/Moderato.Effects.Tracking.Samples
 ```
