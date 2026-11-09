@@ -28,7 +28,9 @@ public sealed class DetailsTests
         var html = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<EntryDetails>(
             ParameterView.FromDictionary(new Dictionary<string, object?>
             {
-                ["Snapshot"] = snapshot, ["Entry"] = entry, ["TraceViewerUrl"] = viewer,
+                ["Snapshot"] = snapshot,
+                ["Entry"] = entry,
+                ["TraceViewerUrl"] = viewer,
             }))).ToHtmlString());
 
         // Then

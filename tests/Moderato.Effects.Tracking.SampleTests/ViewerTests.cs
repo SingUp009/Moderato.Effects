@@ -1,8 +1,8 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Hosting;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -219,7 +219,7 @@ public sealed class ViewerTests
                 options.Protocol = OtlpExportProtocol.HttpProtobuf;
                 options.Endpoint = new Uri("http://collector.invalid");
                 options.HttpClientFactory = () => new HttpClient(new Receiver());
-                });
+            });
             });
         });
         factory.UseKestrel(0);
