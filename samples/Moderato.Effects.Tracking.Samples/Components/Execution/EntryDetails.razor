@@ -1,0 +1,70 @@
+<div class="detail-content">
+    <div class="detail-kind">@Entry.Kind.ToUpperInvariant()@(Entry.Kind == "resource" ? " / LIFETIME" : "") <span>#@Entry.Id</span></div>
+    <h3>@Entry.Name</h3>
+    <span class="state @Entry.State.ToLowerInvariant()">@Entry.State</span>
+    @if (Entry.Kind == "resource") { <span class="lifetime-caption">Lifetime outcome, including release</span> }
+    @if (Entry.Detail is not null) { <code class="error-type">@Entry.Detail</code> }
+    <div class="duration-hero"><strong>@Ms(Entry.Elapsed)</strong><span>ms elapsed</span></div>
+    @if (Entry.Kind == "resource")
+    {
+        var release = Snapshot.Entries.FirstOrDefault(entry => entry.Kind == "release" && entry.ParentId == Entry.Id);
+        var before = release is null ? Entry.Elapsed : release.StartOffset - Entry.StartOffset;
+        @if (release is not null || Snapshot.IsComplete)
+        {
+            <div class="duration-track" role="img" aria-label="Resource time before release and during release">
+                <span class="held-track" style="width: @Percent(before, Entry.Elapsed)%"></span><span class="release-track" style="width: @Percent(release?.Elapsed ?? TimeSpan.Zero, Entry.Elapsed)%"></span>
+            </div>
+        }
+        <dl class="timing-breakdown"><div><dt><i class="held-key"></i>Before release</dt><dd>@(release is null && !Snapshot.IsComplete ? "Unknown" : $"{Ms(before)} ms")</dd></div><div><dt><i class="release-key"></i>Release</dt><dd>@(release is null ? Snapshot.IsComplete ? "Not started" : "Not observed" : $"{Ms(release.Elapsed)} ms")</dd></div></dl>
+    }
+    <dl class="properties">
+        <div><dt>Started</dt><dd>+@Ms(Entry.StartOffset) ms</dd></div>
+        <div><dt>Ended</dt><dd>@(Entry.EndOffset is { } ended ? $"+{Ms(ended)} ms" : "Not observed")</dd></div>
+        @if (Entry.BodyState is not null)
+        {
+            <div><dt>Body</dt><dd>@Entry.BodyState @Entry.BodyDetail</dd></div><div><dt>Final</dt><dd>@Entry.State</dd></div>
+        }
+        @if (Entry.ParentId is { } parent) { <div><dt>Parent</dt><dd>@Reference(parent)</dd></div> }
+        @if (Entry.OwnerId is { } owner) { <div><dt>Owner</dt><dd>@Reference(owner)</dd></div> }
+        @if (Entry.AcquiredBy is { } acquired) { <div><dt>@(Entry.Kind == "fiber" ? "Spawned by" : "Acquired by")</dt><dd>@Reference(acquired)</dd></div> }
+    </dl>
+    <section class="correlation" aria-label="Trace correlation">
+        <h4>Trace correlation</h4>
+        @if (Entry.TraceId is { } trace)
+        {
+            <label>Trace ID<code>@trace</code></label>
+            @if (Entry.SpanId is { } span) { <label>Span ID<code>@span</code></label> }
+            @if (TraceLink() is { } link) { <a class="trace-link" href="@link" target="_blank" rel="noopener noreferrer">Open trace ↗</a> }
+            @if (Entry.Kind is "op" or "attempt") { <p class="detail-note">This record refers to its nearest traced parent.</p> }
+        }
+        else
+        {
+            <p>No tracing context was available when this record started.</p>
+        }
+    </section>
+    @if (Entry.Location is not null) { <div class="source-location">↳ @Entry.Location</div> }
+    <p class="detail-note">@(Entry.Kind == "resource" ? "Acquisition has its own acquire record. This interval ends when the release attempt finishes; it does not prove physical closure." : "Offsets start with the recording. Completed durations stay fixed.")</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EffectRecordingSnapshot Snapshot { get; set; } = null!;
+    [Parameter, EditorRequired] public EffectRecordingEntry Entry { get; set; } = null!;
+    [Parameter] public string? TraceViewerUrl { get; set; }
+
+    private string Reference(long id) => Snapshot.Entries.Any(entry => entry.Id == id) ? $"#{id}" : $"#{id} unavailable";
+    private static string Ms(TimeSpan value) => value.TotalMilliseconds.ToString("N1", System.Globalization.CultureInfo.InvariantCulture);
+    private static string Percent(TimeSpan part, TimeSpan whole) => Math.Clamp(part.Ticks / (double)Math.Max(whole.Ticks, 1) * 100, 0, 100).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string? TraceLink()
+    {
+        if (Entry.TraceId is null || !Uri.TryCreate(TraceViewerUrl, UriKind.Absolute, out var viewer)
+            || viewer.Scheme is not ("http" or "https")) return null;
+        var link = new UriBuilder(viewer)
+        {
+            Path = viewer.AbsolutePath.TrimEnd('/') + "/traces/detail/" + Entry.TraceId,
+            Query = Entry.SpanId is { } span ? "spanId=" + Uri.EscapeDataString(span) : "",
+            Fragment = "",
+        };
+        return link.Uri.AbsoluteUri;
+    }
+}

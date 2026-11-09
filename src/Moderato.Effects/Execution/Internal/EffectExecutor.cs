@@ -233,7 +233,7 @@ internal sealed class LeafFrame<T, E, R>(Effect<T, E, R> effect, R environment, 
     {
         try
         {
-            return Complete(effect.Run(environment, context));
+            return Complete(effect.RunCore(environment, context));
         }
         catch (Exception exception)
         {

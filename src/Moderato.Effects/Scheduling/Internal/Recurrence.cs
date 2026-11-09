@@ -38,7 +38,9 @@ internal static class Recurrence
 
         for (var attempt = 1; ; attempt++)
         {
-            var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
+            var attemptTracking = context.Observation?.HasRecording == true
+                ? EffectObservation.Begin("attempt", context, $"{effect.TrackingName} {attempt}") : null;
+            var outcome = await TraceTasks.Observe(RunOnceAsync(effect, env, context.WithObservation(attemptTracking)), attemptTracking).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Err) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
 
@@ -70,7 +72,9 @@ internal static class Recurrence
 
         for (var repetition = 1; ; repetition++)
         {
-            var outcome = await RunOnceAsync(effect, env, context).ConfigureAwait(false);
+            var attemptTracking = context.Observation?.HasRecording == true
+                ? EffectObservation.Begin("attempt", context, $"{effect.TrackingName} {repetition}") : null;
+            var outcome = await TraceTasks.Observe(RunOnceAsync(effect, env, context.WithObservation(attemptTracking)), attemptTracking).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
             if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
 

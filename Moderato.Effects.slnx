@@ -7,6 +7,8 @@
     <Project Path="src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Moderato.Effects.Tracking.SampleTests/Moderato.Effects.Tracking.SampleTests.csproj" />
+    <Project Path="tests/Moderato.Effects.OpenTelemetry.SampleTests/Moderato.Effects.OpenTelemetry.SampleTests.csproj" />
     <Project Path="tests/Moderato.Effects.Http.SampleTests/Moderato.Effects.Http.SampleTests.csproj" />
     <Project Path="tests/Moderato.Effects.EntityFrameworkCore.Tests/Moderato.Effects.EntityFrameworkCore.Tests.csproj" />
     <Project Path="tests/Moderato.Effects.PackageVerifier/Moderato.Effects.PackageVerifier.csproj" />
@@ -21,6 +23,8 @@
     <Project Path="bench/Moderato.Effects.Benchmarks/Moderato.Effects.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/samples/">
+    <Project Path="samples/Moderato.Effects.Tracking.Samples/Moderato.Effects.Tracking.Samples.csproj" />
+    <Project Path="samples/Moderato.Effects.OpenTelemetry.Samples/Moderato.Effects.OpenTelemetry.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.EntityFrameworkCore.Samples/Moderato.Effects.EntityFrameworkCore.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Http.Samples/Moderato.Effects.Http.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Hosting.Samples/Moderato.Effects.Hosting.Samples.csproj" />

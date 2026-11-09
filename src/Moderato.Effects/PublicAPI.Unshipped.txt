@@ -1,1 +1,30 @@
 #nullable enable
+Moderato.Effects.EffectRecording
+Moderato.Effects.EffectRecording.Dispose() -> void
+Moderato.Effects.EffectRecording.GetTree() -> string!
+Moderato.Effects.Effect<T, E, R>.WithName(string! name, string! file = "", int line = 0) -> Moderato.Effects.Effect<T, E, R>
+static Moderato.Effects.EffectTracker.Record(int capacity = 2048) -> Moderato.Effects.EffectRecording!
+Moderato.Effects.EffectRecording.GetSnapshot() -> Moderato.Effects.EffectRecordingSnapshot!
+Moderato.Effects.EffectRecordingSnapshot
+Moderato.Effects.EffectRecordingSnapshot.Elapsed.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingSnapshot.Entries.get -> System.Collections.Generic.IReadOnlyList<Moderato.Effects.EffectRecordingEntry!>!
+Moderato.Effects.EffectRecordingSnapshot.Dropped.get -> long
+Moderato.Effects.EffectRecordingSnapshot.Evicted.get -> long
+Moderato.Effects.EffectRecordingSnapshot.IsComplete.get -> bool
+Moderato.Effects.EffectRecordingEntry
+Moderato.Effects.EffectRecordingEntry.Id.get -> long
+Moderato.Effects.EffectRecordingEntry.ParentId.get -> long?
+Moderato.Effects.EffectRecordingEntry.Kind.get -> string!
+Moderato.Effects.EffectRecordingEntry.Name.get -> string!
+Moderato.Effects.EffectRecordingEntry.State.get -> string!
+Moderato.Effects.EffectRecordingEntry.Detail.get -> string?
+Moderato.Effects.EffectRecordingEntry.BodyState.get -> string?
+Moderato.Effects.EffectRecordingEntry.BodyDetail.get -> string?
+Moderato.Effects.EffectRecordingEntry.OwnerId.get -> long?
+Moderato.Effects.EffectRecordingEntry.AcquiredBy.get -> long?
+Moderato.Effects.EffectRecordingEntry.Location.get -> string?
+Moderato.Effects.EffectRecordingEntry.StartOffset.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingEntry.EndOffset.get -> System.TimeSpan?
+Moderato.Effects.EffectRecordingEntry.Elapsed.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingEntry.TraceId.get -> string?
+Moderato.Effects.EffectRecordingEntry.SpanId.get -> string?

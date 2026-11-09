@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Moderato.Effects.Internal;
 using Moderato.Results;
 
@@ -16,22 +17,63 @@ public readonly partial struct Effect<T, E, R>
     private readonly Result<T, E> constant;
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
-    internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run) => this.run = run;
+    private readonly string? trackingName;
+    private readonly string? trackingLocation;
+
+    internal Effect(Func<R, RunContext, ValueTask<Outcome<T, E>>> run, [CallerMemberName] string? name = null)
+    {
+        this.run = run;
+        trackingName = name;
+    }
 
     // The delegate target carries instructions without growing each Effect value.
-    internal Effect(EffectInstruction<T, E, R> instruction) => run = instruction.Run;
+    internal Effect(EffectInstruction<T, E, R> instruction, [CallerMemberName] string? name = null)
+    {
+        run = instruction.Run;
+        trackingName = name;
+    }
 
-    internal Effect(Result<T, E> constant) => this.constant = constant;
+    internal Effect(Result<T, E> constant, [CallerMemberName] string? name = null)
+    {
+        this.constant = constant;
+        trackingName = name;
+    }
+
+    private Effect(Effect<T, E, R> source, string name, string location)
+    {
+        constant = source.constant;
+        run = source.run;
+        trackingName = name;
+        trackingLocation = location;
+    }
+
+    /// <summary>Names an operation in execution recordings without changing its work.</summary>
+    public Effect<T, E, R> WithName(string name, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new(Validate(), name, $"{Path.GetFileName(file)}:{line}");
+    }
+
+    internal string TrackingName => trackingName ?? "Effect";
 
     internal Effect<T, E, R> Validate()
         => constant.HasValue || run is not null ? this : ThrowHelper.ThrowUninitializedEffect<Effect<T, E, R>>();
 
     // Opaque async scopes call this entry; an extra dispatch frame reduces their nesting headroom.
     internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context)
+        => context.Observation?.HasRecording == true ? RunTracked(environment, context, null) : RunCore(environment, context);
+
+    internal ValueTask<Outcome<T, E>> RunCore(R environment, RunContext context)
         => constant.HasValue ? new(Steps.FromResult(constant, context))
             : (run ?? ThrowHelper.ThrowUninitializedEffect<Func<R, RunContext, ValueTask<Outcome<T, E>>>>())(environment, context);
 
     internal ValueTask<Outcome<T, E>> Run(R environment, RunContext context, int depth)
+    {
+        if (context.Observation?.HasRecording == true && (depth != 0 || run?.Target is not EffectInstruction<T, E, R>)) return RunTracked(environment, context, depth);
+        return RunDirectCore(environment, context, depth);
+    }
+
+    private ValueTask<Outcome<T, E>> RunDirectCore(R environment, RunContext context, int depth)
     {
         if (constant.HasValue) return new(Steps.FromResult(constant, context));
         if (run?.Target is EffectInstruction<T, E, R> instruction)
@@ -40,18 +82,21 @@ public readonly partial struct Effect<T, E, R>
     }
 
     internal EffectFrame<T, E> Enter(R environment, RunContext context, EffectFrame? parent)
+        => context.Observation?.HasRecording == true ? new TrackingFrame<T, E, R>(this, environment, context, parent) : EnterCore(environment, context, parent);
+
+    internal EffectFrame<T, E> EnterCore(R environment, RunContext context, EffectFrame? parent)
         => run?.Target is EffectInstruction<T, E, R> instruction
             ? instruction.Enter(environment, context, parent) : new LeafFrame<T, E, R>(this, environment, context, parent);
 
     /// <summary>Continues with the outcome and construction-time state; thrown callbacks become defects.</summary>
     internal Effect<U, F, R> Then<U, F, TState>(TState state,
-        Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next)
-        => new(new ThenInstruction<T, E, U, F, R, TState>(Validate(), state, next));
+        Func<Outcome<T, E>, R, RunContext, TState, ValueTask<Outcome<U, F>>> next, [CallerMemberName] string? name = null)
+        => new(new ThenInstruction<T, E, U, F, R, TState>(Validate(), state, next), name);
 
     internal Effect<V, G, R> Bind<U, F, V, G, TState>(TState state,
         Func<Outcome<T, E>, TState, RunContext, EffectSelection<U, F, V, G, R>> select,
-        Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project, bool isolate = false)
-        => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project, isolate));
+        Func<Outcome<U, F>, Outcome<T, E>, RunContext, TState, Outcome<V, G>> project, bool isolate = false, [CallerMemberName] string? name = null)
+        => new(new BindInstruction<T, E, U, F, V, G, R, TState>(Validate(), state, select, project, isolate), name);
 
     /// <summary>An effect that cannot fail can stand in for one with any error type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
@@ -94,6 +139,7 @@ public readonly partial struct Effect<T, E, R>
     private ValueTask<Result<T, E>> RunResult(R environment, RunContext context)
     {
         Validate();
+        if (EffectObservation.Enabled) return RunResultObserved(environment, context);
         var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return ValueTask.FromCanceled<Result<T, E>>(cancellationToken);
         if (constant.HasValue) return new(constant);
@@ -128,6 +174,7 @@ public readonly partial struct Effect<T, E, R>
     private ValueTask<Exit<T, E>> RunExit(R environment, RunContext context)
     {
         Validate();
+        if (EffectObservation.Enabled) return RunExitObserved(environment, context);
         var cancellationToken = context.CancellationToken;
         if (cancellationToken.IsCancellationRequested) return new(new Exit<T, E>(ExitCases.Interrupted));
         if (constant.HasValue) return new(ToExit(Steps.FromResult(constant, context), context));
@@ -152,6 +199,25 @@ public readonly partial struct Effect<T, E, R>
             {
                 return ToExit(Defects.From<T, E>(exception, context), context);
             }
+        }
+    }
+
+    internal EffectObservation? BeginTracking(RunContext context)
+        => EffectObservation.Begin("op", context, TrackingName, location: trackingLocation);
+
+    private ValueTask<Outcome<T, E>> RunTracked(R environment, RunContext context, int? depth)
+    {
+        var node = BeginTracking(context);
+        try
+        {
+            var child = context.WithObservation(node);
+            var task = depth is { } remaining ? RunDirectCore(environment, child, remaining) : RunCore(environment, child);
+            return TraceTasks.Observe(task, node);
+        }
+        catch (Exception exception)
+        {
+            if (node is not null) node.Fault(exception);
+            throw;
         }
     }
 

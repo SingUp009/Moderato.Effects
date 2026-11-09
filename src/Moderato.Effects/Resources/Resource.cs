@@ -49,6 +49,7 @@ public readonly struct Resource<T, E, R>
         {
             using var cancellation = new Cancellation(context);
             var releases = new Releases<R>(cancellation);
+            using var observation = releases.Observation?.Activate();
             var body = releases.BodyContext;
             Outcome<U, E> outcome;
             Outcome<T, E> acquired;
@@ -142,10 +143,10 @@ public static class Resource
         ArgumentNullException.ThrowIfNull(release);
         acquire = acquire.Validate();
         return new(acquire.Provide<ResourceEnvironment<R>>(static environment => environment.Environment)
-            .Then<T, E, Func<T, ExitCase, Effect<Unit, Never, R>>>(release, static (outcome, environment, _, release) =>
+            .Then<T, E, Func<T, ExitCase, Effect<Unit, Never, R>>>(release, static (outcome, environment, context, release) =>
         {
             // Registered before any token check, so a cancellation right after cannot leak the value.
-            if (outcome.Kind == OutcomeKind.Ok) environment.Releases.Add(outcome.Value, release);
+            if (outcome.Kind == OutcomeKind.Ok) environment.Releases.Add(outcome.Value, release, context.Observation);
 
             return new(outcome);
         }));

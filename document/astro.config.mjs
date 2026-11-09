@@ -21,7 +21,7 @@ export default defineConfig({
       { label: 'Start here', items: ['getting-started', 'from-results-to-effects', 'installation', 'adopting-in-an-application'] },
       { label: 'Write effects', items: ['gen-blocks', 'operators', 'error-unions', 'environments'] },
       { label: 'Control execution', items: ['resources', 'time', 'concurrency', 'retry-and-repeat', 'failures'] },
-      { label: 'Integrate and diagnose', items: ['hosting', 'http', 'entity-framework-core', 'effect-tracker', 'analyzers', 'caveats'] },
+      { label: 'Integrate and diagnose', items: ['hosting', 'http', 'entity-framework-core', 'effect-tracker', 'opentelemetry', 'analyzers', 'caveats'] },
     ],
   }), react()],
 });

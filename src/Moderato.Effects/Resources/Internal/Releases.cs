@@ -17,10 +17,14 @@ internal sealed class Releases<R>
     /// <summary>The context the scope's body runs with.</summary>
     internal RunContext BodyContext { get; }
 
+    internal EffectObservation? Observation { get; }
+
     internal Releases(Cancellation bodyCancellation)
     {
         this.bodyCancellation = bodyCancellation;
-        BodyContext = bodyCancellation.Context;
+        var parent = bodyCancellation.Context;
+        Observation = EffectObservation.Begin("scope", parent, "Gen/Use");
+        BodyContext = parent.WithObservation(Observation);
         EffectTracker.Track(this, EffectTrackingKind.Scope);
     }
 
@@ -39,9 +43,9 @@ internal sealed class Releases<R>
 
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release) => AddAction(release);
 
-    internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release)
+    internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release, EffectObservation? acquiredBy = null)
     {
-        var action = new AcquiredRelease<T>(value, release);
+        var action = new AcquiredRelease<T>(value, release, EffectObservation.BeginResource<T>("resource", BodyContext, Observation, acquiredBy));
         AddAction(action);
         EffectTracker.Track(action, EffectTrackingKind.Resource);
     }
@@ -59,17 +63,38 @@ internal sealed class Releases<R>
     private interface IAcquiredRelease
     {
         Effect<Unit, Never, R> Invoke(ExitCase exit);
+        EffectObservation? Observation { get; }
     }
 
-    private sealed class AcquiredRelease<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release) : IAcquiredRelease
+    private sealed class AcquiredRelease<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release, EffectObservation? observation) : IAcquiredRelease
     {
+        public EffectObservation? Observation { get; } = observation;
         public Effect<Unit, Never, R> Invoke(ExitCase exit) => release(value, exit);
     }
 
     /// <summary>Releases everything, then decides the final outcome.</summary>
     // Use and Gen each await this internal ValueTask exactly once.
+    internal ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
+        => Observation is null ? ReleaseCoreAsync(body, env) : ReleaseObservedAsync(body, env);
+
+    private async ValueTask<Outcome<T, E>> ReleaseObservedAsync<T, E>(Outcome<T, E> body, R env)
+    {
+        Observation!.Body(body);
+        try
+        {
+            var result = await ReleaseCoreAsync(body, env).ConfigureAwait(false);
+            Observation.Finish(result);
+            return result;
+        }
+        catch (Exception exception)
+        {
+            Observation.Fault(exception);
+            throw;
+        }
+    }
+
     [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-    internal async ValueTask<Outcome<T, E>> ReleaseAsync<T, E>(Outcome<T, E> body, R env)
+    private async ValueTask<Outcome<T, E>> ReleaseCoreAsync<T, E>(Outcome<T, E> body, R env)
     {
         try
         {
@@ -102,13 +127,16 @@ internal sealed class Releases<R>
             for (var i = actions is List<object> multiple ? multiple.Count - 1 : 0; i >= 0; i--)
             {
                 Outcome<Unit, Never> released;
+                var action = actions is List<object> registered ? registered[i] : actions;
+                var resource = (action as IAcquiredRelease)?.Observation;
+                var releaseObservation = EffectObservation.Begin("release", context.WithObservation(resource), action is IAcquiredRelease ? "Release" : "Defer/Fiber", Observation);
+                using var active = releaseObservation?.Activate();
                 try
                 {
-                    var action = actions is List<object> registered ? registered[i] : actions;
                     var release = action is Func<ExitCase, Effect<Unit, Never, R>> callback
                         ? callback(exit)
                         : ((IAcquiredRelease)action).Invoke(exit);
-                    released = await release.Run(env, context).ConfigureAwait(false);
+                    released = await release.Run(env, context.WithObservation(releaseObservation)).ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {
@@ -117,11 +145,13 @@ internal sealed class Releases<R>
                 finally
                 {
                     if (EffectTracker.EnableTracking)
-                        EffectTracker.Untrack(actions is List<object> registered ? registered[i] : actions);
+                        EffectTracker.Untrack(action);
                 }
 
                 if (released.Kind == OutcomeKind.Interrupted)
                     released = Defects.From<Unit, Never>(new InvalidOperationException("A resource release was interrupted before completing."), context).After(released);
+
+                EffectObservation.FinishRelease(releaseObservation, resource, released);
 
                 if (released.Kind == OutcomeKind.Die)
                 {

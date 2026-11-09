@@ -45,7 +45,53 @@ internal static class Timeouts
                 }
             });
         }
-        return new((env, context) => RunAsync(effect, env, context, after, error, passthrough, timedOut));
+        return new(RunAsync);
+
+        // Keep fixed settings off the stack while entering nested timeouts.
+        async ValueTask<Outcome<U, F>> RunAsync(R env, RunContext context)
+        {
+            Outcome<T, E> inner;
+            bool timedOutFirst;
+            long timeoutOrder;
+            try
+            {
+                var clock = Services.Resolve<TimeProvider, R>(env);
+                using var cancellation = new Deadline(context);
+                var innerContext = cancellation.Context;
+                var timer = clock.CreateTimer(
+                    static state => ((Deadline)state!).Expire(), cancellation, after, Timeout.InfiniteTimeSpan);
+                try
+                {
+                    inner = await effect.Run(env, innerContext).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    inner = Defects.From<T, E>(exception, innerContext);
+                }
+
+                timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
+                try
+                {
+                    await timer.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>(1);
+                    defects.Add(Defects.From<Unit, Never>(exception, context.WithCancellation(CancellationToken.None)));
+                    inner = Releases<R>.Combine(inner, defects);
+                }
+
+                // Taking callback failures closes collection; later failures go to diagnostics.
+                inner = cancellation.WithCallbackFailure(inner);
+                timeoutOrder = cancellation.FailureOrder;
+            }
+            catch (Exception exception)
+            {
+                return Defects.From<U, F>(exception, context);
+            }
+
+            return Finish(inner, timedOutFirst, timeoutOrder, context, error, passthrough, timedOut);
+        }
     }
 
     /// <summary>The longest wait <c>Task.Delay</c> and the system timer accept.</summary>
@@ -57,54 +103,6 @@ internal static class Timeouts
         if (after == Timeout.InfiniteTimeSpan) return;
         ArgumentOutOfRangeException.ThrowIfLessThan(after, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(after, LongestWait);
-    }
-
-    private static async ValueTask<Outcome<U, F>> RunAsync<T, E, U, F, R>(
-        Effect<T, E, R> effect, R env, RunContext context, TimeSpan after, TimeoutError error,
-        Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut)
-        where R : IHas<TimeProvider>
-    {
-        Outcome<T, E> inner;
-        bool timedOutFirst;
-        long timeoutOrder;
-        try
-        {
-            var clock = Services.Resolve<TimeProvider, R>(env);
-            using var cancellation = new Deadline(context);
-            var innerContext = cancellation.Context;
-            var timer = clock.CreateTimer(
-                static state => ((Deadline)state!).Expire(), cancellation, after, Timeout.InfiniteTimeSpan);
-            try
-            {
-                inner = await effect.Run(env, innerContext).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                inner = Defects.From<T, E>(exception, innerContext);
-            }
-
-            timedOutFirst = !cancellation.TrySettle() && cancellation.Reason == CancellationReason.Timeout;
-            try
-            {
-                await timer.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                var defects = ImmutableArray.CreateBuilder<Outcome<Unit, Never>>(1);
-                defects.Add(Defects.From<Unit, Never>(exception, context.WithCancellation(CancellationToken.None)));
-                inner = Releases<R>.Combine(inner, defects);
-            }
-
-            // Taking callback failures closes collection; later failures go to diagnostics.
-            inner = cancellation.WithCallbackFailure(inner);
-            timeoutOrder = cancellation.FailureOrder;
-        }
-        catch (Exception exception)
-        {
-            return Defects.From<U, F>(exception, context);
-        }
-
-        return Finish(inner, timedOutFirst, timeoutOrder, context, error, passthrough, timedOut);
     }
 
     // Finish after the nested run returns, keeping outcome-projection locals off the descent's stack.

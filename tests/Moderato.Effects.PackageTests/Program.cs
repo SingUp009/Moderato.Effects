@@ -27,6 +27,8 @@ await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
 await AssertImplicitUnionWidening();
 await AssertTracker();
+await RecordingTimingChecks.GetSnapshot_BlockedFailingRelease_PreservesFrozenDurations();
+await ObservationChecks.RunExitAsync_Resource_ExportsStandardTelemetry();
 AssertExitCaseAccess();
 
 string[] expected = ["Ok(ada)", "Err(NotFound 2)", "Die(InvalidOperationException)", "Err(NotFound 2)", "Ok(ada)", "Sleep(Ok)"];
