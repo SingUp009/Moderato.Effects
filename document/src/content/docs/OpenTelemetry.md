@@ -64,3 +64,9 @@ Tracing can be sampled, and exporters can drop queued data. Standard span export
 Durations include waits, scheduling and instrumentation. Nested or parallel intervals overlap: their sum is not request latency or CPU time. Metrics count completed observations, not physical resource objects or bytes retained.
 
 Core emits no environment, resource value, typed error payload, exception message, stack or source path. Additional HTTP instrumentation and logging have their own data policies. Observer failures do not replace the Effect's outcome; successful delivery is not guaranteed.
+
+## Inspect the same request locally
+
+Start `EffectTracker.Record()` to collect detailed execution metadata alongside standard telemetry. The two outputs share lifecycle observations and monotonic duration measurements. Snapshot entries expose `TraceId` and `SpanId` for correlation; operation and retry entries refer to their nearest traced parent rather than generating extra spans. See [execution recording](effect-tracker#record-execution-details).
+
+The recording's bounded history and the exporter's sampling/queue limits remain independent. The active-lifetime debug registry also remains available without either output.

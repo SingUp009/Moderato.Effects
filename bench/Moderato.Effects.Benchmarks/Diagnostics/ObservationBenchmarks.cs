@@ -8,17 +8,19 @@ namespace Moderato.Effects.Benchmarks;
 [MemoryDiagnoser]
 public class ObservationBenchmarks
 {
-    [Params("Disabled", "Metrics", "Traces")]
+    [Params("Disabled", "Recording", "Metrics", "Traces", "Combined")]
     public string Mode { get; set; } = "Disabled";
 
     private ActivityListener? activities;
     private MeterListener? metrics;
+    private EffectRecording? recording;
     private readonly Effect<int, Never, int> effect = Effect<int>.Succeed(42);
 
     [GlobalSetup]
     public void Setup()
     {
-        if (Mode == "Traces")
+        if (Mode is "Recording" or "Combined") recording = EffectTracker.Record();
+        if (Mode is "Traces" or "Combined")
         {
             activities = new()
             {
@@ -27,7 +29,7 @@ public class ObservationBenchmarks
             };
             ActivitySource.AddActivityListener(activities);
         }
-        if (Mode == "Metrics")
+        if (Mode is "Metrics" or "Combined")
         {
             metrics = new();
             metrics.InstrumentPublished = (instrument, listener) =>
@@ -50,5 +52,6 @@ public class ObservationBenchmarks
     {
         activities?.Dispose();
         metrics?.Dispose();
+        recording?.Dispose();
     }
 }

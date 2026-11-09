@@ -45,3 +45,15 @@ The activity parent identifies the recorded owning boundary; the application's a
 Trace sampling and exporter queues can omit spans. Standard exporters send completed spans; a never-ending resource may not appear in the trace view. A local Tracker snapshot remains useful for inspecting live work. The counters count completed boundaries, not live resource objects or retained bytes.
 
 Core emits no environment, resource value, error payload, exception message, stack or caller file path. ASP.NET Core and application logging have their own data policies. For deployment, use your existing authenticated collector, TLS and access controls; the local dashboard setup is a viewing example, not a public monitoring service.
+
+## Add detailed local recording
+
+The standard telemetry registration is sufficient for normal monitoring. To inspect the same work in a local debugger or a custom viewer, start a recording before the requests you want to capture:
+
+```csharp
+using var recording = EffectTracker.Record();
+```
+
+Read `recording.GetSnapshot()` while the app runs. `TraceId` and `SpanId` on each copied entry identify the corresponding trace/span in your monitoring tool. Detailed operation and retry entries refer to the nearest traced parent; they do not produce an additional span each. Without an available tracing context, the IDs are null. Sampling can omit the referenced span from the backend.
+
+Recording adds bounded in-memory history and has its own cost. It is not required for OTLP export and is not enabled by this sample by default. Disposing it stops capture of new roots while already captured work can finish. This sample exposes no public HTTP endpoint for diagnostic snapshots.
