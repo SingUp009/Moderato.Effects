@@ -71,22 +71,8 @@ The integration packages depend on Core; it does not need to be installed separa
 
 ## Documentation
 
-The API and how to use it are in the [wiki](https://github.com/SingUp009/Moderato.Effects/wiki):
-
-- [Getting started](https://github.com/SingUp009/Moderato.Effects/wiki/Getting-started)
-- [Adopting in an application](https://github.com/SingUp009/Moderato.Effects/wiki/Adopting-in-an-application)
-- [Gen blocks](https://github.com/SingUp009/Moderato.Effects/wiki/Gen-blocks)
-- [Operators](https://github.com/SingUp009/Moderato.Effects/wiki/Operators)
-- [Error unions](https://github.com/SingUp009/Moderato.Effects/wiki/Error-unions)
-- [Environments](https://github.com/SingUp009/Moderato.Effects/wiki/Environments)
-- [Hosting](https://github.com/SingUp009/Moderato.Effects/wiki/Hosting)
-- [Resources](https://github.com/SingUp009/Moderato.Effects/wiki/Resources)
-- [Time](https://github.com/SingUp009/Moderato.Effects/wiki/Time)
-- [Concurrency](https://github.com/SingUp009/Moderato.Effects/wiki/Concurrency)
-- [Retry and repeat](https://github.com/SingUp009/Moderato.Effects/wiki/Retry-and-repeat)
-- [Failures](https://github.com/SingUp009/Moderato.Effects/wiki/Failures)
-- [Analyzers and diagnostics](https://github.com/SingUp009/Moderato.Effects/wiki/Analyzers)
-- [Caveats](https://github.com/SingUp009/Moderato.Effects/wiki/Caveats)
+- [Documentation](https://moderato-effects.009singup.workers.dev) — guides and tutorials.
+- [API Reference](https://github.com/SingUp009/Moderato.Effects/wiki) — reference for the public API.
 
 ## Building from source
 
@@ -98,6 +84,10 @@ dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*
 ```
 
 BenchmarkDotNet 0.15.8 needs `--inProcess` on the .NET 11 preview.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for bug reports, feature requests and pull requests.
 
 ## Changelog
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://moderato-effects.009singup.workers.dev
+    about: Read the guide and API examples.
+  - name: Contributing guide
+    url: https://github.com/SingUp009/Moderato.Effects/blob/main/CONTRIBUTING.md
+    about: Find build instructions, test conventions, and pull request guidance.
