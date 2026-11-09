@@ -38,7 +38,7 @@ Workers Builds owns the website build and deployment. Connect the GitHub reposit
 | Preview command | `npx wrangler preview` |
 | Build watch include paths | `document/*` |
 
-Enable builds for non-production branches so pull requests receive Cloudflare build checks and preview URLs. The `.node-version` file selects Node.js 26. Workers Builds manages its build token; no Cloudflare deployment secret is required in GitHub Actions.
+Enable builds for non-production branches so pull requests receive Cloudflare build checks and preview URLs. The `.node-version` file pins Node.js 26.13.0, matching the locally verified runtime. Workers Builds manages its build token; no Cloudflare deployment secret is required in GitHub Actions.
 
 Keep the GitHub Actions document job until both a Cloudflare production build and a pull request build have succeeded. After that, remove the duplicate site job; the runnable C# tutorial remains in the .NET test job.
 
