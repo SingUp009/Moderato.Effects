@@ -48,7 +48,7 @@ Stack capture and snapshot allocation have a cost. Enable them deliberately duri
 
 Starts and completions may race with a snapshot. Enabling tracks future starts, and disabling clears the registry; re-enabling does not reconstruct existing work. The switches are process-wide, so coordinate them between tests and debugging tools.
 
-Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](opentelemetry). Its instrumentation is unreleased and is independent of these Tracker switches.
+Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](opentelemetry). Its instrumentation is independent of these Tracker switches.
 
 ## Record execution details
 
