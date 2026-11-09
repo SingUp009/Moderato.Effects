@@ -99,6 +99,10 @@ dotnet run -c Release --project bench/Moderato.Effects.Benchmarks -- --filter '*
 
 BenchmarkDotNet 0.15.8 needs `--inProcess` on the .NET 11 preview.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for bug reports, feature requests and pull requests.
+
 ## Changelog
 
 See [CHANGELOG.md](https://github.com/SingUp009/Moderato.Effects/blob/main/CHANGELOG.md). Breaking changes are listed first for every release.
