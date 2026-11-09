@@ -44,8 +44,36 @@ Moderato.Effects.Effect<T, E, R>.UnwrapOr(T fallback) -> Moderato.Effects.Effect
 Moderato.Effects.Effect<T, E, R>.UnwrapOrElse(System.Func<E, T>! fallback) -> Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>
 Moderato.Effects.Effect<T, E, R>.Widen<F>() -> Moderato.Effects.Effect<T, F, R>
 Moderato.Effects.Effect<T, E, R>.WidenEnv<R2>() -> Moderato.Effects.Effect<T, E, R2>
+Moderato.Effects.Effect<T, E, R>.WithName(string! name, string! file = "", int line = 0) -> Moderato.Effects.Effect<T, E, R>
 Moderato.Effects.EffectDiagnostics
 Moderato.Effects.EffectLinq
+Moderato.Effects.EffectRecording
+Moderato.Effects.EffectRecording.Dispose() -> void
+Moderato.Effects.EffectRecording.GetSnapshot() -> Moderato.Effects.EffectRecordingSnapshot!
+Moderato.Effects.EffectRecording.GetTree() -> string!
+Moderato.Effects.EffectRecordingEntry
+Moderato.Effects.EffectRecordingEntry.AcquiredBy.get -> long?
+Moderato.Effects.EffectRecordingEntry.BodyDetail.get -> string?
+Moderato.Effects.EffectRecordingEntry.BodyState.get -> string?
+Moderato.Effects.EffectRecordingEntry.Detail.get -> string?
+Moderato.Effects.EffectRecordingEntry.Elapsed.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingEntry.EndOffset.get -> System.TimeSpan?
+Moderato.Effects.EffectRecordingEntry.Id.get -> long
+Moderato.Effects.EffectRecordingEntry.Kind.get -> string!
+Moderato.Effects.EffectRecordingEntry.Location.get -> string?
+Moderato.Effects.EffectRecordingEntry.Name.get -> string!
+Moderato.Effects.EffectRecordingEntry.OwnerId.get -> long?
+Moderato.Effects.EffectRecordingEntry.ParentId.get -> long?
+Moderato.Effects.EffectRecordingEntry.SpanId.get -> string?
+Moderato.Effects.EffectRecordingEntry.StartOffset.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingEntry.State.get -> string!
+Moderato.Effects.EffectRecordingEntry.TraceId.get -> string?
+Moderato.Effects.EffectRecordingSnapshot
+Moderato.Effects.EffectRecordingSnapshot.Dropped.get -> long
+Moderato.Effects.EffectRecordingSnapshot.Elapsed.get -> System.TimeSpan
+Moderato.Effects.EffectRecordingSnapshot.Entries.get -> System.Collections.Generic.IReadOnlyList<Moderato.Effects.EffectRecordingEntry!>!
+Moderato.Effects.EffectRecordingSnapshot.Evicted.get -> long
+Moderato.Effects.EffectRecordingSnapshot.IsComplete.get -> bool
 Moderato.Effects.EffectRunOptions
 Moderato.Effects.EffectRunOptions.EffectRunOptions() -> void
 Moderato.Effects.EffectRunOptions.UnobservedFailureHandler.get -> System.Action<Moderato.Effects.ExitCase>?
@@ -283,6 +311,7 @@ static Moderato.Effects.EffectTracker.EnableStackTrace.set -> void
 static Moderato.Effects.EffectTracker.EnableTracking.get -> bool
 static Moderato.Effects.EffectTracker.EnableTracking.set -> void
 static Moderato.Effects.EffectTracker.GetSnapshot() -> Moderato.Effects.EffectTrackingState![]!
+static Moderato.Effects.EffectTracker.Record(int capacity = 2048) -> Moderato.Effects.EffectRecording!
 static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, E, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
 static Moderato.Effects.EffectUnionExtensions.CatchCase<T, E, R, TCase>(this Moderato.Effects.Effect<T, E, R> effect, System.Func<TCase, Moderato.Effects.Effect<T, Moderato.Effects.Never!, R>>! handler) -> Moderato.Effects.Effect<T, E, R>
 static Moderato.Effects.EmptyEnvironment.Value.get -> Moderato.Effects.EmptyEnvironment!
