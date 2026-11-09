@@ -12,6 +12,7 @@ body:
         - Moderato.Effects.Http
         - Moderato.Effects.EntityFrameworkCore
         - Source generators or analyzers
+        - Documentation website or tutorials
         - Other or unsure
     validations:
       required: true
@@ -19,7 +20,7 @@ body:
     id: environment
     attributes:
       label: Versions and environment
-      description: Include each affected package version, the SDK, target framework, operating system, and whether you use JIT or Native AOT. For a source build, include the commit.
+      description: For library issues, include package versions, SDK, target framework, OS, and JIT or Native AOT. For website issues, include the page URL and browser. For a source build, include the commit.
       placeholder: |
         Packages and versions:
         dotnet --info:

@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: User guide
-    url: https://github.com/SingUp009/Moderato.Effects/wiki
+    url: https://moderato-effects.009singup.workers.dev
     about: Read the guide and API examples.
   - name: Contributing guide
     url: https://github.com/SingUp009/Moderato.Effects/blob/main/CONTRIBUTING.md
