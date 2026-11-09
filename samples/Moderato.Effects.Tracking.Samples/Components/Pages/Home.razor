@@ -1,0 +1,78 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject TrackingSession Session
+@inject IConfiguration Configuration
+
+<PageTitle>Effect Tracker · Moderato.Effects</PageTitle>
+
+<div class="shell">
+    <header class="masthead">
+        <a class="brand" href="/" aria-label="Moderato Effects home"><img class="brand-mark" src="@Assets["moderato-symbol.svg"]" width="36" height="36" alt="" /> Moderato.Effects</a>
+        <span class="local-label">Local diagnostics</span>
+    </header>
+    <main>
+        <section class="intro">
+            <div><h1>Effect Tracker</h1><p>Application executions and the resources they own.</p></div>
+            <div class="actions viewer-actions">
+                <button class="button secondary" disabled="@(!interactive)" @onclick="ToggleUpdates">@(paused ? "Resume updates" : "Pause updates")</button>
+                <button class="button secondary" disabled="@(!interactive)" @onclick="Refresh">Refresh</button>
+            </div>
+        </section>
+
+        @if (snapshot is { } view)
+        {
+            var visible = VisibleEntries();
+            <section class="metrics" aria-label="Capture summary">
+                <div class="metric"><span>Retained records</span><strong>@view.Entries.Count <small>/ @TrackingSession.CAPACITY</small></strong></div>
+                <div class="metric"><span>Running roots</span><strong>@view.Entries.Count(static entry => entry.Kind == "run" && entry.State == "Running")</strong></div>
+                <div class="metric"><span>Active resource records</span><strong>@view.Entries.Count(static entry => entry.Kind == "resource" && entry.State == "Running")</strong></div>
+                <div class="metric"><span>Capture coverage</span><strong class="@(view.IsComplete ? "good-text" : "warning-text")">@(view.IsComplete ? "Complete" : "Partial")</strong></div>
+            </section>
+
+            <section class="filters" aria-label="Execution filters">
+                <label>Find execution<input disabled="@(!interactive)" type="search" @bind="query" @bind:event="oninput" @bind:after="ResetRoot" placeholder="Operation, trace ID, or record ID" /></label>
+                <label>Outcome<select disabled="@(!interactive)" @bind="outcome" @bind:after="ResetRoot"><option value="">All outcomes</option><option>Running</option><option>Succeeded</option><option>Failed</option><option>Die</option><option>Interrupted</option></select></label>
+                <label>Execution<select disabled="@(!interactive)" @bind="rootId" @bind:after="SelectRoot"><option value="">All matching executions</option>@foreach (var root in MatchingRoots()) { <option value="@root.Id">#@root.Id · @ExecutionName(root) · @root.State</option> }</select></label>
+            </section>
+            @if (notice is not null) { <p class="capture-notice" role="status">@notice</p> }
+
+            <div class="workspace">
+                <section class="panel tree-panel" aria-labelledby="tree-title">
+                    <div class="panel-heading">
+                        <h2 id="tree-title">Execution tree</h2>
+                        <span class="live-tag @(paused ? "paused-tag" : "")"><span class="live-dot"></span>@(paused ? "PAUSED VIEW" : "LIVE")</span>
+                    </div>
+                    <div class="tree-columns"><span>OPERATION / LIFETIME</span><span>OUTCOME</span><span>DURATION</span></div>
+                    <div class="tree-scroll">
+                        @if (view.Entries.Count == 0)
+                        {
+                            <div class="empty-state"><h3>No recorded executions</h3><p>Waiting for application work.</p></div>
+                        }
+                        else if (visible.Count == 0)
+                        {
+                            <div class="empty-state"><h3>No matching executions</h3><p>Change the search or outcome filter.</p></div>
+                        }
+                        else
+                        {
+                            <ExecutionTree Entries="visible" SelectedId="selectedId" Selected="Select" />
+                        }
+                    </div>
+                    <div class="panel-footer"><span>@view.Dropped dropped · @view.Evicted evicted</span><span>Snapshot at +@view.Elapsed.TotalSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) s</span></div>
+                </section>
+                <aside class="panel inspector" aria-labelledby="detail-title">
+                    <div class="panel-heading"><h2 id="detail-title">Execution details</h2></div>
+                    @if (view.Entries.FirstOrDefault(entry => entry.Id == selectedId) is { } selected)
+                    {
+                        <EntryDetails Snapshot="view" Entry="selected" TraceViewerUrl="@(Configuration["Tracking:TraceViewerUrl"])" />
+                    }
+                    else
+                    {
+                        <div class="detail-placeholder"><p>@(selectedId is { } missing ? $"Record #{missing} is no longer retained." : "Select a record to inspect timing, ownership, and trace correlation.")</p></div>
+                    }
+                </aside>
+            </div>
+            <footer class="page-footer"><span>This process only · pausing does not stop capture</span><span>Overlapping durations are not additive. Completion does not prove physical closure.</span></footer>
+        }
+    </main>
+</div>

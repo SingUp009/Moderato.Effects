@@ -1,0 +1,64 @@
+<ul class="tree" role="list">
+    @foreach (var entry in level)
+    {
+        <li @key="entry.Id">
+            <div class="tree-line @(SelectedId == entry.Id ? "selected" : "")">
+                @if (children[entry.Id].Any())
+                {
+                    <button class="fold" aria-label="@(collapsed.Contains(entry.Id) ? $"Expand {entry.Name}" : $"Collapse {entry.Name}")"
+                            aria-expanded="@(!collapsed.Contains(entry.Id))" @onclick="() => Toggle(entry.Id)">
+                        @(collapsed.Contains(entry.Id) ? "›" : "⌄")
+                    </button>
+                }
+                else
+                {
+                    <span class="fold-spacer"></span>
+                }
+                <button class="node" @onclick="() => Selected.InvokeAsync(entry.Id)">
+                    <span class="node-kind">@entry.Kind</span>
+                    <span class="node-title"><span class="node-name">@entry.Name</span>
+                        @if (entry.BodyState is not null) { <small class="body-result">body @entry.BodyState @entry.BodyDetail</small> }
+                        @if (ParentId is null && entry.ParentId is { } missingParent) { <small class="body-result">parent #@missingParent unavailable</small> }
+                    </span>
+                    <span class="node-id">#@entry.Id</span>
+                    <span class="node-outcome">
+                        @if (entry.Kind == "resource") { <small>lifetime</small> }
+                        <span class="state @entry.State.ToLowerInvariant()">@entry.State</span>
+                    </span>
+                    <span class="node-time">@Milliseconds(entry.Elapsed)<span>ms</span></span>
+                </button>
+            </div>
+            @if (!collapsed.Contains(entry.Id))
+            {
+                <ExecutionTree Entries="Entries" Children="children" ParentId="entry.Id" SelectedId="SelectedId" Selected="Selected" />
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<EffectRecordingEntry> Entries { get; set; } = [];
+    [Parameter] public long? ParentId { get; set; }
+    [Parameter] public ILookup<long, EffectRecordingEntry>? Children { get; set; }
+    [Parameter] public long? SelectedId { get; set; }
+    [Parameter] public EventCallback<long> Selected { get; set; }
+    private readonly HashSet<long> collapsed = [];
+    private ILookup<long, EffectRecordingEntry> children = Array.Empty<EffectRecordingEntry>().ToLookup(static entry => entry.ParentId ?? 0);
+    private IEnumerable<EffectRecordingEntry> level = [];
+
+    protected override void OnParametersSet()
+    {
+        children = Children ?? Entries.ToLookup(static entry => entry.ParentId ?? 0);
+        if (ParentId is { } parent)
+        {
+            level = children[parent];
+        }
+        else
+        {
+            var known = Entries.Select(static entry => entry.Id).ToHashSet();
+            level = Entries.Where(entry => entry.ParentId is null || !known.Contains(entry.ParentId.Value));
+        }
+    }
+    private void Toggle(long id) { if (!collapsed.Add(id)) collapsed.Remove(id); }
+    private static string Milliseconds(TimeSpan value) => value.TotalMilliseconds.ToString("N1", System.Globalization.CultureInfo.InvariantCulture);
+}
