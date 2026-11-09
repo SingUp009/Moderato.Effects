@@ -4,8 +4,6 @@ title: OpenTelemetry
 
 # OpenTelemetry
 
-> This integration is unreleased. The published preview.5 package does not emit these activities or metrics.
-
 Collect Effect execution telemetry using .NET's standard `ActivitySource` and `Meter`. Core does not depend on the OpenTelemetry SDK. Applications select their SDK, exporter and monitoring backend.
 
 ## Register collection

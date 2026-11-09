@@ -40,7 +40,7 @@ EffectTracker.EnableTracking = true;
 
 Stack capture applies only to new entries and is disabled by default. Each snapshot entry has `Id`, `Kind`, `TypeName`, `StartedAt` and an optional `StackTrace`. `TypeName` describes the internal lifetime owner, not an application operation name.
 
-Stack capture and snapshot allocation have a cost. Enable them deliberately during diagnosis. Tracking is disabled by default; this does not promise that the presence of tracking support has zero execution overhead. Disabled completion overhead is tracked in [#401](https://github.com/SingUp009/Moderato.Effects/issues/401).
+Stack capture and snapshot allocation have a cost. Enable them deliberately during diagnosis. Tracking is disabled by default; this does not promise that the presence of tracking support has zero execution overhead.
 
 ## Build a display
 
