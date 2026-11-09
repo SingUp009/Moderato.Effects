@@ -52,8 +52,6 @@ Core provides the data API. For standard tracing and process-wide runtime metric
 
 ## Record execution details
 
-The following API is unreleased. It is not available in the published preview.5 package.
-
 Start a bounded recording before running the work:
 
 ```csharp
@@ -70,7 +68,7 @@ The default capacity is 2,048 records. Completed entries can be evicted, and new
 
 ## Use the local viewer
 
-The [Tracking sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Tracking.Samples) provides a read-only Blazor screen for execution recordings. Like the recording API, it is unreleased; build it from source with the SDK selected by `global.json`.
+The [Tracking sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Tracking.Samples) provides a read-only Blazor screen for execution recordings. Build it from source with the SDK selected by `global.json`.
 
 ```sh
 dotnet watch --project samples/Moderato.Effects.Tracking.Samples
