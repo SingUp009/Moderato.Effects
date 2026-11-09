@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "prepare": "panda codegen"
+    "prepare": "panda codegen",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.4",
@@ -25,6 +26,7 @@
     "@pandacss/dev": "^2.5.0",
     "@pandacss/preset-base": "^2.5.0",
     "@pandacss/preset-panda": "^2.5.0",
-    "@pandacss/vite": "^2.5.0"
+    "@pandacss/vite": "^2.5.0",
+    "wrangler": "^4.158.0"
   }
 }

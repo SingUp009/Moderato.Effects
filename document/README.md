@@ -1,4 +1,4 @@
-# Moderato.Effects documentation preview
+# Moderato.Effects documentation
 
 Edit the Markdown and MDX in `src/content/docs/`. Starlight builds the site directly from these files.
 
@@ -7,4 +7,17 @@ npm ci
 npm run dev
 ```
 
-Use `npm run build` for a static build in `dist/`. This is a review copy; it does not update the official GitHub Wiki.
+## Cloudflare Workers
+
+The site is static. Workers serves the generated `dist/` directory with its static assets support; no server adapter is needed.
+
+Authenticate with your Cloudflare account, then build and deploy:
+
+```sh
+npx wrangler login
+npm run deploy
+```
+
+`wrangler.jsonc` names the Worker `moderato-effects-docs` and uses the generated `404.html` for unknown routes. Use `npx wrangler deploy --dry-run` after `npm run build` to check deployment configuration without publishing.
+
+This site does not update the separate GitHub Wiki repository.
