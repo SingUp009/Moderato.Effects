@@ -15,8 +15,11 @@ Open the login URL printed by the dashboard. Then run this application in anothe
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
+DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 dotnet run --project samples/Moderato.Effects.OpenTelemetry.Samples -- --urls http://localhost:5218
 ```
+
+The CLI opt-out keeps SDK command telemetry out of this viewer; the application still exports its own telemetry. Select the `Moderato.Effects.OpenTelemetry.Samples` service in the dashboard.
 
 Send real requests:
 
