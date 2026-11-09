@@ -5,10 +5,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.6] - 2026-11-09
+
 ### Added
 
-- Share internal lifecycle observations between detailed execution recording and standard telemetry. Add immutable recording snapshots with monotonic resource timing and trace/span correlation IDs. ([#397](https://github.com/SingUp009/Moderato.Effects/issues/397), [#399](https://github.com/SingUp009/Moderato.Effects/issues/399))
-- Emit standard .NET activities and completion/duration metrics for Effect runs, scopes, fibers, acquisition, resource lifetimes and release attempts independently of debug tracking. Add an HTTP application sample with OpenTelemetry OTLP export and process-wide runtime metrics. ([#399](https://github.com/SingUp009/Moderato.Effects/issues/399))
+- Emit standard .NET activities and completion/duration metrics for Effect runs, scopes, fibers, acquisition, resource lifetimes and release attempts, independently of debug tracking. Core has no OpenTelemetry SDK or exporter dependency. ([#439](https://github.com/SingUp009/Moderato.Effects/pull/439))
+- Add bounded execution recording with `EffectTracker.Record()`, named operations through `WithName`, immutable snapshots, resource ownership, monotonic timing, body/final outcomes and trace/span correlation IDs. Recording and standard telemetry share observation points but remain independently enabled. ([#439](https://github.com/SingUp009/Moderato.Effects/pull/439))
+- Add a read-only local Blazor viewer and real HTTP samples with OTLP export. Document the two views using screenshots of the same request. The viewer observes its own process and is intended for access from the same PC. ([#439](https://github.com/SingUp009/Moderato.Effects/pull/439), [#440](https://github.com/SingUp009/Moderato.Effects/pull/440))
+
+### Changed
+
+- Keep fixed timeout settings in the construction-time closure, preserving the existing finite timeout-nesting verification depth after adding observation metadata. Arbitrarily deep control-wrapper nesting remains unsupported. ([#439](https://github.com/SingUp009/Moderato.Effects/pull/439))
+
+### Validation and known limitations
+
+- This release updates `Moderato.Effects` only. Hosting, HTTP and EF retain their independently versioned preview.5 packages.
+- Validated with the .NET 11 RC3 SDK/runtime pinned in `global.json`; .NET 11 GA revalidation remains outstanding.
+- Core, Hosting and HTTP have JIT and Linux x64 Native AOT package-consumer coverage. EF has JIT and SQLite coverage; EF Native AOT, PostgreSQL and real network failures are not validated.
+- Validation includes 2,555 solution tests, process-isolated deep-composition checks, short sustained-execution checks and 120 real HTTP requests with matching digests. No new long-duration soak is included; it remains deferred to an always-on PC.
+- Recording retains bounded metadata and can drop or evict records. Trace sampling and exporter queues independently affect telemetry delivery. Neither release completion nor an observed interruption proves whether an external operation completed.
+- Observation adds time and allocation costs when enabled. Runtime allocation metrics are process-wide, not per Effect; nested durations overlap and are not additive CPU time. Short-run measurements do not establish performance under sustained production load.
 
 ## [0.1.0-preview.5] - 2026-11-06
 
@@ -310,7 +326,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 - Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.5...HEAD
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.6...HEAD
+[0.1.0-preview.6]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.5...v0.1.0-preview.6
 [0.1.0-preview.5]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.4...v0.1.0-preview.5
 [0.1.0-preview.4]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.3...v0.1.0-preview.4
 [0.1.0-preview.3]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...v0.1.0-preview.3
