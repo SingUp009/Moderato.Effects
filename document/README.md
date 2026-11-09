@@ -24,6 +24,17 @@ npm run deploy
 
 This site does not update the separate GitHub Wiki repository.
 
+## Markdown for agents
+
+`/llms.txt` indexes the Markdown guides and tutorial chapters. Each guide is also available with a `.md` suffix, for example `/getting-started.md` or `/tutorial/01-results.md`. These files are generated from the same content as the HTML pages during the build. Drafts and the MDX landing page are excluded.
+
+```sh
+curl https://moderato-effects.009singup.workers.dev/llms.txt
+curl https://moderato-effects.009singup.workers.dev/getting-started.md
+```
+
+HTML URLs continue to return HTML; Markdown URLs return `text/markdown`. No request-time conversion is needed. `npm run build` also checks the generated Markdown index and its targets.
+
 ## Automatic builds
 
 Workers Builds owns the website build and deployment. Connect the GitHub repository to the `moderato-effects` Worker and use these settings:

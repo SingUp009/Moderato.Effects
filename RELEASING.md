@@ -22,7 +22,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the EF consumer passes under JIT. EF Native AOT is not validated. All integration-only consumers receive the transitive generators and analyzers.
 - [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all four packages.
 - [ ] Review the local HTTP validation notes, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
-- [ ] Prepare English wiki drafts for Hosting, HTTP, EF and Core operator changes. During previews, keep drafts locally and leave the published wiki unchanged until the stable release.
+- [ ] Update the English guides in `document/src/content/docs/` for public API and behavior changes. Generate and review the separate Wiki's API reference using [.github/tools/ApiReference](.github/tools/ApiReference/README.md).
 
 Merge the PR once CI is green.
 
@@ -41,7 +41,7 @@ Merge the PR once CI is green.
 - [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against the selected package's own version, packs all four packages at their declared versions and uploads them for validation. `package` runs consumers using each package's version, checks their analyzers and exercises supported consumers with Native AOT. EF currently has JIT checks only. Only the tagged package and its symbols are copied to `artifacts/release/` for publication.
 - [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**. Before an extension is pushed, CI confirms that its required Core version is already available on nuget.org; wait for indexing and rerun if it is not.
 - [ ] Confirm the selected package version on nuget.org. Packages not selected by this tag must remain unchanged. Indexing can take 5 to 15 minutes.
-- [ ] For the stable release only, after all packages are publicly available, review the saved drafts against the released APIs and update the English wiki installation commands, notices and index labels. Revalidate draft examples and version references; do not apply preview-era drafts unchanged.
+- [ ] After the packages are publicly available, regenerate and review the Wiki API reference from the released source. Publish the reviewed reference to the separate Wiki repository. Verify the documentation site's installation commands, examples and version references against the released packages.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 

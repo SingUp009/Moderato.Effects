@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <ProjectReference Include="../../../src/Moderato.Effects/Moderato.Effects.csproj" />
+    <ProjectReference Include="../../../src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj" />
+    <ProjectReference Include="../../../src/Moderato.Effects.Http/Moderato.Effects.Http.csproj" />
+    <ProjectReference Include="../../../src/Moderato.Effects.EntityFrameworkCore/Moderato.Effects.EntityFrameworkCore.csproj" />
+  </ItemGroup>
+</Project>
