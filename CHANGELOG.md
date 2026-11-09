@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Emit standard .NET activities and completion/duration metrics for Effect runs, scopes, fibers, acquisition, resource lifetimes and release attempts independently of debug tracking. Add an HTTP application sample with OpenTelemetry OTLP export and process-wide runtime metrics. ([#399](https://github.com/SingUp009/Moderato.Effects/issues/399))
+
 ## [0.1.0-preview.5] - 2026-11-06
 
 ### Added
