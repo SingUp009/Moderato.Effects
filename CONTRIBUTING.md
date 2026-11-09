@@ -1,6 +1,6 @@
 # Contributing
 
-Bug reports, documentation improvements and pull requests are welcome.
+Bug reports, documentation improvements and pull requests are welcome. Using the library in applications and sharing what works or is confusing also helps. Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Issues
 
