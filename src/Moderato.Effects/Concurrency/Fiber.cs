@@ -14,7 +14,7 @@ public sealed class Fiber<T, E, R>
     private Fiber(Effect<T, E, R> effect, R env, Releases<R> owner, Cancellation cancellation)
     {
         this.cancellation = cancellation;
-        var observation = EffectObservation.Begin("fiber", owner.BodyContext);
+        var observation = EffectObservation.Begin("fiber", owner.BodyContext, effect.TrackingName, owner.Observation, cancellation.Context.Observation);
         var context = cancellation.Context.WithObservation(observation);
         EffectTracker.Track(this, EffectTrackingKind.Fiber);
         task = Task.Run(async () =>

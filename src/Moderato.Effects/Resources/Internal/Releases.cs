@@ -23,7 +23,7 @@ internal sealed class Releases<R>
     {
         this.bodyCancellation = bodyCancellation;
         var parent = bodyCancellation.Context;
-        Observation = EffectObservation.Begin("scope", parent);
+        Observation = EffectObservation.Begin("scope", parent, "Gen/Use");
         BodyContext = parent.WithObservation(Observation);
         EffectTracker.Track(this, EffectTrackingKind.Scope);
     }
@@ -43,9 +43,9 @@ internal sealed class Releases<R>
 
     internal void Add(Func<ExitCase, Effect<Unit, Never, R>> release) => AddAction(release);
 
-    internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release)
+    internal void Add<T>(T value, Func<T, ExitCase, Effect<Unit, Never, R>> release, EffectObservation? acquiredBy = null)
     {
-        var action = new AcquiredRelease<T>(value, release, EffectObservation.Begin("resource", BodyContext));
+        var action = new AcquiredRelease<T>(value, release, EffectObservation.BeginResource<T>("resource", BodyContext, Observation, acquiredBy));
         AddAction(action);
         EffectTracker.Track(action, EffectTrackingKind.Resource);
     }
@@ -129,7 +129,7 @@ internal sealed class Releases<R>
                 Outcome<Unit, Never> released;
                 var action = actions is List<object> registered ? registered[i] : actions;
                 var resource = (action as IAcquiredRelease)?.Observation;
-                var releaseObservation = EffectObservation.Begin("release", context.WithObservation(resource));
+                var releaseObservation = EffectObservation.Begin("release", context.WithObservation(resource), action is IAcquiredRelease ? "Release" : "Defer/Fiber", Observation);
                 using var active = releaseObservation?.Activate();
                 try
                 {
@@ -151,8 +151,7 @@ internal sealed class Releases<R>
                 if (released.Kind == OutcomeKind.Interrupted)
                     released = Defects.From<Unit, Never>(new InvalidOperationException("A resource release was interrupted before completing."), context).After(released);
 
-                releaseObservation?.Finish(released);
-                resource?.Finish(released);
+                EffectObservation.FinishRelease(releaseObservation, resource, released);
 
                 if (released.Kind == OutcomeKind.Die)
                 {

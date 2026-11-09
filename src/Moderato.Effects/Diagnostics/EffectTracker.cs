@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace Moderato.Effects;
 
 /// <summary>Lists active scope, fiber and resource lifetimes for debugging.</summary>
-public static class EffectTracker
+public static partial class EffectTracker
 {
     private static ConditionalWeakTable<object, EffectTrackingState>? tracking;
     private static bool enableStackTrace;
