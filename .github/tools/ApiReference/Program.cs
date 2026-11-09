@@ -14,7 +14,7 @@ Directory.CreateDirectory(output);
 var packages = new[] { "Moderato.Effects", "Moderato.Effects.Hosting", "Moderato.Effects.Http", "Moderato.Effects.EntityFrameworkCore" };
 var paths = Directory.GetFiles(AppContext.BaseDirectory, "*.dll")
     .Concat(((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator))
-    .Distinct(StringComparer.Ordinal).ToArray();
+    .DistinctBy(Path.GetFileName, StringComparer.Ordinal).ToArray();
 var references = paths.Select(path => MetadataReference.CreateFromFile(path)).ToArray();
 var compilation = CSharpCompilation.Create("ApiReference", references: references);
 var format = new SymbolDisplayFormat(
@@ -23,6 +23,7 @@ var format = new SymbolDisplayFormat(
     memberOptions: SymbolDisplayMemberOptions.IncludeAccessibility | SymbolDisplayMemberOptions.IncludeModifiers | SymbolDisplayMemberOptions.IncludeParameters | SymbolDisplayMemberOptions.IncludeType | SymbolDisplayMemberOptions.IncludeConstantValue | SymbolDisplayMemberOptions.IncludeRef,
     parameterOptions: SymbolDisplayParameterOptions.IncludeType | SymbolDisplayParameterOptions.IncludeName | SymbolDisplayParameterOptions.IncludeDefaultValue | SymbolDisplayParameterOptions.IncludeParamsRefOut | SymbolDisplayParameterOptions.IncludeExtensionThis,
     propertyStyle: SymbolDisplayPropertyStyle.ShowReadWriteDescriptor,
+    delegateStyle: SymbolDisplayDelegateStyle.NameAndSignature,
     kindOptions: SymbolDisplayKindOptions.IncludeTypeKeyword,
     miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes | SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 var assemblies = packages.Select(package => (IAssemblySymbol)compilation.GetAssemblyOrModuleSymbol(
@@ -86,6 +87,8 @@ IEnumerable<INamedTypeSymbol> GetTypes(INamespaceOrTypeSymbol container)
 }
 
 bool IsPublicMember(ISymbol member) => member.DeclaredAccessibility == Accessibility.Public && member is not INamedTypeSymbol &&
+    member.ContainingType.TypeKind != TypeKind.Delegate &&
+    (member.ContainingType.TypeKind != TypeKind.Enum || member is IFieldSymbol) &&
     (member is not IMethodSymbol method || method.MethodKind is MethodKind.Constructor or MethodKind.Ordinary or MethodKind.Conversion or MethodKind.UserDefinedOperator) &&
     (member.CanBeReferencedByName || member is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.Conversion or MethodKind.UserDefinedOperator });
 

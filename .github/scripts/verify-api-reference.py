@@ -25,6 +25,10 @@ assert 'public const string SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed"'
 assert "needs `R` and ends with `T` or `E`" in effect
 assert "where F : IUnionRest<F, E, TCase>" in effect
 assert "IEquatable<Exit<T, E>>" in (output / "moderato.effects.exit-2.md").read_text()
+assert "ConstraintKind()" not in (output / "moderato.effects.entityframeworkcore.constraintkind.md").read_text()
+delegate = (output / "moderato.effects.entityframeworkcore.trymapdatabasefailure-1.md").read_text()
+assert "public delegate bool TryMapDatabaseFailure<E>(DatabaseFailure failure, out E error)" in delegate
+assert "IntPtr" not in delegate
 assert "**Returns:**" in (output / "moderato.effects.http.effectrequest.md").read_text()
 assert "Connects effects to request cancellation and standard logging." in (output / "moderato.effects.http.effectshttpservicecollectionextensions.md").read_text()
 print(f"Verified {len(expected)} tracked public types, local links, signatures, and XML documentation.")
