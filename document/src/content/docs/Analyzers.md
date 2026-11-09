@@ -36,8 +36,8 @@ When MEFF103 or MEFF104 is reported, nothing is generated for that environment.
 
 | ID | Severity | Reports | Fix |
 |---|---|---|---|
-| MEFF301 | Warning | A catch-all `catch` around scope steps, which swallows `ScopeFailure` | Add `when (ex is not ScopeFailure)`, or rethrow with `throw;` |
-| MEFF302 | Warning | `scope.Run` / `Get` / `Acquire` / `Fork` in `finally` or a catch-all `catch`, which does not run after an Err | Use `scope.Defer` or a resource for cleanup |
+| MEFF301 | Warning | A `catch` around scope steps that swallows `ScopeFailure` | Add `when (ex is not ScopeFailure)`, or rethrow with `throw;` |
+| MEFF302 | Warning | `scope.Run` / `Get` / `Acquire` / `Fork` in `finally` or in a `catch` that handles `ScopeFailure` | Use `scope.Defer` or a resource for cleanup |
 | MEFF303 | Warning | The scope used in a nested function: a lambda, a local function or a nested Gen block | Use the scope only in its own block; run the nested block with `scope.Run` |
 | MEFF304 | Warning | The scope stored in a field or property, or returned | Keep the scope inside its block |
 | MEFF305 | Warning | `scope.Acquire` / `Defer` / `Fork` in a loop, which holds every resource until the block ends | Use `resource.Use` or a nested Gen block per iteration |
@@ -55,6 +55,8 @@ Parentheses, `checked` / `unchecked`, null-forgiving `!`, identity casts and sta
 MEFF306 checks direct `Result` access and calls to the supported wait methods. Taking a method-group reference, mentioning a member in `nameof`, or calling a user extension does not trigger it. The analyzer does not follow later calls through delegates or helper implementations.
 
 A `nameof` operand does not count as scope use for MEFF301 or MEFF303: it neither runs a scope operation nor captures the scope.
+
+MEFF301 and MEFF302 recognize `catch (ScopeFailure)` and filters that accept it based on the caught exception's type, such as `when (ex is not OperationCanceledException)`. Filters that call application code may require manual review.
 
 MEFF305 includes tuple-deconstructing `foreach` and `await foreach` loops. Use a nested Gen block per iteration when its resources should be released before the next iteration.
 

@@ -437,10 +437,12 @@ public class SwallowedErrTests
             {
                 throw scope.Fail(new NotFound(1));
             }
+#pragma warning disable MEFF301
             catch (ScopeFailure)
             {
                 throw new InvalidOperationException("wrapped");
             }
+#pragma warning restore MEFF301
         });
 
         // When
