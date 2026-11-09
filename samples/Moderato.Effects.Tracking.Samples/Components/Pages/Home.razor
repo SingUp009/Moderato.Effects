@@ -4,16 +4,15 @@
 @inject TrackingSession Session
 @inject IConfiguration Configuration
 
-<PageTitle>Effect Tracker · Moderato.Effects</PageTitle>
+<PageTitle>Effect Tracker | Moderato.Effects</PageTitle>
 
 <div class="shell">
     <header class="masthead">
         <a class="brand" href="/" aria-label="Moderato Effects home"><img class="brand-mark" src="@Assets["moderato-symbol.svg"]" width="36" height="36" alt="" /> Moderato.Effects</a>
-        <span class="local-label">Local diagnostics</span>
     </header>
     <main>
         <section class="intro">
-            <div><h1>Effect Tracker</h1><p>Application executions and the resources they own.</p></div>
+            <div><h1>Effect Tracker</h1></div>
             <div class="actions viewer-actions">
                 <button class="button secondary" disabled="@(!interactive)" @onclick="ToggleUpdates">@(paused ? "Resume updates" : "Pause updates")</button>
                 <button class="button secondary" disabled="@(!interactive)" @onclick="Refresh">Refresh</button>
@@ -72,7 +71,7 @@
                     }
                 </aside>
             </div>
-            <footer class="page-footer"><span>This process only · pausing does not stop capture</span><span>Overlapping durations are not additive. Completion does not prove physical closure.</span></footer>
+            <footer class="page-footer"><span>Copyright © 2026 SingUp_009</span></footer>
         }
     </main>
 </div>
