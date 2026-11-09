@@ -14,14 +14,16 @@ Choose the package your application needs. The integration packages bring Core a
 | [Moderato.Effects.EntityFrameworkCore](/entity-framework-core/) | Owned EF transactions and scope-aware saves |
 
 ```sh
-dotnet add package Moderato.Effects
+dotnet add package Moderato.Effects --prerelease
 ```
 
-For an integration:
+The packages are currently previews, so these commands include `--prerelease`. For an integration:
 
 ```sh
-dotnet add package Moderato.Effects.EntityFrameworkCore
+dotnet add package Moderato.Effects.EntityFrameworkCore --prerelease
 ```
+
+Integrations specify a minimum Core version. Add or update `Moderato.Effects` directly to use newer Core features; the integration package does not need the same version number.
 
 ## Build from source
 
