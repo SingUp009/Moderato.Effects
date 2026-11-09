@@ -6,6 +6,10 @@ title: OpenTelemetry
 
 Collect Effect execution telemetry using .NET's standard `ActivitySource` and `Meter`. Core does not depend on the OpenTelemetry SDK. Applications select their SDK, exporter and monitoring backend.
 
+[![Aspire displaying the HTTP request and effect lifetime spans, with the resource span and its outcome selected.](/opentelemetry/demo.png)](/opentelemetry/demo.png)
+
+Aspire shows the same request as the [local viewer](effect-tracker#use-the-local-viewer), after it has completed. Its duration includes waiting for the upload. Select the image to view it at full size.
+
 ## Register collection
 
 Add `OpenTelemetry.Extensions.Hosting`, `OpenTelemetry.Exporter.OpenTelemetryProtocol` and, for HTTP applications, `OpenTelemetry.Instrumentation.AspNetCore` to your application. Configure the providers at startup:
