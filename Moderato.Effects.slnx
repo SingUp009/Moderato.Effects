@@ -26,6 +26,9 @@
     <Project Path="samples/Moderato.Effects.Hosting.Samples/Moderato.Effects.Hosting.Samples.csproj" />
     <Project Path="samples/Moderato.Effects.Samples/Moderato.Effects.Samples.csproj" />
   </Folder>
+  <Folder Name="/tutorial/">
+    <Project Path="tutorial/Moderato.Effects.Tutorial/Moderato.Effects.Tutorial.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="global.json" />

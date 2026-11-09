@@ -1,0 +1,32 @@
+.landing-features {
+    margin-top: 0;
+    padding-block: 1rem 2.5rem;
+}
+
+.landing-features .sl-link-card {
+    align-content: start;
+    padding: 1.5rem;
+    background: var(--sl-color-bg-nav);
+    box-shadow: none;
+}
+
+.landing-features .sl-link-card .title {
+    font-size: 1rem;
+}
+
+.landing-features .sl-link-card .description {
+    font-size: 0.875rem;
+    line-height: 1.65;
+}
+
+@media (min-width: 60rem) {
+    .landing-features .card-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+    }
+}
+
+.landing-hero .expressive-code pre {
+    font-size: 0.8125rem;
+    border-radius: 0.5rem;
+}

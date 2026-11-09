@@ -1,0 +1,22 @@
+---
+title: Moderato.Effects
+description: An effect system for C# with typed errors, explicit dependencies, and managed resource lifetimes.
+template: splash
+hero: {}
+prev: false
+next: false
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import '../../styles/landing.css';
+
+<div class="landing-features">
+
+<CardGrid>
+  <LinkCard title="Typed errors" description="Make expected failures part of your signature. Return Ok or Err and handle each case." href="/failures/" />
+  <LinkCard title="Explicit dependencies" description="Declare the services your work needs in its environment. Supply them when you run it." href="/environments/" />
+  <LinkCard title="Managed resources" description="Acquire resources in a scope and release them when it ends, including after failure or cancellation." href="/resources/" />
+  <LinkCard title="Composable execution" description="Add retries, timeouts, and concurrency around the same description of work." href="/operators/" />
+</CardGrid>
+
+</div>
