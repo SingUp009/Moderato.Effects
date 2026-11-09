@@ -10,6 +10,13 @@ export default defineConfig({
   integrations: [
     starlight({
     plugins: [starlightThemeNord()],
+    // Starlight declares summary_large_image but adds no image, so the card needs an absolute URL here.
+    head: [
+      { tag: 'meta', attrs: { property: 'og:image', content: 'https://moderato-effects.009singup.workers.dev/ogp.jpg' } },
+      { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+      { tag: 'meta', attrs: { property: 'og:image:height', content: '676' } },
+      { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://moderato-effects.009singup.workers.dev/ogp.jpg' } },
+    ],
     customCss: ['./src/styles/panda.css'],
     components: { Hero: './src/components/LandingHero.astro', Footer: './src/components/Footer.astro' },
     title: 'Moderato.Effects',
