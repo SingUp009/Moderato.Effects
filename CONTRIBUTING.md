@@ -67,7 +67,7 @@ Follow the surrounding code and [.editorconfig](.editorconfig):
 
 Add public API changes to the affected package's `PublicAPI.Unshipped.txt`; leave release bookkeeping to the release process. For analyzer changes, update `AnalyzerReleases.Unshipped.md` in the source generator project. Describe breaking changes explicitly, including binary compatibility changes.
 
-Update documentation and samples affected by the change. The website builds from `document/`; the API Reference lives in the separate GitHub Wiki repository and is not updated by a website build. Describe any required reference changes in your pull request.
+Update documentation and samples affected by the change. The website builds from `document/`. The API Reference is generated from the library DLLs and XML documentation using the [API reference tool](.github/tools/ApiReference/README.md). CI checks the generated reference; publishing it to the separate GitHub Wiki repository remains a reviewed, manual step. Describe any required reference changes in your pull request.
 
 ## Commits and pull requests
 
