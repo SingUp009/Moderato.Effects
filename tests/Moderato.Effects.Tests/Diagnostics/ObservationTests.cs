@@ -255,6 +255,38 @@ public sealed class ObservationTests
         Assert.Same(parent, Activity.Current);
     }
 
+    [Fact]
+    public async Task RunExitAsync_ChildDefectAndThrowingCancellationCallback_ClosesFiberOnce()
+    {
+        // Given
+        ConcurrentQueue<Activity> ended = new();
+        using var listener = Listen(ended.Enqueue);
+        var failChild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var defect = new IOException("child");
+        var effect = Scope<Never, EmptyEnvironment>.Gen(async scope =>
+        {
+            using var registration = scope.CancellationToken.Register(() => throw new InvalidOperationException("callback"));
+            var fiber = await scope.Fork(Effect<EmptyEnvironment>.Async<int>(async _ =>
+            {
+                await failChild.Task;
+                throw defect;
+            }));
+            failChild.SetResult();
+            return await scope.Run(fiber.Join());
+        });
+
+        // When
+        var result = await effect.RunExitAsync(CancellationToken.None);
+
+        // Then
+        Assert.True(result.TryGetValue(out Die? failure));
+        Assert.Same(defect, failure.Exception);
+        var fiber = Assert.Single(ended, span => span.GetTagItem("effect.kind") is "fiber");
+        Assert.Equal("die", fiber.GetTagItem("effect.outcome"));
+        Assert.Equal(ActivityStatusCode.Error, fiber.Status);
+        Assert.Equal(ended.Count, ended.Select(span => span.SpanId).Distinct().Count());
+    }
+
     private static ActivityListener Listen(Action<Activity> stopped)
     {
         var listener = new ActivityListener
