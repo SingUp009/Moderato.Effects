@@ -69,6 +69,13 @@ jobs:
           dotnet build tutorial/Moderato.Effects.Tutorial -c Release
           bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
 
+      - name: Verify API reference generation
+        run: |
+          dotnet run --project .github/tools/ApiReference -c Release -- artifacts/api-reference
+          python3 .github/scripts/verify-api-reference.py artifacts/api-reference
+          dotnet format whitespace .github/tools/ApiReference --verify-no-changes --no-restore
+          dotnet format style .github/tools/ApiReference --verify-no-changes --severity warn --no-restore
+
       - name: Run the samples
         run: |
           dotnet run --project samples/Moderato.Effects.Samples -c Release
