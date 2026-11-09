@@ -8,7 +8,7 @@
     <IsAotCompatible>true</IsAotCompatible>
 
     <PackageId>Moderato.Effects</PackageId>
-    <Version>0.1.0-preview.4</Version>
+    <Version>0.1.0-preview.5</Version>
     <Description>Effect System for C#</Description>
     <PackageTags>effect;effect-system;result;error-handling;union;discriminated-union;functional</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>

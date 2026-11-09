@@ -1,14 +1,14 @@
 # Releasing
 
-A release is a version-bump PR followed by a tag. CI publishes the package that the tagged build tested.
+Each package has its own version and release tag. A release is a version-bump PR followed by a tag; CI publishes only the tagged package after testing the complete package set.
 
 ## 1. Open the release PR
 
 On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 
-- [ ] **Version**: set `<Version>` in `src/Moderato.Effects/Moderato.Effects.csproj`, `src/Moderato.Effects.Hosting/Moderato.Effects.Hosting.csproj`, `src/Moderato.Effects.Http/Moderato.Effects.Http.csproj` and `src/Moderato.Effects.EntityFrameworkCore/Moderato.Effects.EntityFrameworkCore.csproj`. CI rejects mismatched versions or tags. Development versions are placeholders: never reuse an already published version for changed binaries.
+- [ ] **Version**: update `<Version>` only in the projects being released. An extension can keep its version when only Core changes, provided the new Core remains compatible. Project references supply the current Core package version as the extension's minimum dependency when it is packed. If an extension needs newer Core APIs, release that Core version first. Never reuse a published version for changed binaries or dependency metadata.
 - [ ] **New package IDs**: verify that the nuget.org [Trusted Publishing policy](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing#select-scopes) permits new packages and its glob covers every intended ID. `Moderato.Effects*` covers Core, Hosting, HTTP and EF; `Moderato.Effects.*` omits Core. Keep the repository, workflow (`ci.yml`) and environment (`nuget`) restrictions.
-- [ ] **Public API**: move every line of `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in Core, Hosting, HTTP and EF.
+- [ ] **Public API**: move the released APIs from `PublicAPI.Unshipped.txt` into `PublicAPI.Shipped.txt` in the packages being released.
   - Add the plain entries to Shipped.
   - For each `*REMOVED*` entry, delete the matching line from Shipped.
   - Keep Shipped sorted, and leave Unshipped with only `#nullable enable`.
@@ -29,36 +29,42 @@ Merge the PR once CI is green.
 ## 2. Tag and publish
 
 - [ ] On GitHub, **Releases → Draft a new release**.
-  - **Tag:** `v<Version>`, created on `main`.
+  - **Tag**, created on `main`:
+    - Core: `v<Version>` (for example, `v1.2.0`).
+    - Hosting: `Moderato.Effects.Hosting/v<Version>`.
+    - HTTP: `Moderato.Effects.Http/v<Version>`.
+    - EF: `Moderato.Effects.EntityFrameworkCore/v<Version>`.
+    - Use one tag for each package being released, with its own version. Release a required Core version before an extension that depends on it.
   - **Title:** the same as the tag.
   - **Notes:** the separately prepared and reviewed release notes.
   - Mark previews as **pre-release**.
-- [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against `<Version>`, packs and uploads the packages, and `package` runs a consumer of them, checks that their analyzers run, and exercises supported consumers with Native AOT. EF currently has JIT checks only.
-- [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**.
-- [ ] Confirm the version on https://www.nuget.org/packages/Moderato.Effects, https://www.nuget.org/packages/Moderato.Effects.Hosting, https://www.nuget.org/packages/Moderato.Effects.Http and https://www.nuget.org/packages/Moderato.Effects.EntityFrameworkCore. Indexing can take 5 to 15 minutes.
+- [ ] Publishing the release starts CI. `lint`, `format` and `test` must pass; then `pack` checks the tag against the selected package's own version, packs all four packages at their declared versions and uploads them for validation. `package` runs consumers using each package's version, checks their analyzers and exercises supported consumers with Native AOT. EF currently has JIT checks only. Only the tagged package and its symbols are copied to `artifacts/release/` for publication.
+- [ ] `publish` waits for approval in the `nuget` environment. Approve it under **Actions → the run → Review deployments**. Before an extension is pushed, CI confirms that its required Core version is already available on nuget.org; wait for indexing and rerun if it is not.
+- [ ] Confirm the selected package version on nuget.org. Packages not selected by this tag must remain unchanged. Indexing can take 5 to 15 minutes.
 - [ ] For the stable release only, after all packages are publicly available, review the saved drafts against the released APIs and update the English wiki installation commands, notices and index labels. Revalidate draft examples and version references; do not apply preview-era drafts unchanged.
 
 A version on nuget.org can be unlisted but never deleted or reused, so check the tag before publishing.
 
 ## Local verification without publishing
 
-Use a unique unpublished version and the project-local package caches. The packages use minimum-version dependencies, so upgrading Core or Microsoft.Extensions remains possible; their compatible higher versions are not pinned away.
+Use a unique validation suffix and the project-local package caches. The suffix is applied to each project's own version, including referenced Core, without overriding other projects' versions. Packages use minimum-version dependencies; compatible higher Core and Microsoft.Extensions versions remain usable.
 
-```bash
-validation_version="0.1.0-local.$(git rev-parse --short HEAD).1"
-dotnet pack src/Moderato.Effects -c Release -p:Version="$validation_version" -o artifacts
-dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version="$validation_version" -o artifacts
-dotnet pack src/Moderato.Effects.Http -c Release -p:Version="$validation_version" -o artifacts
-dotnet pack src/Moderato.Effects.EntityFrameworkCore -c Release -p:Version="$validation_version" -o artifacts
-dotnet run --project tests/Moderato.Effects.PackageVerifier -c Release -- artifacts "$validation_version" "$(git rev-parse HEAD)"
-dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
-dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
-dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
-dotnet run --project tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion="$validation_version"
-dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-hosting
+From the repository root, using .NET 11 or later and the SDK pinned in `global.json`:
+
+```sh
+VALIDATION_PACKAGE_SUFFIX="local.$(git rev-parse --short HEAD).1" \
+  bash .github/scripts/pack.sh dotnet artifacts "$(git rev-parse HEAD)"
+source artifacts/versions.env
+dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion="$CORE_VERSION"
+dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion="$HOSTING_VERSION"
+dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion="$HTTP_VERSION"
+dotnet run --project tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion="$EF_VERSION"
+dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$HOSTING_VERSION" -o artifacts/aot-hosting
 ./artifacts/aot-hosting/Moderato.Effects.Hosting.PackageTests
-dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$validation_version" -o artifacts/aot-http
+dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion="$HTTP_VERSION" -o artifacts/aot-http
 ./artifacts/aot-http/Moderato.Effects.Http.PackageTests
 ```
 
-Increment the suffix after changing package contents. Non-tag CI builds use a unique `-ci.<run>.<attempt>` version stored in `artifacts/version.txt`; only tag builds can reach the existing approval-gated publishing job. Use the SDK in `global.json`; RC3 replaces the vulnerable RC2 Native AOT toolchain without suppressing NuGet security checks.
+Increment the suffix after changing package contents. Non-tag CI builds append `-ci.<run>.<attempt>` to each declared version. `artifacts/versions.env` records the four resolved versions for downstream consumers. Tag builds keep the declared versions and stage only the selected package; non-tag builds stage nothing for publication. The existing `nuget` environment approval remains required.
+
+`bash .github/scripts/verify-pack.sh` checks version selection with differing package versions, Core-only and extension-only updates, tag rejection and failed verification. The package verifier checks each archive's own version and validates extension dependencies against the packed Core version, not the extension version. The pack script replaces old `.nupkg` and `.snupkg` outputs in its artifact directory; keep hand-saved packages elsewhere.

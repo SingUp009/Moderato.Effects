@@ -3,12 +3,12 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>true</IsPackable>
     <PackageId>Moderato.Effects.EntityFrameworkCore</PackageId>
-    <Version>0.1.0-preview.4</Version>
+    <Version>0.1.0-preview.5</Version>
     <Description>EF Core transaction and save integration for Moderato.Effects.</Description>
     <PackageTags>effect;entityframeworkcore;sqlite;transaction</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>https://github.com/SingUp009/Moderato.Effects/blob/v$(Version)/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/SingUp009/Moderato.Effects/releases/tag/Moderato.Effects.EntityFrameworkCore/v$(Version)</PackageReleaseNotes>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>

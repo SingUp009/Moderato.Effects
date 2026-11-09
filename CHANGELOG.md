@@ -5,11 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.0-preview.5] - 2026-11-06
+
 ### Added
 
-- Classify EF optimistic concurrency conflicts as `OptimisticConcurrencyConflict`, preserving the original exception and existing save-mapping policy. No automatic retry or conflict resolution is added. ([#423](https://github.com/SingUp009/Moderato.Effects/issues/423))
-- Add an EF Core integration with owned transactions, scope-aware saves and standard `CommitNotConfirmed` errors. Include a ConsoleAppFramework SQLite CRUD sample and package-consumer checks. Initial database validation is limited to SQLite; retrying execution strategies, PostgreSQL, Native AOT and real network failures are not validated. ([#409](https://github.com/SingUp009/Moderato.Effects/issues/409))
-- Add `ExitCase.HasValue` and typed `TryGetValue` access to `Succeeded`, `Failed`, `Die` and `Interrupted`. A successful query provides a non-null case; mismatched, default and null cases return false with a null output. Direct case patterns remain available. ([#411](https://github.com/SingUp009/Moderato.Effects/issues/411))
+- Classify EF optimistic concurrency conflicts as `OptimisticConcurrencyConflict`, preserving the original exception and existing save-mapping policy. No automatic retry or conflict resolution is added. ([#424](https://github.com/SingUp009/Moderato.Effects/pull/424))
+- Add an EF Core integration with owned transactions, scope-aware saves and standard `CommitNotConfirmed` errors. Include a ConsoleAppFramework SQLite CRUD sample and package-consumer checks. Initial database validation is limited to SQLite; PostgreSQL, EF Native AOT and real network failures are not validated. ([#420](https://github.com/SingUp009/Moderato.Effects/pull/420))
+- Add `ExitCase.HasValue` and typed `TryGetValue` access to `Succeeded`, `Failed`, `Die` and `Interrupted`. A successful query provides a non-null case; mismatched, default and null cases return false with a null output. Direct case patterns remain available. ([#414](https://github.com/SingUp009/Moderato.Effects/pull/414))
+
+### Changed
+
+- Organize source, tests, benchmarks and samples by feature, and shorten public API XML documentation without changing library behavior or API signatures. ([#422](https://github.com/SingUp009/Moderato.Effects/pull/422))
+- Preserve each package's own version during validation and release only the package selected by its tag. Core uses `v<Version>`; extensions use `<PackageId>/v<Version>`. Extension publication checks that its required Core version is already available on NuGet. ([#426](https://github.com/SingUp009/Moderato.Effects/pull/426))
+
+### Validation and known limitations
+
+- Validated with the .NET 11 RC3 SDK/runtime pinned in `global.json`; .NET 11 GA revalidation remains outstanding.
+- Core, Hosting and HTTP have JIT and Native AOT package-consumer coverage. EF has JIT package-consumer and SQLite integration coverage; EF Native AOT, PostgreSQL and real network failures are not validated. Retrying execution strategies and contexts with an existing transaction are explicitly rejected.
+- No new final-source long-duration validation is included. The earlier soak targeted commit `611ce78`; it is not evidence for this release. Current-source soak remains deferred to an always-on PC.
+- Open follow-ups include [#377](https://github.com/SingUp009/Moderato.Effects/issues/377) for the earlier late-run Gen slowdown, [#401](https://github.com/SingUp009/Moderato.Effects/issues/401) for disabled Tracker completion overhead, [#403](https://github.com/SingUp009/Moderato.Effects/issues/403) for further HTTP validation, and [#409](https://github.com/SingUp009/Moderato.Effects/issues/409) for broader database integration requirements. Interrupted outcomes and unconfirmed commits do not establish whether an external write completed; no automatic database retry is added.
 
 ## [0.1.0-preview.4] - 2026-11-05
 
@@ -291,7 +305,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyzers: MEFF301 to MEFF306 and MEFF310 for misuse of Gen blocks, MEFF307 for the system clock inside effects, and MEFF308 and MEFF309 for `Catch` calls that do not compile.
 - Zero allocation: running a prebuilt effect that completes synchronously allocates nothing. This covers the factories, operators and LINQ query syntax, `Retry` and `Repeat` with built-in schedules that do not wait, and value-type environments, errors and clocks. Gen blocks still allocate their scope.
 
-[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.4...HEAD
+[Unreleased]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.5...HEAD
+[0.1.0-preview.5]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.4...v0.1.0-preview.5
 [0.1.0-preview.4]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.3...v0.1.0-preview.4
 [0.1.0-preview.3]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.2...v0.1.0-preview.3
 [0.1.0-preview.2]: https://github.com/SingUp009/Moderato.Effects/compare/v0.1.0-preview.1...v0.1.0-preview.2

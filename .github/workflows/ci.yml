@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v*', 'Moderato.Effects.Hosting/v*', 'Moderato.Effects.Http/v*', 'Moderato.Effects.EntityFrameworkCore/v*']
   pull_request:
 
 permissions:
@@ -59,6 +59,9 @@ jobs:
           dotnet format style tests/Moderato.Effects.SoakProbe --verify-no-changes --severity warn --no-restore
           bash tests/Moderato.Effects.SoakProbe/verify.sh dotnet tests/Moderato.Effects.SoakProbe/bin/Release/net11.0/Moderato.Effects.SoakProbe.dll
 
+      - name: Verify package version and release selection
+        run: bash .github/scripts/verify-pack.sh
+
       - name: Verify the tutorial
         run: |
           dotnet build tutorial/Moderato.Effects.Tutorial -c Release
@@ -82,35 +85,8 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Select and verify the package version
-        run: |
-          version=$(dotnet msbuild src/Moderato.Effects -getProperty:Version)
-          hosting_version=$(dotnet msbuild src/Moderato.Effects.Hosting -getProperty:Version)
-          http_version=$(dotnet msbuild src/Moderato.Effects.Http -getProperty:Version)
-          ef_version=$(dotnet msbuild src/Moderato.Effects.EntityFrameworkCore -getProperty:Version)
-          if [ "$version" != "$hosting_version" ] || [ "$version" != "$http_version" ] || [ "$version" != "$ef_version" ]; then
-            echo "::error::Core, Hosting, HTTP and EF development versions must match"
-            exit 1
-          fi
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-              echo "::error::Tag $GITHUB_REF_NAME does not match <Version>$version</Version>"
-              exit 1
-            fi
-          else
-            version="${version%%-*}-ci.$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
-          fi
-          mkdir -p artifacts
-          echo "$version" > artifacts/version.txt
-          echo "VERSION=$version" >> "$GITHUB_ENV"
-
-      - name: Pack Core, Hosting, HTTP and EF
-        run: |
-          dotnet pack src/Moderato.Effects -c Release -p:Version=$VERSION -o artifacts
-          dotnet pack src/Moderato.Effects.Hosting -c Release -p:Version=$VERSION -o artifacts
-          dotnet pack src/Moderato.Effects.Http -c Release -p:Version=$VERSION -o artifacts
-          dotnet pack src/Moderato.Effects.EntityFrameworkCore -c Release -p:Version=$VERSION -o artifacts
-          dotnet run --project tests/Moderato.Effects.PackageVerifier -c Release -- artifacts "$VERSION" "$GITHUB_SHA"
+      - name: Pack and verify independently versioned packages
+        run: bash .github/scripts/pack.sh dotnet artifacts "$GITHUB_SHA"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -133,15 +109,15 @@ jobs:
           name: packages
           path: artifacts
 
-      - name: Find the packed version
-        run: echo "VERSION=$(cat artifacts/version.txt)" >> "$GITHUB_ENV"
+      - name: Find the packed versions
+        run: cat artifacts/versions.env >> "$GITHUB_ENV"
 
       - name: Run a consumer of the package
-        run: dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+        run: dotnet run --project tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion=$CORE_VERSION
 
       - name: Check that the package's analyzers run
         run: |
-          if dotnet build tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:CheckAnalyzers=true > analyzers.log; then
+          if dotnet build tests/Moderato.Effects.PackageTests -c Release -p:ModeratoEffectsVersion=$CORE_VERSION -p:CheckAnalyzers=true > analyzers.log; then
             echo "::error::Misuse.cs built, so the analyzers did not run"
             exit 1
           fi
@@ -149,15 +125,15 @@ jobs:
 
       - name: Publish and run the consumer with Native AOT
         run: |
-          dotnet publish tests/Moderato.Effects.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot
+          dotnet publish tests/Moderato.Effects.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$CORE_VERSION -o aot
           ./aot/Moderato.Effects.PackageTests
 
       - name: Run a consumer referencing only the Hosting package
-        run: dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+        run: dotnet run --project tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$HOSTING_VERSION
 
       - name: Check analyzers through the Hosting dependency
         run: |
-          if dotnet build tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:CheckAnalyzers=true > hosting-analyzers.log; then
+          if dotnet build tests/Moderato.Effects.Hosting.PackageTests -c Release -p:ModeratoEffectsVersion=$HOSTING_VERSION -p:CheckAnalyzers=true > hosting-analyzers.log; then
             echo "::error::Hosting consumer misuse built without the expected analyzer error"
             exit 1
           fi
@@ -165,11 +141,11 @@ jobs:
 
       - name: Publish and run the Hosting consumer with Native AOT
         run: |
-          dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-hosting
+          dotnet publish tests/Moderato.Effects.Hosting.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$HOSTING_VERSION -o aot-hosting
           ./aot-hosting/Moderato.Effects.Hosting.PackageTests
 
       - name: Run a consumer referencing only the HTTP package
-        run: dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+        run: dotnet run --project tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$HTTP_VERSION
 
       - name: Check analyzers and response contracts through the HTTP dependency
         run: |
@@ -179,27 +155,27 @@ jobs:
               Exhaustiveness) expected=CS8509 ;;
               ResponseTypes) expected=CS0029 ;;
             esac
-            if dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:Check$check=true > http-$check.log; then
+            if dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$HTTP_VERSION -p:Check$check=true > http-$check.log; then
               echo "::error::HTTP negative consumer $check built unexpectedly"
               exit 1
             fi
             grep -q "error $expected" http-$check.log || { cat http-$check.log; exit 1; }
           done
-          dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:CheckExhaustiveness=true -p:TreatWarningsAsErrors=false > http-exhaustiveness-warning.log
+          dotnet build tests/Moderato.Effects.Http.PackageTests -c Release -p:ModeratoEffectsVersion=$HTTP_VERSION -p:CheckExhaustiveness=true -p:TreatWarningsAsErrors=false > http-exhaustiveness-warning.log
           grep -q "warning CS8509" http-exhaustiveness-warning.log || { cat http-exhaustiveness-warning.log; exit 1; }
 
       - name: Publish and run the HTTP consumer with Native AOT
         run: |
-          dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-http
+          dotnet publish tests/Moderato.Effects.Http.PackageTests -c Release -r linux-x64 -p:ModeratoEffectsVersion=$HTTP_VERSION -o aot-http
           ./aot-http/Moderato.Effects.Http.PackageTests
 
       - name: Verify deep composition in the native package consumer
         run: |
-          dotnet publish tests/Moderato.Effects.StackSafetyProbe -c Release -r linux-x64 -p:ModeratoEffectsVersion=$VERSION -o aot-probe
+          dotnet publish tests/Moderato.Effects.StackSafetyProbe -c Release -r linux-x64 -p:ModeratoEffectsVersion=$CORE_VERSION -o aot-probe
           bash tests/Moderato.Effects.StackSafetyProbe/verify.sh ./aot-probe/Moderato.Effects.StackSafetyProbe
 
       - name: Run a consumer referencing only the EF integration package
-        run: dotnet run --project tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION
+        run: dotnet run --project tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion=$EF_VERSION
 
       - name: Check EF error requirements and transitive analyzers
         run: |
@@ -208,7 +184,7 @@ jobs:
               ErrorType) expected=CS0315 ;;
               Analyzers) expected=MEFF301 ;;
             esac
-            if dotnet build tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion=$VERSION -p:Check$check=true > ef-$check.log; then
+            if dotnet build tests/Moderato.Effects.EntityFrameworkCore.PackageTests -c Release -p:ModeratoEffectsVersion=$EF_VERSION -p:Check$check=true > ef-$check.log; then
               echo "::error::EF negative consumer $check built unexpectedly"
               exit 1
             fi
@@ -216,7 +192,7 @@ jobs:
           done
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: [pack, package]
     runs-on: ubuntu-latest
     environment: nuget
@@ -233,6 +209,15 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Find release dependencies
+        run: cat artifacts/versions.env >> "$GITHUB_ENV"
+
+      - name: Verify that the extension's Core dependency is published
+        if: env.RELEASE_PACKAGE != 'Moderato.Effects'
+        run: >
+          curl --fail --silent --show-error --head --retry 3
+          "https://api.nuget.org/v3-flatcontainer/moderato.effects/${CORE_VERSION,,}/moderato.effects.${CORE_VERSION,,}.nupkg"
+
       - name: NuGet login
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
@@ -240,7 +225,7 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - run: >
-          dotnet nuget push "artifacts/*.nupkg"
+          dotnet nuget push "artifacts/release/*.nupkg"
           -s https://api.nuget.org/v3/index.json
           -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --skip-duplicate
