@@ -70,3 +70,20 @@ Core emits no environment, resource value, typed error payload, exception messag
 Start `EffectTracker.Record()` to collect detailed execution metadata alongside standard telemetry. The two outputs share lifecycle observations and monotonic duration measurements. Snapshot entries expose `TraceId` and `SpanId` for correlation; operation and retry entries refer to their nearest traced parent rather than generating extra spans. See [execution recording](effect-tracker#record-execution-details).
 
 The recording's bounded history and the exporter's sampling/queue limits remain independent. The active-lifetime debug registry also remains available without either output.
+
+### Run the viewer with OTLP export
+
+The [Tracking sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Tracking.Samples) combines a local recording viewer with a real HTTP application and OTLP export:
+
+```sh
+DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
+dotnet watch --project samples/Moderato.Effects.Tracking.Samples
+```
+
+Open `http://127.0.0.1:5217` and send `POST /sha256` requests as described in the [local viewer guide](effect-tracker#use-the-local-viewer). The exported service name is `Moderato.Effects.Tracking.Samples`. Selecting **Open trace** takes you from a recorded entry to the corresponding trace in a local Aspire dashboard. The collector and dashboard run separately; starting the sample does not start them.
+
+`DOTNET_CLI_TELEMETRY_OPTOUT=1` excludes the .NET CLI's own telemetry from this example; application export still follows its OpenTelemetry configuration. Without a collector, the recording viewer remains usable. Set `OTEL_SDK_DISABLED=true` to disable the sample's OpenTelemetry collection and export.
+
+The viewer shows active work and detailed operations that completed-span exporters may not show yet. It does not add per-Effect allocation attribution or guarantee that a sampled trace was exported. See [recording limits](effect-tracker#record-execution-details) before enabling capture in an application.
