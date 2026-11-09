@@ -4,6 +4,8 @@ Bug reports, documentation improvements and pull requests are welcome. Using the
 
 ## Issues
 
+For suspected security vulnerabilities, follow the [Security Policy](SECURITY.md) and report privately.
+
 Search [existing issues](https://github.com/SingUp009/Moderato.Effects/issues) before opening a new one.
 
 - **Bug reports:** include the affected packages and their versions, your SDK and runtime environment, a small reproduction, and the expected and actual behavior. For cancellation or concurrency bugs, include the order of events and how often the problem occurs.
