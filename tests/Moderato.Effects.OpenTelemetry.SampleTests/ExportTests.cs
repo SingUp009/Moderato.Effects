@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Moderato.Effects;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -18,6 +19,7 @@ public sealed class ExportTests
         ConcurrentQueue<(string Path, string ContentType, byte[] Body)> received = new();
         await using var factory = CreateFactory(received);
         using var client = factory.CreateClient();
+        using var recording = EffectTracker.Record();
 
         // When
         using var response = await client.PostAsync("/sha256", new StringContent("hello"), TestContext.Current.CancellationToken);
@@ -45,6 +47,12 @@ public sealed class ExportTests
         Assert.Contains("moderato.effects.duration", metricText);
         Assert.Contains("dotnet.gc.heap.total_allocated", metricText);
         Assert.DoesNotContain("hello", traceText);
+        var snapshot = recording.GetSnapshot();
+        Assert.True(snapshot.IsComplete);
+        Assert.Contains(snapshot.Entries, entry => entry.Kind == "resource");
+        Assert.All(snapshot.Entries, entry => Assert.NotNull(entry.TraceId));
+        Assert.All(snapshot.Entries, entry => Assert.NotNull(entry.SpanId));
+        Assert.Single(snapshot.Entries.Select(entry => entry.TraceId).Distinct());
     }
 
     [Theory]

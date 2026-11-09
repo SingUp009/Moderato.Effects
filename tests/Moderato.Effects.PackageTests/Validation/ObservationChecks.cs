@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Text.Json;
 using Moderato.Effects;
 using Moderato.Results;
 
@@ -24,6 +25,7 @@ internal static class ObservationChecks
         };
         metrics.SetMeasurementEventCallback<long>((_, value, _, _) => count += value);
         metrics.Start();
+        using var recording = EffectTracker.Record();
         var resource = Resource.Make(Effect<EmptyEnvironment>.Succeed(new object()),
             (_, _) => Effect<EmptyEnvironment>.Succeed(Unit.Value));
 
@@ -36,6 +38,22 @@ internal static class ObservationChecks
             || !spans.Any(span => span.GetTagItem("effect.kind") is "release"))
         {
             throw new InvalidOperationException("Packaged standard telemetry did not observe the resource lifetime.");
+        }
+        var snapshot = recording.GetSnapshot();
+        foreach (var entry in snapshot.Entries.Where(entry => entry.Kind is not ("op" or "attempt")))
+        {
+            var span = spans.Single(span => span.SpanId.ToHexString() == entry.SpanId);
+            if (entry.TraceId != span.TraceId.ToHexString() || Math.Abs((entry.Elapsed - span.Duration).Ticks) > 1)
+                throw new InvalidOperationException("Packaged recording and standard telemetry disagree.");
+        }
+        var json = JsonSerializer.Serialize(snapshot, RecordingJsonContext.Default.EffectRecordingSnapshot);
+        using var document = JsonDocument.Parse(json);
+        var first = snapshot.Entries[0];
+        var serialized = document.RootElement.GetProperty("Entries")[0];
+        if (serialized.GetProperty("TraceId").GetString() != first.TraceId
+            || serialized.GetProperty("SpanId").GetString() != first.SpanId)
+        {
+            throw new InvalidOperationException("Packaged correlation metadata must support source-generated JSON.");
         }
     }
 }

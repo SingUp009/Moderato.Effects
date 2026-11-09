@@ -27,6 +27,7 @@ await AssertInterruptedRelease(useResource: true);
 await AssertSnapshotTransfer();
 await AssertImplicitUnionWidening();
 await AssertTracker();
+await RecordingTimingChecks.GetSnapshot_BlockedFailingRelease_PreservesFrozenDurations();
 await ObservationChecks.RunExitAsync_Resource_ExportsStandardTelemetry();
 AssertExitCaseAccess();
 
