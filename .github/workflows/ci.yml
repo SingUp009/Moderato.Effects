@@ -4,28 +4,14 @@ on:
   push:
     branches: [main]
     tags: ['v*', 'Moderato.Effects.Hosting/v*', 'Moderato.Effects.Http/v*', 'Moderato.Effects.EntityFrameworkCore/v*']
+    paths-ignore: ['document/**']
   pull_request:
+    paths-ignore: ['document/**']
 
 permissions:
   contents: read
 
 jobs:
-  document:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: document
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '26'
-          cache: npm
-          cache-dependency-path: document/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - run: npx wrangler deploy --dry-run
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -82,6 +68,13 @@ jobs:
         run: |
           dotnet build tutorial/Moderato.Effects.Tutorial -c Release
           bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
+
+      - name: Verify API reference generation
+        run: |
+          dotnet run --project .github/tools/ApiReference -c Release -- artifacts/api-reference
+          python3 .github/scripts/verify-api-reference.py artifacts/api-reference
+          dotnet format whitespace .github/tools/ApiReference --verify-no-changes --no-restore
+          dotnet format style .github/tools/ApiReference --verify-no-changes --severity warn --no-restore
 
       - name: Run the samples
         run: |
