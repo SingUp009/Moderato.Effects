@@ -429,6 +429,63 @@ public class TimeoutTests
         Assert.True(exit.TryGetValue(out Interrupted? _));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Timeout_CallerCancelsDuringRelease_WaitsAndPreservesReleaseFailure(bool releaseFails)
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        using var caller = new CancellationTokenSource();
+        var token = TestContext.Current.CancellationToken;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var defect = new IOException("release");
+        var releases = 0;
+        var releaseToken = CancellationToken.None;
+        var resource = Resource.Make(Effect<TimeEnvironment>.Succeed(Unit.Value), (_, _) => Effect<TimeEnvironment>.Async<Unit>(async ct =>
+        {
+            releaseToken = ct;
+            releases++;
+            releasing.SetResult();
+            await finish.Task;
+            if (releaseFails) throw defect;
+            return Unit.Value;
+        }));
+        var effect = resource.Use(_ => Effect<TimeEnvironment>.Async<int>(async ct =>
+        {
+            entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return 1;
+        })).Timeout(oneSecond);
+
+        // When
+        var running = effect.RunExitAsync(new TimeEnvironment(time), caller.Token).AsTask();
+        bool waited;
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+            time.Advance(oneSecond);
+            await releasing.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+            await caller.CancelAsync();
+            waited = !running.IsCompleted;
+        }
+        finally
+        {
+            finish.TrySetResult();
+            await caller.CancelAsync();
+        }
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), token);
+
+        // Then
+        Assert.True(waited);
+        Assert.Equal(1, releases);
+        Assert.False(releaseToken.CanBeCanceled);
+        if (releaseFails) Assert.Same(defect, Assert.IsType<Die>(exit.Value).Exception);
+        else Assert.IsType<Interrupted>(exit.Value);
+    }
+
     [Fact]
     public void Timeout_NegativeLimit_Throws()
     {
