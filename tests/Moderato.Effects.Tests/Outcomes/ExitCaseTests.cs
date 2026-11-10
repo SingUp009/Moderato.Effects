@@ -95,4 +95,35 @@ public class ExitCaseTests
         // Then
         Assert.Throws<ArgumentException>(Act);
     }
+
+    [Fact]
+    public void Suppressed_WithAnotherFailure_ReplacesTheCase()
+    {
+        // Given
+        var suppressed = new Suppressed(new Interrupted(), Relation.Sequential);
+        var failed = new Failed("error");
+
+        // When
+        var replaced = suppressed with { Case = failed };
+
+        // Then
+        Assert.Same(failed, replaced.Case.Value);
+        Assert.Equal(Relation.Sequential, replaced.Relation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Suppressed_WithSucceededOrDefaultCase_Throws(bool succeeded)
+    {
+        // Given
+        var suppressed = new Suppressed(new Interrupted(), Relation.Sequential);
+        ExitCase exit = succeeded ? new ExitCase(new Succeeded()) : default;
+
+        // When
+        void Act() => _ = suppressed with { Case = exit };
+
+        // Then
+        Assert.Throws<ArgumentException>(Act);
+    }
 }
