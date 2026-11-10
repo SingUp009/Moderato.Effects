@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
 - Preserve the last `Retry` or `Repeat` result when the schedule is exhausted, without calling its predicate again. ([#445](https://github.com/SingUp009/Moderato.Effects/issues/445))
+- Report MEFF304 when a Gen block stores its scope in an array element or in a local or parameter captured from the enclosing member. ([#460](https://github.com/SingUp009/Moderato.Effects/issues/460))
 
 ## [0.1.0-preview.6] - 2026-11-09
 
