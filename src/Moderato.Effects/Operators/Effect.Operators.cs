@@ -149,7 +149,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R2> WidenEnv<R2>() where R2 : R
     {
         var effect = Validate();
-        if (effect.constant.HasValue) return new(effect.constant);
+        if (effect.constant.HasValue) return new(effect.constant, effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R2> Deferred(Effect<T, E, R> effect)
