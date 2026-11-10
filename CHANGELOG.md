@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
 - Preserve the last `Retry` or `Repeat` result when the schedule is exhausted, without calling its predicate again. ([#445](https://github.com/SingUp009/Moderato.Effects/issues/445))
 
+- Keep the value of a `Race` or `RaceFirst` winner when the caller cancels while the loser is still being awaited, as an Err winner already was. A child that finishes after the cancellation is still not a winner. ([#464](https://github.com/SingUp009/Moderato.Effects/issues/464))
 ## [0.1.0-preview.6] - 2026-11-09
 
 ### Added
