@@ -7,6 +7,67 @@ namespace Moderato.Effects.EntityFrameworkCore.Tests;
 public sealed class CommitTests
 {
 
+    [Fact]
+    public async Task Transaction_ReaderBlocksCommit_ClassifiesRejectionAndRollsBack()
+    {
+        // Given
+        var directory = Directory.CreateTempSubdirectory("moderato-commit-");
+        try
+        {
+            var token = TestContext.Current.CancellationToken;
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = Path.Combine(directory.FullName, "test.db"),
+                DefaultTimeout = 1,
+                Pooling = false,
+            }.ConnectionString;
+            await using var reader = new SqliteConnection(connectionString);
+            await reader.OpenAsync(token);
+            await using var command = reader.CreateCommand();
+            command.CommandText = "PRAGMA journal_mode=DELETE; CREATE TABLE Rows (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+            await command.ExecuteNonQueryAsync(token);
+
+            var writer = new SqliteConnection(connectionString);
+            var probe = new Probe();
+            var options = new DbContextOptionsBuilder<TestDb>().UseSqlite(writer).AddInterceptors(probe).Options;
+            await using var store = new Store(writer, options, probe);
+            await writer.OpenAsync(token);
+            await using var readTransaction = reader.BeginTransaction(deferred: true);
+            command.Transaction = readTransaction;
+            command.CommandText = "SELECT COUNT(*) FROM Rows";
+            await command.ExecuteScalarAsync(token);
+
+            static bool Map(DatabaseFailure failure, out TestError error)
+            {
+                error = failure;
+                return true;
+            }
+
+            // When
+            var transaction = EfDatabase<Store>.Transaction(
+                contexts: env => env, environment: (_, db) => db, body: TestEffects.Insert(1), commitFailure: Map);
+            var blocked = await transaction.RunExitAsync(store, token);
+            await readTransaction.RollbackAsync(token);
+            var rowsAfterRollback = await store.Count();
+            var recovered = await transaction.RunExitAsync(store, token);
+
+            // Then
+            var mapped = Assert.IsType<DatabaseFailure>(Assert.IsType<Err<TestError>>(blocked.Value).Error.Value);
+            var failure = Assert.IsType<UnclassifiedDatabaseFailure>(mapped.Value);
+            Assert.Equal(SQLITE_BUSY, Assert.IsType<SqliteException>(failure.Cause).SqliteErrorCode);
+            Assert.Equal(0, rowsAfterRollback);
+            Assert.Equal(1, Assert.IsType<Ok<int>>(recovered.Value).Value);
+            Assert.Equal(1, await store.Count());
+            Assert.Equal(2, probe.Commits);
+            Assert.Equal(1, probe.Rollbacks);
+            Assert.Equal(2, probe.Disposals);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
