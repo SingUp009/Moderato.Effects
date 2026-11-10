@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Analyze a method or local function that takes a `Scope<E, R>` like a Gen block lambda, so MEFF301, MEFF302, MEFF304, MEFF305, MEFF306 and MEFF310 also apply to Gen bodies passed as method groups and to scope helpers. Existing helpers can get new warnings. ([#468](https://github.com/SingUp009/Moderato.Effects/issues/468))
+
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))

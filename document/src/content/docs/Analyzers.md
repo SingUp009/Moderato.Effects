@@ -45,9 +45,11 @@ When MEFF103 or MEFF104 is reported, nothing is generated for that environment.
 | MEFF306 | Warning | `.Result`, `.Wait()` or `GetAwaiter().GetResult()`, which block the thread | `await` instead |
 | MEFF310 | Warning | `scope.Run` / `Acquire` / `Fork` not awaited at once, including storing it to await later | `await` it, or `return` it |
 
+A method or local function that takes a `Scope<E, R>` is analyzed like a Gen block lambda, whether it is passed to `Gen` as a method group or called as a helper. Its own `catch` clauses, cleanup code, loops and waits are checked; a non-async helper may return its step for the caller to await.
+
 Returning a step directly from a non-async Gen body lets Gen await it. An async body must await the step: returning it as the body's result value does not consume it. Awaiting a step whose value itself is a `Task` or `ValueTask` remains valid.
 
-MEFF302, MEFF305 and MEFF310 inspect calls bound to the library's scope methods. A method-group reference or a call bound to a user extension does not trigger them; the analyzer does not follow helper implementations. The scope capture and escape checks still apply.
+MEFF302, MEFF305 and MEFF310 inspect calls bound to the library's scope methods. A method-group reference or a call bound to a user extension does not trigger them; the analyzer does not follow a call into a helper, but it analyzes each helper that takes the scope on its own. The scope capture and escape checks still apply.
 
 MEFF310 follows the standard `ValueTask<T>.AsTask`, `Preserve` and `ConfigureAwait` adapters, and `Task<T>` / `Task` `ConfigureAwait`. A call bound to a custom extension with one of these names does not establish that the step was awaited, even if the extension's result is awaited.
 
@@ -66,7 +68,7 @@ MEFF305 checks registrations that can repeat. A `for` statement's initialization
 Not reported, because they are safe:
 
 - `scope.Run` in a `catch` for a specific type, such as `catch (FormatException)`: that `catch` never catches `ScopeFailure`.
-- Passing the scope to a helper method that uses it in the same flow.
+- Passing the scope to a helper method that uses it in the same flow. The helper's own body is checked by the same rules.
 
 ## Time
 
