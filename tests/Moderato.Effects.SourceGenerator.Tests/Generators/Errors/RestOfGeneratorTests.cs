@@ -1,7 +1,41 @@
+using Microsoft.CodeAnalysis.Text;
+
 namespace Moderato.Effects.SourceGenerator.Tests;
 
 public class RestOfGeneratorTests
 {
+    [Fact]
+    public void RestOf_UnionCaseIsAddedAndRemoved_ReplacesIncrementalOutput()
+    {
+        // Given
+        const string SOURCE = """
+            public record A;
+            public record B;
+            public record C;
+            [Error] public partial union Full(A, B);
+            [RestOf<Full>] public partial union Rest(B);
+            """;
+        const string HINT = "Rest.RestOf.g.cs";
+        var original = Compiler.CreateCompilation(SOURCE);
+        var tree = original.SyntaxTrees.Last();
+        var edit = tree.WithChangedText(SourceText.From(SOURCE.Replace("Full(A, B)", "Full(A, B, C)", StringComparison.Ordinal)));
+        var modified = original.ReplaceSyntaxTree(tree, edit);
+        var driver = Compiler.CreateDriver();
+
+        // When
+        var before = Compiler.Build(original, ref driver);
+        var during = Compiler.Build(modified, ref driver);
+        var after = Compiler.Build(modified.ReplaceSyntaxTree(edit, tree), ref driver);
+
+        // Then
+        Assert.Empty(before.Errors);
+        Assert.Contains(HINT, before.Generated.Keys);
+        Assert.Equal("MEFF202", Assert.Single(during.Errors));
+        Assert.DoesNotContain(HINT, during.Generated.Keys);
+        Assert.Empty(after.Errors);
+        Assert.Equal(before.Generated[HINT], after.Generated[HINT]);
+    }
+
     private const string ERRORS = """
         namespace App;
         public record User(string Name);

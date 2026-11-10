@@ -5,6 +5,80 @@ namespace Moderato.Effects.EntityFrameworkCore.Tests;
 public sealed class CleanupTests
 {
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Transaction_ChildAndReleaseArePending_WaitsBeforeCommit(bool releaseFails)
+    {
+        // Given
+        await using var store = await Store.Open();
+        var token = TestContext.Current.CancellationToken;
+        var entered = Signal();
+        var childReleasing = Signal();
+        var finishChild = Signal();
+        var outerReleasing = Signal();
+        var finishOuter = Signal();
+        var defect = new IOException("outer release");
+        var child = Scope<Never, TestDb>.Gen(async scope =>
+        {
+            scope.Defer(_ => Effect<TestDb>.Async<Unit>(async _ =>
+            {
+                childReleasing.SetResult();
+                await finishChild.Task;
+                return Unit.Value;
+            }));
+            entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, scope.CancellationToken);
+            return Unit.Value;
+        });
+        var insert = TestEffects.Insert(1);
+        var body = Scope<TestError, TestDb>.Gen(async scope =>
+        {
+            var rows = await scope.Run(insert);
+            scope.Defer(_ => Effect<TestDb>.Async<Unit>(async _ =>
+            {
+                outerReleasing.SetResult();
+                await finishOuter.Task;
+                if (releaseFails) throw defect;
+                return Unit.Value;
+            }));
+            await scope.Fork(child);
+            await entered.Task;
+            return rows;
+        });
+
+        // When
+        var running = EfDatabase<Store>.Transaction(env => env, (_, db) => db, body).RunExitAsync(store, token).AsTask();
+        bool waitingForChild;
+        bool waitingForOuter;
+        try
+        {
+            await childReleasing.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+            waitingForChild = !running.IsCompleted && store.Probe.Commits == 0 && store.Probe.Disposals == 0;
+            finishChild.SetResult();
+            await outerReleasing.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+            waitingForOuter = !running.IsCompleted && store.Probe.Commits == 0 && store.Probe.Disposals == 0;
+        }
+        finally
+        {
+            finishChild.TrySetResult();
+            finishOuter.TrySetResult();
+        }
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), token);
+
+        // Then
+        Assert.True(waitingForChild);
+        Assert.True(waitingForOuter);
+        Assert.Equal(releaseFails ? 0 : 1, store.Probe.Commits);
+        Assert.Equal(releaseFails ? 1 : 0, store.Probe.Rollbacks);
+        Assert.Equal(releaseFails ? 0 : 1, await store.Count());
+        Assert.Equal(1, store.Probe.Disposals);
+        if (releaseFails) Assert.Same(defect, Assert.IsType<Die>(exit.Value).Exception);
+        else Assert.Equal(1, Assert.IsType<Ok<int>>(exit.Value).Value);
+
+        static TaskCompletionSource Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     [Fact]
     public async Task Transaction_RollbackFails_StillDisposesAndRetainsTheBodyErr()
     {

@@ -55,12 +55,14 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         var body = (SyntaxNode?)function.Block ?? function.ExpressionBody;
         if (body is null) return;
 
-        AnalyzeScopeUses(context, function, body, scopes);
-        AnalyzeCatchClauses(context, body, scopes);
+        var scopeFailure = scopes[0].Type.ContainingAssembly?.GetTypeByMetadataName("Moderato.Effects.ScopeFailure");
+        AnalyzeScopeUses(context, function, body, scopes, scopeFailure);
+        AnalyzeCatchClauses(context, body, scopes, scopeFailure);
         AnalyzeBlockingWaits(context, body);
     }
 
-    private static void AnalyzeScopeUses(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body, ImmutableArray<IParameterSymbol> scopes)
+    private static void AnalyzeScopeUses(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body,
+        ImmutableArray<IParameterSymbol> scopes, INamedTypeSymbol? scopeFailure)
     {
         var reportedNested = new HashSet<SyntaxNode>();
         foreach (var identifier in body.DescendantNodes().OfType<IdentifierNameSyntax>())
@@ -93,7 +95,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 }
 
                 var name = access.Name.Identifier.ValueText;
-                if (steps.Contains(name) && InCleanup(context.SemanticModel, identifier, function))
+                if (steps.Contains(name) && InCleanup(context.SemanticModel, identifier, function, scopeFailure))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepInCleanup, access.GetLocation(), access.ToString()));
                 if (resources.Contains(name) && InLoop(identifier, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ResourceInLoop, access.GetLocation(), access.ToString()));
@@ -166,12 +168,12 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     }
 
     // A finally block, or a catch that also catches ScopeFailure, runs after an Err too.
-    private static bool InCleanup(SemanticModel model, SyntaxNode node, SyntaxNode function)
+    private static bool InCleanup(SemanticModel model, SyntaxNode node, SyntaxNode function, INamedTypeSymbol? scopeFailure)
     {
         foreach (var ancestor in node.Ancestors().TakeWhile(a => a != function))
         {
             if (ancestor is FinallyClauseSyntax) return true;
-            if (ancestor is CatchClauseSyntax clause && CatchesScopeFailure(model, clause)) return true;
+            if (ancestor is CatchClauseSyntax clause && CatchesScopeFailure(model, clause, scopeFailure)) return true;
         }
 
         return false;
@@ -201,21 +203,64 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         _ => false,
     };
 
-    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode body, ImmutableArray<IParameterSymbol> scopes)
+    private static void AnalyzeCatchClauses(SyntaxNodeAnalysisContext context, SyntaxNode body,
+        ImmutableArray<IParameterSymbol> scopes, INamedTypeSymbol? scopeFailure)
     {
         foreach (var clause in body.DescendantNodes(static n => !IsFunction(n)).OfType<CatchClauseSyntax>())
         {
-            if (clause.Filter is not null || !CatchesScopeFailure(context.SemanticModel, clause) || Rethrows(context.SemanticModel, clause)) continue;
+            if (!CatchesScopeFailure(context.SemanticModel, clause, scopeFailure) || Rethrows(context.SemanticModel, clause)) continue;
             if (clause.Parent is not TryStatementSyntax tryStatement || !UsesScope(context.SemanticModel, tryStatement.Block, scopes)) continue;
             context.ReportDiagnostic(Diagnostic.Create(Diagnostics.CatchAllInGen, clause.CatchKeyword.GetLocation()));
         }
     }
 
-    private static bool CatchesScopeFailure(SemanticModel model, CatchClauseSyntax clause)
+    private static bool CatchesScopeFailure(SemanticModel model, CatchClauseSyntax clause, INamedTypeSymbol? scopeFailure)
     {
-        if (clause.Filter is not null) return false;
-        if (clause.Declaration is null) return true;
-        return model.GetTypeInfo(clause.Declaration.Type).Type?.ToDisplayString() is "System.Exception";
+        if (scopeFailure is null) return false;
+        if (clause.Declaration is { } declaration && !MatchesType(model.GetTypeInfo(declaration.Type).Type)) return false;
+        if (clause.Filter is null) return true;
+        if (model.GetOperation(clause) is not ICatchClauseOperation operation) return false;
+        var caught = operation.Locals.FirstOrDefault();
+        return Accepts(operation.Filter) == true;
+
+        bool MatchesType(ITypeSymbol? type)
+        {
+            if (type is null || type.TypeKind == TypeKind.Error) return false;
+            var conversion = model.Compilation.ClassifyCommonConversion(scopeFailure, type);
+            return conversion.IsIdentity || conversion is { IsImplicit: true, IsReference: true };
+        }
+
+        // Filters involving arbitrary user code cannot establish that this catch handles ScopeFailure.
+        bool? Accepts(IOperation? filter) => filter switch
+        {
+            { ConstantValue: { HasValue: true, Value: bool value } } => value,
+            IParenthesizedOperation parenthesized => Accepts(parenthesized.Operand),
+            IUnaryOperation { OperatorKind: UnaryOperatorKind.Not, OperatorMethod: null } unary => !Accepts(unary.Operand),
+            IBinaryOperation { OperatorKind: BinaryOperatorKind.ConditionalAnd, OperatorMethod: null } binary
+                => Accepts(binary.LeftOperand) & Accepts(binary.RightOperand),
+            IBinaryOperation { OperatorKind: BinaryOperatorKind.ConditionalOr, OperatorMethod: null } binary
+                => Accepts(binary.LeftOperand) | Accepts(binary.RightOperand),
+            IIsTypeOperation test when IsCaught(test.ValueOperand) => MatchesType(test.TypeOperand) != test.IsNegated,
+            IIsPatternOperation test when IsCaught(test.Value) => MatchesPattern(test.Pattern),
+            _ => null,
+        };
+
+        bool IsCaught(IOperation operand)
+            => caught is not null && operand is ILocalReferenceOperation local
+                && SymbolEqualityComparer.Default.Equals(caught, local.Local);
+
+        bool? MatchesPattern(IPatternOperation pattern) => pattern switch
+        {
+            ITypePatternOperation type => MatchesType(type.MatchedType),
+            IDeclarationPatternOperation { MatchedType: { } type } => MatchesType(type),
+            IConstantPatternOperation { Value.ConstantValue: { HasValue: true, Value: null } } => false,
+            INegatedPatternOperation negated => !MatchesPattern(negated.Pattern),
+            IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.And } binary
+                => MatchesPattern(binary.LeftPattern) & MatchesPattern(binary.RightPattern),
+            IBinaryPatternOperation { OperatorKind: BinaryOperatorKind.Or } binary
+                => MatchesPattern(binary.LeftPattern) | MatchesPattern(binary.RightPattern),
+            _ => null,
+        };
     }
 
     // Only a catch whose every path ends in a bare throw lets ScopeFailure through.

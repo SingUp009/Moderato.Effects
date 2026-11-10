@@ -311,10 +311,12 @@ public class FailureProvenanceTests
             {
                 throw scope.Fail(new MutableError(1));
             }
+#pragma warning disable MEFF301
             catch (ScopeFailure failure)
             {
                 _ = ((System.Runtime.CompilerServices.IUnion)failure.Error!).Value;
             }
+#pragma warning restore MEFF301
             return new(42);
         });
 

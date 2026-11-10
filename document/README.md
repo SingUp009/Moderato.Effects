@@ -33,7 +33,21 @@ curl https://moderato-effects.009singup.workers.dev/llms.txt
 curl https://moderato-effects.009singup.workers.dev/getting-started.md
 ```
 
-HTML URLs continue to return HTML; Markdown URLs return `text/markdown`. No request-time conversion is needed. `npm run build` also checks the generated Markdown index and its targets.
+HTML URLs are indexable. Workers serves each Markdown asset as `text/markdown` with `X-Robots-Tag: noindex` so it stays readable without competing with its HTML counterpart in search. The crawl policy allows access to the Markdown and to `/llms.txt`. `npm run build` checks the generated Markdown index and its targets.
+
+## Search discovery
+
+Starlight generates `sitemap-index.xml` and its child sitemaps. The sitemap lists published HTML URLs with their canonical trailing slashes. `public/robots.txt` advertises the sitemap index. The docs build checks the sitemap, page metadata, and internal links.
+
+After deployment, check the public host to confirm that `/robots.txt` advertises `/sitemap-index.xml` and that the index and its listed sitemap files return HTTP 200. Check that `/getting-started` redirects to `/getting-started/`, whose HTML declares that same canonical URL. Check that `/getting-started.md` and `/tutorial/01-results.md` return HTTP 200 with `Content-Type: text/markdown; charset=utf-8` and `X-Robots-Tag: noindex`. Confirm that `/llms.txt` still returns its plain-text index and `/ogp.jpg` returns the social image.
+
+### Google Search Console
+
+1. Add the [URL-prefix property](https://support.google.com/webmasters/answer/10432366) for `https://moderato-effects.009singup.workers.dev/`.
+2. Choose [HTML file verification](https://support.google.com/webmasters/answer/9008080). Place Google's downloaded file in `public/` with its original name and content. After an approved deployment, check that the file is accessible at the URL shown in Search Console, then click **Verify**. Keep the file available for periodic rechecks.
+3. Submit `sitemap-index.xml` in the [Sitemaps report](https://support.google.com/webmasters/answer/7451001) and check the processing status.
+4. Use [URL Inspection](https://support.google.com/webmasters/answer/12482179) for the homepage and important guides. Check their Google-selected canonical URLs and use the [Page indexing report](https://support.google.com/webmasters/answer/7440203) to investigate exclusions.
+5. In the [Performance report](https://support.google.com/webmasters/answer/7576553), track queries, pages, impressions, and clicks over time.
 
 ## Automatic builds
 

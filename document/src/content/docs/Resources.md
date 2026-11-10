@@ -1,5 +1,6 @@
 ---
 title: Resources
+description: Acquire, compose, and release resources in Moderato.Effects. Learn how scoped cleanup handles success, failure, and cancellation.
 ---
 
 # Resources
