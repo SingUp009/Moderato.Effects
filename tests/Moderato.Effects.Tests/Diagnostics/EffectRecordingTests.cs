@@ -25,6 +25,30 @@ public sealed class EffectRecordingTests
         Assert.DoesNotContain("Running", tree);
     }
 
+    [Theory]
+    [InlineData("Timeout", 5)]
+    [InlineData("Timeout", 0)]
+    [InlineData("TimeoutResult", 5)]
+    [InlineData("TimeoutResult", 0)]
+    public async Task Record_Timeout_UsesThePublicOperationName(string operation, int seconds)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var source = Effect<DefaultEnvironment>.Sync(static () => 1);
+        var after = TimeSpan.FromSeconds(seconds);
+        var effect = operation == "Timeout"
+            ? source.Timeout(after).Map(static _ => Unit.Value)
+            : source.TimeoutResult(after).Map(static _ => Unit.Value).MapErr(static _ => new TimeoutError(TimeSpan.Zero));
+
+        // When
+        await effect.RunExitAsync(DefaultEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        var names = recording.GetSnapshot().Entries.Where(static entry => entry.Kind == "op").Select(static entry => entry.Name).ToArray();
+        Assert.Contains(operation, names);
+        Assert.DoesNotContain("Create", names);
+    }
+
     [Fact]
     public async Task Record_FailedBodyAndBlockedRelease_ShowsBodyAndFinalSeparately()
     {
