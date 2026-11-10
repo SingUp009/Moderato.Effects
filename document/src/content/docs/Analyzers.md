@@ -72,7 +72,9 @@ Not reported, because they are safe:
 
 | ID | Severity | Reports | Fix |
 |---|---|---|---|
-| MEFF307 | Info | The system clock inside a Gen block, an `Effect<R>` factory's lambda or `Succeed`'s argument | Use `scope.Env.Resolve<TimeProvider>()` or `Effect.Sleep<R>` |
+| MEFF307 | Info | The system clock inside a Gen block, an `Effect<R>` factory's lambda, `Succeed`'s argument or a callback passed to the library | Use `scope.Env.Resolve<TimeProvider>()` or `Effect.Sleep<R>` |
+
+A callback passed to the library is a lambda given to any method of the `Moderato.Effects` packages: operators such as `Map`, `AndThen` and `Tap`, query syntax, `Resource.Make` and `Use`, `Retry` and `Repeat` policies and filters, and the integrations' callbacks. A method or local function that takes a `Scope<E, R>` counts as a Gen block. A value computed outside the lambda and captured by it is not reported, and neither is a lambda passed to other code, such as `Enumerable.Select`, unless it runs inside one of the callbacks above.
 
 The list of clock APIs is in [Time](/time/#the-system-clock-inside-effects). Overloads that take a `TimeProvider` are not reported. A clock property mentioned only in `nameof` is not a clock read.
 

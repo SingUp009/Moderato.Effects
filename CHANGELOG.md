@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Report MEFF307 for system-clock reads in callbacks passed to the library (operators, query syntax, `Resource.Make` and `Use`, `Retry` and `Repeat` policies, integration callbacks) and in methods or local functions that take a `Scope<E, R>`. ([#472](https://github.com/SingUp009/Moderato.Effects/issues/472))
+
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
