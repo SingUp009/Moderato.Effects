@@ -52,7 +52,8 @@ internal static class UnobservedFailures
     private static string Describe(ExitCase failure) => failure.Value switch
     {
         Die die => die.Exception.ToString(),
-        Failed failed => $"unjoined Err: {failed.Error}",
+        // An error value can carry application data, so only its type reaches the process's error stream.
+        Failed failed => $"unjoined Err of type {failed.Error?.GetType().Name ?? "null"}",
         var other => other?.ToString() ?? "",
     };
 }

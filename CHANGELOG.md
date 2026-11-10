@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Write only the type name of an unjoined Err from the default unobserved-failure handler, instead of the error value. Set `EffectDiagnostics.UnobservedFailureHandler` to log more. ([#465](https://github.com/SingUp009/Moderato.Effects/issues/465))
+
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
