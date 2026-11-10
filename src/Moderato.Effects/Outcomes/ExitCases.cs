@@ -6,6 +6,20 @@ namespace Moderato.Effects;
 /// <param name="Suppressed">Failures alongside the defect that were not chosen as the outcome.</param>
 public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppressed)
 {
+    /// <summary>The defect that ended the run.</summary>
+    public Exception Exception
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(Exception));
+    } = Exception ?? throw new ArgumentNullException(nameof(Exception));
+
+    /// <summary>Failures alongside the defect that were not chosen as the outcome.</summary>
+    public IReadOnlyList<Suppressed> Suppressed
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(Suppressed));
+    } = Suppressed ?? throw new ArgumentNullException(nameof(Suppressed));
+
     /// <summary>Enables <c>Die(var exception)</c> patterns.</summary>
     public void Deconstruct(out Exception exception) => exception = Exception;
 
