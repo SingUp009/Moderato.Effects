@@ -34,6 +34,7 @@ var result = await FetchPrices<R>()
 | `.Jittered()` | Spread each wait randomly over 80–120% |
 
 - A schedule says when and how often, never which errors; that is `when:`.
+- Once a schedule reaches its retry or time limit, `Retry` and `Repeat` return the last result without calling `when`.
 - Without `UpTo` or `During`, a schedule has no limit.
 - A growing schedule caps each wait at the timer's limit (about 49.7 days) rather than failing.
 - `During` checks before each wait and does not shorten the wait: `Spaced(1 hour).During(5 seconds)` can wait an hour after the first failure. For a strict limit, use `effect.Retry(schedule).Timeout(total)`.

@@ -167,19 +167,29 @@ internal readonly struct ScheduleClock<R> where R : IHas<TimeProvider>
     }
 
     /// <summary>Waits before recurrence <paramref name="recurrence"/>, or decides to stop.</summary>
-    internal ValueTask<Outcome<bool, Never>> WaitBeforeAsync(int recurrence, R env, RunContext context)
+    internal ValueTask<Outcome<bool, Never>> WaitBeforeAsync<T>(int recurrence, T value, Func<T, bool>? when, R env, RunContext context)
     {
-        // One Retry at a time uses this clock, so its private Random needs no lock.
-        if (spec.Next(recurrence, time.GetElapsedTime(started), random) is not { } delay) return new(Outcome<bool, Never>.Ok(false));
-        return WaitAsync(delay, env, context);
-
-        // The schedule policy returns this only to DecideAsync, which awaits it once.
-        [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
-        static async ValueTask<Outcome<bool, Never>> WaitAsync(TimeSpan delay, R env, RunContext context)
+        if (when is not null && (recurrence > spec.MaxRecurrences
+            || spec.MaxElapsed is { } limit && time.GetElapsedTime(started) >= limit
+            || !when(value)))
         {
-            await Task.Delay(delay, Services.Resolve<TimeProvider, R>(env), context.CancellationToken).ConfigureAwait(false);
-            return Outcome<bool, Never>.Ok(true);
+            return new(Outcome<bool, Never>.Ok(false));
         }
+
+        // The predicate can use up the rest of the time budget.
+        var elapsed = time.GetElapsedTime(started);
+        if (recurrence > spec.MaxRecurrences || elapsed >= spec.MaxElapsed) return new(Outcome<bool, Never>.Ok(false));
+
+        // One Retry at a time uses this clock, so its private Random needs no lock.
+        return WaitAsync(spec.Delay(recurrence, random), env, context);
+    }
+
+    // The schedule policy returns this only to DecideAsync, which awaits it once.
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+    private static async ValueTask<Outcome<bool, Never>> WaitAsync(TimeSpan delay, R env, RunContext context)
+    {
+        await Task.Delay(delay, Services.Resolve<TimeProvider, R>(env), context.CancellationToken).ConfigureAwait(false);
+        return Outcome<bool, Never>.Ok(true);
     }
 
     // Only a seed is taken, once per run under a lock, so a non-thread-safe Random survives parallel retries (F6, F23).
@@ -209,7 +219,7 @@ internal readonly struct ScheduledRetry<E, R>(ScheduleSpec spec, R env, Func<E, 
     private readonly ScheduleClock<R> clock = new(spec, env);
 
     public ValueTask<Outcome<bool, Never>> Decide(RetryContext<E> state, R env, RunContext context)
-        => when is not null && !when(state.Error) ? new(Outcome<bool, Never>.Ok(false)) : clock.WaitBeforeAsync(state.Attempt, env, context);
+        => clock.WaitBeforeAsync(state.Attempt, state.Error, when, env, context);
 }
 
 internal readonly struct ScheduledRepeat<T, R>(ScheduleSpec spec, R env, Func<T, bool>? when) : IRecurrencePolicy<RepeatContext<T>, R>
@@ -218,5 +228,5 @@ internal readonly struct ScheduledRepeat<T, R>(ScheduleSpec spec, R env, Func<T,
     private readonly ScheduleClock<R> clock = new(spec, env);
 
     public ValueTask<Outcome<bool, Never>> Decide(RepeatContext<T> state, R env, RunContext context)
-        => when is not null && !when(state.Value) ? new(Outcome<bool, Never>.Ok(false)) : clock.WaitBeforeAsync(state.Repetition, env, context);
+        => clock.WaitBeforeAsync(state.Repetition, state.Value, when, env, context);
 }
