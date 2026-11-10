@@ -6,4 +6,6 @@ public sealed class ObservedFailures
     public TaskCompletionSource<EffectHttpException> AfterResponseStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource DisconnectEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource DisconnectCleaned { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource TransactionWritten { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource<bool> TransactionEnded { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

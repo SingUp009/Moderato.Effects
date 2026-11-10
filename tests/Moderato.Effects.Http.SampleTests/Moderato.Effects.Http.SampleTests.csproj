@@ -3,9 +3,12 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Moderato.Effects.EntityFrameworkCore/Moderato.Effects.EntityFrameworkCore.csproj" />
     <ProjectReference Include="../../src/Moderato.Effects.Http/Moderato.Effects.Http.csproj" />
     <ProjectReference Include="../../src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0-rc.3.26522.148" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <Compile Include="../../samples/Moderato.Effects.Http.Samples/Orders/*.cs" Link="Orders/%(Filename)%(Extension)" />
     <Compile Include="../../samples/Moderato.Effects.Http.Samples/Authorization/*.cs" Link="Authorization/%(Filename)%(Extension)" />
   </ItemGroup>
