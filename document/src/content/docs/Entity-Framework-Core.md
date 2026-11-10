@@ -87,7 +87,7 @@ Returning true chooses an `Err` in the scope's error type. Without a mapper, or 
 
 Constraint kinds are `Unique` (including a primary key), `ForeignKey`, `NotNull`, `Check` and `Other`. SQLite constraint classification uses provider error codes, not message parsing. The library does not guess a constraint's name or which application rule it represents. The sample maps a unique failure to `OrderAlreadyExists` because that schema has only one unique constraint: its primary key.
 
-The transaction requires an error type containing `DatabaseFailure`. An unmapped `CommitNotConfirmed` is returned through that case as Err. A confirmed commit rejection without a successful custom mapper remains a Die. A later cleanup failure can still become the primary Die and retain the earlier error as context.
+The transaction requires an error type containing `DatabaseFailure`. A database exception thrown while the context is created or the transaction begins is returned through that case as Err, normally as `UnclassifiedDatabaseFailure`: the body has not started and nothing was written, so the caller can retry or report the database as unavailable. Other exceptions at that point, such as a misconfigured factory, remain a Die. An unmapped `CommitNotConfirmed` is returned through that case as Err. A confirmed commit rejection without a successful custom mapper remains a Die. A later cleanup failure can still become the primary Die and retain the earlier error as context.
 
 Do not blindly retry an unconfirmed commit: the write may already exist. Reconcile with the database or use an application idempotency protocol first.
 

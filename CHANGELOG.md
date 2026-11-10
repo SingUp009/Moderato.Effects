@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Return a database exception thrown while `EfDatabase.Transaction` creates its context or begins its transaction as an Err holding the `DatabaseFailure`, instead of a Die. The body has not started at that point. ([#473](https://github.com/SingUp009/Moderato.Effects/issues/473))
+
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
