@@ -1,5 +1,6 @@
 ---
 title: Time
+description: Use TimeProvider for delays and cooperative timeouts in Moderato.Effects, and test time-dependent work with a fake clock.
 ---
 
 # Time

@@ -1,5 +1,6 @@
 ---
 title: 02 - Your First Effect
+description: Turn order validation into a deferred C# effect with Effect.Gen, run it with RunAsync, and read its typed result.
 ---
 
 # Your First Effect

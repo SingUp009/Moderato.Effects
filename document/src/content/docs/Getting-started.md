@@ -1,5 +1,6 @@
 ---
 title: Getting started
+description: Write and run your first Moderato.Effects program in C#. Handle typed results and compose asynchronous work with timeouts and retries.
 ---
 
 # Getting started

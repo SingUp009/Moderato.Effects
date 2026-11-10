@@ -1,17 +1,18 @@
 ---
 title: Installation
+description: Install Moderato.Effects and its .NET integration packages from NuGet, or build the library from source with the pinned SDK.
 ---
 
 # Installation
 
 Choose the package your application needs. The integration packages bring Core as a transitive dependency, including its generators and analyzers.
 
-| Package | Use |
+| Package on NuGet | Use |
 |---|---|
-| Moderato.Effects | Effects, error unions, resources, concurrency and tracking |
-| [Moderato.Effects.Hosting](/hosting/) | .NET background services |
-| [Moderato.Effects.Http](/http/) | ASP.NET Core request execution |
-| [Moderato.Effects.EntityFrameworkCore](/entity-framework-core/) | Owned EF transactions and scope-aware saves |
+| [Moderato.Effects](https://www.nuget.org/packages/Moderato.Effects) | Effects, error unions, resources, concurrency and tracking |
+| [Moderato.Effects.Hosting](https://www.nuget.org/packages/Moderato.Effects.Hosting) | [.NET background services](/hosting/) |
+| [Moderato.Effects.Http](https://www.nuget.org/packages/Moderato.Effects.Http) | [ASP.NET Core request execution](/http/) |
+| [Moderato.Effects.EntityFrameworkCore](https://www.nuget.org/packages/Moderato.Effects.EntityFrameworkCore) | [Owned EF transactions and scope-aware saves](/entity-framework-core/) |
 
 ```sh
 dotnet add package Moderato.Effects --prerelease

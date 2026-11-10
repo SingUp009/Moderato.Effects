@@ -1,5 +1,6 @@
 ---
 title: 01 - Result
+description: Validate an order quantity with Moderato.Results and handle success and expected failure explicitly in a C# console application.
 ---
 
 # Success and Failure with Result

@@ -1,5 +1,6 @@
 ---
 title: Hosting
+description: Run an effect as a .NET BackgroundService, supply its typed environment from dependency injection, and connect its diagnostics to the host.
 ---
 
 # Hosting

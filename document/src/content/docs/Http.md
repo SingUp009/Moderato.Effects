@@ -1,5 +1,6 @@
 ---
 title: HTTP
+description: Run effects in ASP.NET Core endpoints with EffectRequest, map typed results to HTTP responses, and respect request cancellation.
 ---
 
 # HTTP

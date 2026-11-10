@@ -1,5 +1,6 @@
 ---
 title: Concurrency
+description: Run effects sequentially or in parallel, race competing operations, and manage fibers within a scope using Moderato.Effects.
 ---
 
 # Concurrency

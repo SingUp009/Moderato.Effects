@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://moderato-effects.009singup.workers.dev/sitemap-index.xml

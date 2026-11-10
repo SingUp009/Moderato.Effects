@@ -1,5 +1,6 @@
 ---
 title: Effect Tracker
+description: Inspect active scopes, fibers, and resources with Effect Tracker. Record execution details and correlate them with OpenTelemetry traces.
 ---
 
 # Effect Tracker
@@ -48,7 +49,7 @@ Stack capture and snapshot allocation have a cost. Enable them deliberately duri
 
 Starts and completions may race with a snapshot. Enabling tracks future starts, and disabling clears the registry; re-enabling does not reconstruct existing work. The switches are process-wide, so coordinate them between tests and debugging tools.
 
-Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](opentelemetry). Its instrumentation is independent of these Tracker switches.
+Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](/opentelemetry/). Its instrumentation is independent of these Tracker switches.
 
 ## Record execution details
 
@@ -96,7 +97,7 @@ Durations include waiting and cleanup, and nested intervals overlap. A completed
 
 ## Correlate with OpenTelemetry
 
-Execution recording and standard telemetry use the same internal observation points. Enable [OpenTelemetry](opentelemetry) normally, then start a recording when detailed local inspection is needed. No second instrumentation wrapper is required.
+Execution recording and standard telemetry use the same internal observation points. Enable [OpenTelemetry](/opentelemetry/) normally, then start a recording when detailed local inspection is needed. No second instrumentation wrapper is required.
 
 An entry's `TraceId` and `SpanId` let you look up the surrounding request in your monitoring tool:
 

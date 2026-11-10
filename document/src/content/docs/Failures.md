@@ -1,5 +1,6 @@
 ---
 title: Failures
+description: Distinguish expected errors, defects, and interruption. Learn which failure reaches the caller and how to inspect suppressed failures.
 ---
 
 # Failures
