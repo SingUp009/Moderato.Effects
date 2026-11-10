@@ -1,5 +1,6 @@
 ---
 title: Entity Framework Core
+description: Run EF Core work in an owned transaction with Moderato.Effects, and map selected save failures to typed errors.
 ---
 
 # Entity Framework Core

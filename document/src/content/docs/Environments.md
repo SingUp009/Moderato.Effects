@@ -1,5 +1,6 @@
 ---
 title: Environments
+description: Declare an effect's service dependencies with typed environments, resolve them in a scope, and connect them to .NET dependency injection.
 ---
 
 # Environments

@@ -1,5 +1,6 @@
 ---
 title: Retry and repeat
+description: Build retry and repeat schedules with backoff, jitter, and limits. Decide which operations are safe to run again and how cancellation stops the schedule.
 ---
 
 # Retry and repeat

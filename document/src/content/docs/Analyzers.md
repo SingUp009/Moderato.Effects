@@ -1,5 +1,6 @@
 ---
 title: Analyzers and diagnostics
+description: Understand the diagnostics emitted by the Moderato.Effects source generators and analyzers, and configure their severity in .editorconfig.
 ---
 
 # Analyzers and diagnostics

@@ -1,5 +1,6 @@
 ---
 title: Adopting in an application
+description: Introduce effects at an application boundary while keeping your existing .NET host and dependency injection. Plan for typed failures, lifetimes, and cancellation.
 ---
 
 # Adopting in an application

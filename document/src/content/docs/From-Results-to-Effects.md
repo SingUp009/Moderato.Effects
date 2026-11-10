@@ -1,5 +1,6 @@
 ---
 title: From Results to Effects
+description: See how Moderato.Effects builds on Moderato.Results. Learn when to return a Result and when to describe deferred work with an Effect.
 ---
 
 # From Results to Effects
