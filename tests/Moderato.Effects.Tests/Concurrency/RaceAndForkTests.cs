@@ -211,14 +211,15 @@ public class RaceTests
         using var caller = new CancellationTokenSource();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var late = Effect<EmptyEnvironment>.Async(async _ =>
+        Effect<string, AppError, EmptyEnvironment> late = Effect<EmptyEnvironment>.Async(async _ =>
         {
             started.SetResult();
             await canceled.Task;
-            return 1;
+            return "late";
         });
         var log = new List<string>();
-        var race = raceFirst ? Effect.RaceFirst(late, Steps.WaitUntilCanceled(log, "b")) : Effect.Race(late, Steps.WaitUntilCanceled(log, "b"));
+        var waiting = Steps.WaitUntilCanceled(log, "waiting");
+        var race = raceFirst ? Effect.RaceFirst(late, waiting) : Effect.Race(late, waiting);
 
         // When
         var running = race.RunExitAsync(EmptyEnvironment.Value, caller.Token).AsTask();
