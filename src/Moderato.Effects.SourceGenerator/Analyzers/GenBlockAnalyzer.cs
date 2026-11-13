@@ -236,6 +236,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     private static bool Outlives(ISymbol? target, SyntaxNode function) => target switch
     {
         IFieldSymbol or IPropertySymbol => true,
+        // An out or ref parameter writes to the caller's variable, even when the function declares it.
+        IParameterSymbol { RefKind: RefKind.Out or RefKind.Ref } => true,
         ILocalSymbol or IParameterSymbol => target.DeclaringSyntaxReferences.All(reference => !function.Span.Contains(reference.Span)),
         _ => false,
     };

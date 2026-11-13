@@ -157,4 +157,21 @@ public class NamedGenBodyTests
         // Then
         Assert.Empty(build.Diagnostics);
     }
+
+    [Theory]
+    [InlineData("static void Keep(Scope<string, R> scope, out Scope<string, R> kept) { kept = scope; }", true)]
+    [InlineData("static void Keep(Scope<string, R> scope, ref Scope<string, R>? kept) => kept = scope;", true)]
+    [InlineData("static void Keep(Scope<string, R> scope, Scope<string, R>? other) { other = scope; _ = other; }", false)]
+    public void GenBlock_ScopeAssignedToTheFunctionsOwnParameter_ReportsMEFF304OnlyForOutAndRef(string member, bool reported)
+    {
+        // Given
+        var source = InClass(member);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Equal(reported ? ["MEFF304"] : [], build.Ids);
+    }
 }
