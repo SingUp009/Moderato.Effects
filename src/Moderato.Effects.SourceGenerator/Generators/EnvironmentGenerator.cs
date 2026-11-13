@@ -43,6 +43,16 @@ public sealed class EnvironmentGenerator : IIncrementalGenerator
         var services = new List<Service>();
         var diagnostics = new List<DiagnosticInfo>();
         var providers = new Dictionary<string, string>();
+        // A generated implementation beside a hand-written explicit one fails with CS8646 in generated code.
+        foreach (var implemented in type.GetMembers().OfType<IPropertySymbol>().SelectMany(static p => p.ExplicitInterfaceImplementations))
+        {
+            if (implemented.ContainingType is { IsGenericType: true } contract
+                && contract.ConstructedFrom.ToDisplayString() == "Moderato.Effects.IHas<TService>")
+            {
+                providers[Shapes.Identity(contract.TypeArguments[0])] =
+                    $"{contract.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)}.{implemented.Name}";
+            }
+        }
         foreach (var parameter in primary.Parameters)
         {
             var parameterLocation = parameter.Locations.FirstOrDefault() ?? location;
