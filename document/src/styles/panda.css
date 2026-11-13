@@ -1,1 +1,17 @@
 @layer reset, starlight, nord, base, tokens, recipes, utilities;
+
+@font-face {
+  font-family: "STIX Two Math";
+  src: url("/fonts/STIXTwoMath-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+.sl-markdown-content .math-block {
+  overflow-x: auto;
+}
+
+.math-block math {
+  min-width: max-content;
+  font-family: "STIX Two Math", "Cambria Math", math;
+  font-size: 1.125rem;
+}
