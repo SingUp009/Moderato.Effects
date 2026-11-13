@@ -5,7 +5,7 @@ description: Supply a TextWriter through an effect's environment and choose wher
 
 # Managing Dependencies
 
-In [chapter 4](../04-composing-effects/), order preparation wrote its progress directly to the console. In this chapter, the caller supplies a writer. The same effect can write to the console in one run and capture its output in memory in another.
+In [chapter 4](/tutorial/04-composing-effects/), order preparation wrote its progress directly to the console. In this chapter, the caller supplies a writer. The same effect can write to the console in one run and capture its output in memory in another.
 
 ## Run the chapter
 
@@ -83,4 +83,4 @@ The example uses a single service as its environment. See [Environments](/enviro
 
 ## Next
 
-In [chapter 6](../06-managing-resources/), let the effect acquire its own writer and release it when the scope ends.
+In [chapter 6](/tutorial/06-managing-resources/), let the effect acquire its own writer and release it when the scope ends.

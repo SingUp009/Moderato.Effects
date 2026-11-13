@@ -5,7 +5,7 @@ description: Run effects in sequence with scope.Run and pass a prepared order to
 
 # Composing Effects
 
-In [chapter 3](../03-expected-errors/), `scope.Get` let a validation result decide whether order preparation could continue. Add a second step now. Prepare the order, then pass its accepted quantity to an effect that confirms it.
+In [chapter 3](/tutorial/03-expected-errors/), `scope.Get` let a validation result decide whether order preparation could continue. Add a second step now. Prepare the order, then pass its accepted quantity to an effect that confirms it.
 
 ## Run the chapter
 
@@ -100,4 +100,4 @@ You can tell which steps ran by their messages. Only the valid order prints `Pre
 
 ## Next
 
-In the [next chapter](../05-managing-dependencies/), give the order preparation effect a dependency and choose which implementation it uses at run time.
+In the [next chapter](/tutorial/05-managing-dependencies/), give the order preparation effect a dependency and choose which implementation it uses at run time.

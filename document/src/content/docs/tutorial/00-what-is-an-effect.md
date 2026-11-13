@@ -186,4 +186,4 @@ For a language with effect annotations and formal typing rules, see [Koka: Progr
 
 ## Next
 
-In [chapter 1](../01-results/), you'll write a method that returns a `Result` and handle both of its cases.
+In [chapter 1](/tutorial/01-results/), you'll write a method that returns a `Result` and handle both of its cases.
