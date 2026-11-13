@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Report MEFF103 when an `[Environment]` type already implements `IHas<T>.Service` explicitly for a parameter's service, instead of failing with CS8646 in generated code. ([#459](https://github.com/SingUp009/Moderato.Effects/issues/459))
 - Report MEFF304 when a Gen block stores its scope in an array element or in a local or parameter captured from the enclosing member. ([#460](https://github.com/SingUp009/Moderato.Effects/issues/460))
 - Reject a `Succeeded` or default case assigned to `Suppressed.Case` through a `with` expression. ([#461](https://github.com/SingUp009/Moderato.Effects/issues/461))
+- Reject a null `Exception` or `Suppressed` when a `Die` is created or copied with a `with` expression. ([#467](https://github.com/SingUp009/Moderato.Effects/issues/467))
 
 - Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
 ## [0.1.0-preview.6] - 2026-11-09

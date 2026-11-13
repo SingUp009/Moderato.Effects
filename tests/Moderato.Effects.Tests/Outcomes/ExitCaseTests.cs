@@ -126,4 +126,53 @@ public class ExitCaseTests
         // Then
         Assert.Throws<ArgumentException>(Act);
     }
+
+    [Fact]
+    public void Die_ExceptionAndSuppressed_KeepsBoth()
+    {
+        // Given
+        var exception = new InvalidOperationException("defect");
+        Suppressed[] suppressed = [new(new Interrupted(), Relation.Parallel)];
+
+        // When
+        var die = new Die(exception, suppressed);
+
+        // Then
+        Assert.Same(exception, die.Exception);
+        Assert.Same(suppressed, die.Suppressed);
+        Assert.Equal("Die(InvalidOperationException)", new Exit<int, string>(die).ToString());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Die_NullMember_Throws(bool nullException)
+    {
+        // Given
+        var exception = nullException ? null : new InvalidOperationException("defect");
+        IReadOnlyList<Suppressed>? suppressed = nullException ? [] : null;
+
+        // When
+        void Act() => _ = new Die(exception!, suppressed!);
+
+        // Then
+        var thrown = Assert.Throws<ArgumentNullException>(Act);
+        Assert.Equal(nullException ? "Exception" : "Suppressed", thrown.ParamName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Die_WithNullMember_Throws(bool nullException)
+    {
+        // Given
+        var die = new Die(new InvalidOperationException("defect"), []);
+
+        // When
+        void Act() => _ = nullException ? die with { Exception = null! } : die with { Suppressed = null! };
+
+        // Then
+        var thrown = Assert.Throws<ArgumentNullException>(Act);
+        Assert.Equal(nullException ? "Exception" : "Suppressed", thrown.ParamName);
+    }
 }
