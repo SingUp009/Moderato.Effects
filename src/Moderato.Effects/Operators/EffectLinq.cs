@@ -8,13 +8,13 @@ public static class EffectLinq
     public static Effect<U, E, R> Select<T, E, R, U>(this Effect<T, E, R> source, Func<T, U> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        return source.Map(selector);
+        return source.Map(selector, nameof(Select));
     }
 
     public static Effect<U, E, R> SelectMany<T, E, R, U>(this Effect<T, E, R> source, Func<T, Effect<U, E, R>> selector)
     {
         ArgumentNullException.ThrowIfNull(selector);
-        return source.AndThen(selector);
+        return source.AndThen(selector, nameof(SelectMany));
     }
 
     public static Effect<V, E, R> SelectMany<T, E, R, U, V>(
@@ -75,6 +75,6 @@ public static class EffectLinq
         return source.Bind((next, complete), static (outcome, state, _) => outcome.Kind == OutcomeKind.Ok
                 ? new EffectSelection<U, F, V, E, R>(state.next(outcome.Value))
                 : new EffectSelection<U, F, V, E, R>(outcome.WithValueType<V>()),
-            static (outcome, previous, context, state) => state.complete(outcome, (previous, context)));
+            static (outcome, previous, context, state) => state.complete(outcome, (previous, context)), name: nameof(SelectMany));
     }
 }

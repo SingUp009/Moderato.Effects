@@ -14,6 +14,9 @@ public readonly partial struct Effect<T, E, R>
 {
     private const string RUN_OPTIONS_JUSTIFICATION = "The original overload preserves compatibility; explicit options require a token to keep default arguments unambiguous.";
 
+    // A conversion has no member name a user wrote, so recordings show it as the widening it performs.
+    private const string WIDEN_NAME = nameof(Widen);
+
     private readonly Result<T, E> constant;
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
@@ -115,7 +118,7 @@ public readonly partial struct Effect<T, E, R>
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<T, Never, R> effect)
-            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithErrorType<E>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithErrorType<E>()), WIDEN_NAME);
     }
 
     /// <summary>An effect that cannot succeed can stand in for one with any value type.</summary>
@@ -127,7 +130,7 @@ public readonly partial struct Effect<T, E, R>
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<Never, E, R> effect)
-            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithValueType<T>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithValueType<T>()), WIDEN_NAME);
     }
 
     /// <summary>An effect that ends in the result.</summary>

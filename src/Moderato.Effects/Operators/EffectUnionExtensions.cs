@@ -36,5 +36,5 @@ public static class EffectUnionExtensions
             var recovery = handle(caught).Validate();
             UnobservedFailures.ReportDefects(outcome.Suppressed, context);
             return new(recovery);
-        }, static (next, _, _, _) => next);
+        }, static (next, _, _, _) => next, name: nameof(CatchCase));
 }
