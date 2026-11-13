@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Keep the value of a `Race` or `RaceFirst` winner when the caller cancels while the loser is still being awaited, as an Err winner already was. A child that finishes after the cancellation is still not a winner. ([#464](https://github.com/SingUp009/Moderato.Effects/issues/464))
 - Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
 - Record operators under the member the user wrote: an implicit `Never` conversion as `Widen` instead of `op_Implicit`, `Widen` instead of `MapErr`, query syntax as `Select` / `SelectMany` instead of `Map` / `AndThen` / `Bind`, and `CatchCase` instead of `Catch`. No operation is hidden from recordings. ([#470](https://github.com/SingUp009/Moderato.Effects/issues/470))
+- Report MEFF306 and MEFF304 when a lambda's or method's expression body is itself the blocking access or the returned scope. ([#496](https://github.com/SingUp009/Moderato.Effects/issues/496))
 
 ### Tests
 
