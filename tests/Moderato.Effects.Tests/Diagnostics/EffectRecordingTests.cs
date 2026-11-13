@@ -25,6 +25,74 @@ public sealed class EffectRecordingTests
         Assert.DoesNotContain("Running", tree);
     }
 
+    [Theory]
+    [InlineData("error")]
+    [InlineData("value")]
+    [InlineData("environment")]
+    public async Task Record_NamedConstantWidened_KeepsItsNameAndLocation(string widened)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var succeed = Effect<EmptyEnvironment>.Succeed(1).WithName("Constant");
+        var fail = Effect<EmptyEnvironment>.Fail("unavailable").WithName("Constant");
+        Effect<int, string, EmptyEnvironment> effect = widened switch
+        {
+            "error" => succeed,
+            "value" => fail,
+            _ => succeed.WidenEnv<EmptyEnvironment>(),
+        };
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(widened == "value" ? new Err<string>("unavailable") : new Ok<int>(1), exit);
+        var entry = Assert.Single(recording.GetSnapshot().Entries, static entry => entry.Kind == "op");
+        Assert.Equal("Constant", entry.Name);
+        Assert.StartsWith("EffectRecordingTests.cs:", entry.Location);
+    }
+
+    [Fact]
+    public async Task Record_UnnamedConstantWidened_KeepsItsFactoryName()
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        Effect<int, string, EmptyEnvironment> effect = Effect<EmptyEnvironment>.Succeed(1);
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(new Ok<int>(1), exit);
+        var entry = Assert.Single(recording.GetSnapshot().Entries, static entry => entry.Kind == "op");
+        Assert.Equal("Succeed", entry.Name);
+        Assert.Null(entry.Location);
+    }
+
+    [Theory]
+    [InlineData("Timeout", 5)]
+    [InlineData("Timeout", 0)]
+    [InlineData("TimeoutResult", 5)]
+    [InlineData("TimeoutResult", 0)]
+    public async Task Record_Timeout_UsesThePublicOperationName(string operation, int seconds)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var source = Effect<DefaultEnvironment>.Sync(static () => 1);
+        var after = TimeSpan.FromSeconds(seconds);
+        var effect = operation == "Timeout"
+            ? source.Timeout(after).Map(static _ => Unit.Value)
+            : source.TimeoutResult(after).Map(static _ => Unit.Value).MapErr(static _ => new TimeoutError(TimeSpan.Zero));
+
+        // When
+        await effect.RunExitAsync(DefaultEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        var names = recording.GetSnapshot().Entries.Where(static entry => entry.Kind == "op").Select(static entry => entry.Name).ToArray();
+        Assert.Contains(operation, names);
+        Assert.DoesNotContain("Create", names);
+    }
+
     [Fact]
     public async Task Record_FailedBodyAndBlockedRelease_ShowsBodyAndFinalSeparately()
     {
