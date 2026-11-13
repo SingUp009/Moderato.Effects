@@ -25,7 +25,7 @@ public readonly struct Resource<T, E, R>
         {
             var acquire = Acquire;
             return acquire.Target is ResourceAcquisition<T, E, R> acquisition ? acquisition.Effect
-                : new((environment, context) => acquire(environment.Environment, context, environment.Releases));
+                : new((environment, context) => acquire(environment.Environment, context, environment.Releases), nameof(Acquire));
         }
     }
 
@@ -33,7 +33,7 @@ public readonly struct Resource<T, E, R>
     public static implicit operator Resource<T, E, R>(Resource<T, Never, R> resource)
     {
         return new(resource.Acquisition.Then<T, E, Unit>(Unit.Value,
-            static (outcome, _, _, _) => new(outcome.WithErrorType<E>())));
+            static (outcome, _, _, _) => new(outcome.WithErrorType<E>()), nameof(Widen)));
     }
 
     /// <summary>Acquires the value, runs <paramref name="use"/> with it, then releases it however the use ended.</summary>
@@ -229,6 +229,6 @@ public static class ResourceLinq
             {
                 return Defects.From<V, E>(exception, context).After(second).After(first);
             }
-        }, isolate: true));
+        }, isolate: true, name: nameof(SelectMany)));
     }
 }

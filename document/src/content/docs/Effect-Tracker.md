@@ -61,6 +61,8 @@ await effect.WithName("Orders.Create").RunExitAsync(environment, cancellationTok
 var snapshot = recording.GetSnapshot();
 ```
 
+Each operation is recorded under the member that built it (`Map`, `AndThen`, `Timeout`, `Select`, `CatchCase`, ...) unless `WithName` names it. An implicit conversion from a `Never`-typed effect is recorded as `Widen`. Nothing is hidden: an operator the library builds from others, such as a tuple `All`, shows each of its steps (`Map`, `All`, and one `Map` per child).
+
 Recording captures roots started during that session, including detailed operations and retry attempts. It is separate from the active-lifetime registry above: neither `EnableTracking` nor stack capture is required. Only one recording can be active per process. Disposing stops new root capture; already captured executions can finish in their original recording.
 
 `GetSnapshot()` copies one coherent frame of metadata. Each entry has a monotonic `StartOffset`, optional `EndOffset` and `Elapsed`. Active durations extend to the capture instant; completed durations remain fixed. Scope `BodyState` is recorded before cleanup and `State` is the final result. A resource's state includes its release outcome; acquisition has its own entry. Resource and release completion share one observation instant.

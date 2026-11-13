@@ -93,6 +93,46 @@ public sealed class EffectRecordingTests
         Assert.DoesNotContain("Create", names);
     }
 
+    [Theory]
+    [InlineData("implicit", "Widen")]
+    [InlineData("widen", "Widen")]
+    [InlineData("select", "Select")]
+    [InlineData("selectMany", "SelectMany")]
+    [InlineData("query", "SelectMany")]
+    [InlineData("catchCase", "CatchCase")]
+    [InlineData("map", "Map")]
+    [InlineData("mapErr", "MapErr")]
+    [InlineData("andThen", "AndThen")]
+    public async Task Record_OperatorBuiltOnAnother_UsesTheMemberTheUserWrote(string composition, string expected)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var source = Effect<EmptyEnvironment>.Sync(static () => 1).WithName("Source");
+        Effect<int, NotFound, EmptyEnvironment> typed = Effect<EmptyEnvironment>.Sync(static () => 1).WithName("Source").MapErr(static _ => new NotFound(1));
+        Effect<int, AppError, EmptyEnvironment> effect = composition switch
+        {
+            "implicit" => source,
+            "widen" => typed.Widen<AppError>(),
+            "select" => from value in typed.Widen<AppError>() select value + 1,
+            "selectMany" => typed.Widen<AppError>().SelectMany(static value => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(value)),
+            "query" => from first in typed.Widen<AppError>() from second in typed.Widen<AppError>() select first + second,
+            "catchCase" => typed.Widen<AppError>().CatchCase((NotFound _) => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(0)),
+            "map" => typed.Widen<AppError>().Map(static value => value + 1),
+            "mapErr" => typed.MapErr(static error => (AppError)error),
+            _ => typed.Widen<AppError>().AndThen(static value => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(value)),
+        };
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Ok<int> _));
+        var entries = recording.GetSnapshot().Entries.Where(static entry => entry.Kind == "op").ToArray();
+        Assert.Equal(expected, entries[0].Name);
+        Assert.Contains(entries, static entry => entry.Name == "Source");
+        Assert.DoesNotContain(entries, static entry => entry.Name is "op_Implicit" or "Bind");
+    }
+
     [Fact]
     public async Task Record_FailedBodyAndBlockedRelease_ShowsBodyAndFinalSeparately()
     {
