@@ -270,7 +270,7 @@ public readonly partial struct Effect<T, E, R>
                 AttachSuppressed(exception, outcome.Suppressed, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
                 // An inner cancellation can interrupt the run while the caller's token is not canceled.
                 return ValueTask.FromCanceled<Result<T, E>>(context.CancellationToken.IsCancellationRequested
                     ? context.CancellationToken : new CancellationToken(canceled: true));

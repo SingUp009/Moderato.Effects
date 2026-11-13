@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Report the Errs suppressed under an `Interrupted` to the unobserved-failure handler when the interruption reaches `RunAsync` or `RunExitAsync`, as its defects already were. A `CommitNotConfirmed` produced while the caller canceled inside `All` or `Race` is no longer lost. ([#463](https://github.com/SingUp009/Moderato.Effects/issues/463))
+
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
