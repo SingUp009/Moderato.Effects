@@ -110,10 +110,10 @@ public sealed class Fiber<T, E, R>
                 break;
             case OutcomeKind.Err:
                 UnobservedFailures.Report(ExitCases.Failed(outcome.Error), context);
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportDropped(outcome.Suppressed, context);
                 break;
             case OutcomeKind.Ok or OutcomeKind.Interrupted:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportDropped(outcome.Suppressed, context);
                 break;
         }
 

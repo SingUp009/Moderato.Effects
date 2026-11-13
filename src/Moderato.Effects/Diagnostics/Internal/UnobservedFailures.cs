@@ -5,17 +5,9 @@ namespace Moderato.Effects.Internal;
 /// <summary>Sends failures that no outcome could carry to the run's diagnostic handler.</summary>
 internal static class UnobservedFailures
 {
-    /// <summary>Reports the defects among failures that are about to be dropped.</summary>
-    internal static void ReportDefects(ImmutableArray<Suppressed> suppressed, RunContext context)
-    {
-        foreach (var failure in suppressed)
-        {
-            if (failure.Case is Die) Report(failure.Case, context);
-        }
-    }
-
-    /// <summary>Reports the defects and Errs that an interruption drops, since Interrupted carries no context.</summary>
-    internal static void ReportInterrupted(ImmutableArray<Suppressed> suppressed, RunContext context)
+    /// <summary>Reports the defects and Errs among suppressed failures that are about to be dropped.</summary>
+    // One rule for every place that drops context: an interruption among it says nothing, anything else is reported.
+    internal static void ReportDropped(ImmutableArray<Suppressed> suppressed, RunContext context)
     {
         foreach (var failure in suppressed)
         {

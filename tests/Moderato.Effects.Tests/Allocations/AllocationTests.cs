@@ -550,7 +550,9 @@ public class AllocationTests
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(earlier));
         var next = new Effect<int, string, EmptyEnvironment>((_, _) => new(later));
         var effect = source.AndThen(_ => next);
-        await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
+        // The dropped Errs are reported at the boundary, so the handler must not allocate either.
+        var options = new EffectRunOptions { UnobservedFailureHandler = static _ => { } };
+        await WarmUpAsync(() => effect.RunAsync(EmptyEnvironment.Value, CancellationToken.None, options));
 
         // When
         var completedAtOnce = true;
@@ -561,7 +563,7 @@ public class AllocationTests
             var before = GC.GetAllocatedBytesForCurrentThread();
             for (var i = 0; i < RUNS; i++)
             {
-                var run = effect.RunAsync(CancellationToken.None);
+                var run = effect.RunAsync(EmptyEnvironment.Value, CancellationToken.None, options);
                 completedAtOnce &= run.IsCompletedSuccessfully;
                 result = await run;
             }
