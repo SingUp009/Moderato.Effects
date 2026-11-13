@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Report MEFF304 when a Gen block stores its scope in an array element or in a local or parameter captured from the enclosing member. ([#460](https://github.com/SingUp009/Moderato.Effects/issues/460))
 - Reject a `Succeeded` or default case assigned to `Suppressed.Case` through a `with` expression. ([#461](https://github.com/SingUp009/Moderato.Effects/issues/461))
 - Reject a null `Exception` or `Suppressed` when a `Die` is created or copied with a `with` expression. ([#467](https://github.com/SingUp009/Moderato.Effects/issues/467))
+- Keep the Err or defect of a Gen block's unawaited step as an independent failure when only the block's own end canceled the step, so `All`, `Race` and `RaceFirst` end with it instead of `Interrupted`. ([#462](https://github.com/SingUp009/Moderato.Effects/issues/462))
 
 - Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
 ## [0.1.0-preview.6] - 2026-11-09
