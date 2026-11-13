@@ -57,6 +57,8 @@ MEFF310 follows the standard `ValueTask<T>.AsTask`, `Preserve` and `ConfigureAwa
 
 Parentheses, `checked` / `unchecked`, null-forgiving `!`, identity casts and standard upcasts from `Task<T>` to `Task` also preserve immediate consumption. Other conversions or casts do not establish it: they can select a user awaiter that ignores the original step.
 
+MEFF306 does not track whether a task has already completed. Reading `.Result` after `await Task.WhenAll(first, second)` does not block, but it is still reported; write `await first` instead, which returns the same value without waiting again.
+
 MEFF306 checks direct `Result` access and calls to the supported wait methods. Taking a method-group reference, mentioning a member in `nameof`, or calling a user extension does not trigger it. The analyzer does not follow later calls through delegates or helper implementations.
 
 A `nameof` operand does not count as scope use for MEFF301 or MEFF303: it neither runs a scope operation nor captures the scope.
