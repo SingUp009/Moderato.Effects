@@ -93,8 +93,23 @@ If the caller cancels during the commit while the transaction runs inside `Effec
 
 Do not blindly retry an unconfirmed commit: the write may already exist. Reconcile with the database or use an application idempotency protocol first.
 
+## Do not nest transactions
+
+:::caution
+Running `EfDatabase.Transaction` inside the body of another `Transaction` does not join the outer transaction. The inner call asks the factory for another context and begins a transaction of its own, while the outer one is still open.
+
+On SQLite the inner transaction cannot start:
+
+- if both contexts share one connection, the provider rejects a second transaction at once, which is a Die;
+- on separate connections, the inner transaction waits for the outer one's write lock until the connection's timeout expires, then fails with a `DatabaseFailure`.
+
+Either way the outer body fails with it, and the outer transaction rolls back. Other providers have not been validated; where a second transaction can start, it commits or rolls back independently of the outer one.
+:::
+
+Do all the work of one unit in a single `Transaction` body, and pass its context to helpers through the body's environment.
+
 ## Current limits
 
-Initial provider validation covers SQLite. EF optimistic concurrency classification uses EF's public exception type, but this is not validation of every database provider. Retrying execution strategies and a context with an existing transaction are rejected. There is no transaction nesting, automatic retry, Outbox or guessed provider metadata.
+Initial provider validation covers SQLite. EF optimistic concurrency classification uses EF's public exception type, but this is not validation of every database provider. Retrying execution strategies and a context with an existing transaction are rejected. There is no transaction nesting (see [Do not nest transactions](#do-not-nest-transactions)), automatic retry, Outbox or guessed provider metadata.
 
 Keep each context private to its execution. Parallel children must not use one DbContext concurrently. PostgreSQL, real network failure behavior and EF integration Native AOT have not been validated.

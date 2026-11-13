@@ -27,6 +27,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Keep the value of a `Race` or `RaceFirst` winner when the caller cancels while the loser is still being awaited, as an Err winner already was. A child that finishes after the cancellation is still not a winner. ([#464](https://github.com/SingUp009/Moderato.Effects/issues/464))
 
 - Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
+
+### Tests
+
+- Cover a `Transaction` nested in another transaction's body on SQLite: it fails at once on a shared connection and after the connection timeout on separate connections, and the outer transaction rolls back. ([#474](https://github.com/SingUp009/Moderato.Effects/issues/474))
+
 ## [0.1.0-preview.6] - 2026-11-09
 
 ### Added
