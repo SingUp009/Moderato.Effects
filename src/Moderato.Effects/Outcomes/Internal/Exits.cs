@@ -18,7 +18,7 @@ internal static class Exits
             case OutcomeKind.Die:
                 return new(ExitCases.ToDie(outcome));
             default:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
                 return new(ExitCases.Interrupted);
         }
     }
