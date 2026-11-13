@@ -60,6 +60,8 @@ var fastest = Effect.Race(FromPrimary<R>(key), FromReplica<R>(key));
 
 The loser is canceled and awaited. If the loser's release fails, that defect outranks the winner's result, so a failing release is never dropped.
 
+A winner that finished before the caller canceled is kept, even if the cancellation arrives while the loser is still being awaited. A child that only finishes after the caller canceled is not a winner, and the race is `Interrupted`.
+
 ## Fibers
 
 A fiber is work that runs alongside its parent. It never outlives the parent's scope: when the scope ends, the fiber is canceled and the scope waits for it.
