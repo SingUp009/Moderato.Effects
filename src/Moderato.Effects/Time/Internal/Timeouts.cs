@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Moderato.Results;
 
 namespace Moderato.Effects.Internal;
@@ -23,7 +24,8 @@ internal static class Timeouts
     }
 
     internal static Effect<U, F, R> Create<T, E, U, F, R>(
-        Effect<T, E, R> effect, TimeSpan after, Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut)
+        Effect<T, E, R> effect, TimeSpan after, Func<Outcome<T, E>, Outcome<U, F>> passthrough, Func<TimeoutError, long, Outcome<U, F>> timedOut,
+        [CallerMemberName] string? name = null)
         where R : IHas<TimeProvider>
     {
         ThrowIfInvalid(after);
@@ -43,9 +45,9 @@ internal static class Timeouts
                 {
                     return new(Defects.From<U, F>(exception, context));
                 }
-            });
+            }, name);
         }
-        return new(RunAsync);
+        return new(RunAsync, name);
 
         // Keep fixed settings off the stack while entering nested timeouts.
         async ValueTask<Outcome<U, F>> RunAsync(R env, RunContext context)
