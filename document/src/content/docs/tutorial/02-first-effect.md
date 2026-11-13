@@ -149,4 +149,4 @@ You can now describe work with `Effect.Gen`, execute it and read its successful 
 
 ## Next
 
-Chapter 1 returned either `Ok` or `Err`. This chapter described work with no expected errors. Next, you will bring the two together: use the quantity validation result inside a Gen block and let an expected failure stop the work.
+In the [next chapter](../03-expected-errors/), use the quantity validation result from chapter 1 inside a Gen block. An expected failure will stop the work and become an `Err` for the caller.
