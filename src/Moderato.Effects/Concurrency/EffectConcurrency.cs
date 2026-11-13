@@ -163,10 +163,9 @@ public static partial class Effect
         var primary = Concurrent.PrimaryFailure(ends, callerCanceled);
         // No winner ∧ no deciding failure ⇒ the caller canceled.
         if (primary is null && winner is null) return InterruptedWithOthers<T, E, T, E>(ends);
+        // A winner finished before any cancellation, so a loser interrupted afterwards cannot undo the race.
         var decidedByFailure = primary is { } p
-            && (ends[p].Outcome.Kind == OutcomeKind.Die && ends[p].IsIndependentFailure
-                || ends[p].Outcome.Kind == OutcomeKind.Interrupted && callerCanceled
-                || winner is null);
+            && (ends[p].Outcome.Kind == OutcomeKind.Die && ends[p].IsIndependentFailure || winner is null);
         if (decidedByFailure) return Concurrent.Fail<T, E, T, E>(ends, primary!.Value, static error => error);
 
         var chosen = ends[winner!.Value].Outcome;

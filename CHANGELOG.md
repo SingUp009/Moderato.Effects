@@ -7,13 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Report the Errs suppressed under an `Interrupted` to the unobserved-failure handler when the interruption reaches `RunAsync` or `RunExitAsync`, as its defects already were. A `CommitNotConfirmed` produced while the caller canceled inside `All` or `Race` is no longer lost. ([#463](https://github.com/SingUp009/Moderato.Effects/issues/463))
 - Write only the type name of an unjoined Err from the default unobserved-failure handler, instead of the error value. Set `EffectDiagnostics.UnobservedFailureHandler` to log more. ([#465](https://github.com/SingUp009/Moderato.Effects/issues/465))
 
 ### Fixed
 
 - Report scope misuse in typed catches and exception filters that accept `ScopeFailure`. ([#444](https://github.com/SingUp009/Moderato.Effects/issues/444))
 - Preserve the last `Retry` or `Repeat` result when the schedule is exhausted, without calling its predicate again. ([#445](https://github.com/SingUp009/Moderato.Effects/issues/445))
+- Keep a constant effect's `WithName` name and location, or its factory name, in recordings after the implicit `Never` conversions and `WidenEnv`. ([#457](https://github.com/SingUp009/Moderato.Effects/issues/457))
+- Reject a default body when `EfDatabase.Transaction` is built, before any run creates a context or begins a transaction. ([#458](https://github.com/SingUp009/Moderato.Effects/issues/458))
+- Report MEFF103 when an `[Environment]` type already implements `IHas<T>.Service` explicitly for a parameter's service, instead of failing with CS8646 in generated code. ([#459](https://github.com/SingUp009/Moderato.Effects/issues/459))
+- Report MEFF304 when a Gen block stores its scope in an array element or in a local or parameter captured from the enclosing member. ([#460](https://github.com/SingUp009/Moderato.Effects/issues/460))
+- Reject a `Succeeded` or default case assigned to `Suppressed.Case` through a `with` expression. ([#461](https://github.com/SingUp009/Moderato.Effects/issues/461))
+- Reject a null `Exception` or `Suppressed` when a `Die` is created or copied with a `with` expression. ([#467](https://github.com/SingUp009/Moderato.Effects/issues/467))
+- Keep the Err or defect of a Gen block's unawaited step as an independent failure when only the block's own end canceled the step, so `All`, `Race` and `RaceFirst` end with it instead of `Interrupted`. ([#462](https://github.com/SingUp009/Moderato.Effects/issues/462))
+- Keep the value of a `Race` or `RaceFirst` winner when the caller cancels while the loser is still being awaited, as an Err winner already was. A child that finishes after the cancellation is still not a winner. ([#464](https://github.com/SingUp009/Moderato.Effects/issues/464))
 
+- Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
 ## [0.1.0-preview.6] - 2026-11-09
 
 ### Added
