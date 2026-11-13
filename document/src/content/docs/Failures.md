@@ -71,7 +71,7 @@ if (exit is Die die)
 
 The labels describe how failures are combined; they are not timestamps relative to the primary failure. If the body returns an Err and a later release dies, the earlier Err is `Sequential` context on the release's Die. `Parallel` does not require failures to be observed at the same instant.
 
-`Suppressed.Case` is an `ExitCase`: `Failed`, `Die` or `Interrupted`. At most 100 are kept per outcome; `Die.OmittedSuppressed` counts the rest. `RunAsync` attaches the suppressed failures to the rethrown exception's `Data` under `Effect<T, E, R>.SUPPRESSED_DATA_KEY`.
+`Suppressed.Case` is an `ExitCase`: `Failed`, `Die` or `Interrupted`. At most 100 are kept per outcome; `Die.OmittedSuppressed` counts the rest. `RunAsync` attaches the suppressed failures to the rethrown exception's `Data` under `Effect<T, E, R>.SUPPRESSED_DATA_KEY`, and the number left out under `Effect<T, E, R>.OMITTED_SUPPRESSED_DATA_KEY` when it is not zero.
 
 Separate throws of the same exception instance are separate failures. A child's failure propagated through `Join` is counted once; if the parent's body throws that exception again in a separate operation, its failure is also kept as context.
 
