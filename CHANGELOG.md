@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Report the Errs suppressed under an `Interrupted` to the unobserved-failure handler when the interruption reaches `RunAsync` or `RunExitAsync`, as its defects already were. A `CommitNotConfirmed` produced while the caller canceled inside `All` or `Race` is no longer lost. ([#463](https://github.com/SingUp009/Moderato.Effects/issues/463))
 - Write only the type name of an unjoined Err from the default unobserved-failure handler, instead of the error value. Set `EffectDiagnostics.UnobservedFailureHandler` to log more. ([#465](https://github.com/SingUp009/Moderato.Effects/issues/465))
+- Analyze a method or local function that takes a `Scope<E, R>` like a Gen block lambda, so MEFF301, MEFF302, MEFF304, MEFF305, MEFF306 and MEFF310 also apply to Gen bodies passed as method groups and to scope helpers. Existing helpers can get new warnings. ([#468](https://github.com/SingUp009/Moderato.Effects/issues/468))
 
 ### Fixed
 
