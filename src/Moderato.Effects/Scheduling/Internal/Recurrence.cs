@@ -42,10 +42,10 @@ internal static class Recurrence
                 ? EffectObservation.Begin("attempt", context, $"{effect.TrackingName} {attempt}") : null;
             var outcome = await TraceTasks.Observe(RunOnceAsync(effect, env, context.WithObservation(attemptTracking)), attemptTracking).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Err) return outcome;
-            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
             var decision = await DecideAsync(policy, new RetryContext<E>(attempt, outcome.Error), env, context).ConfigureAwait(false);
-            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome, context);
+            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
@@ -76,10 +76,10 @@ internal static class Recurrence
                 ? EffectObservation.Begin("attempt", context, $"{effect.TrackingName} {repetition}") : null;
             var outcome = await TraceTasks.Observe(RunOnceAsync(effect, env, context.WithObservation(attemptTracking)), attemptTracking).ConfigureAwait(false);
             if (outcome.Kind != OutcomeKind.Ok) return outcome;
-            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome, context);
+            if (context.CancellationToken.IsCancellationRequested) return Interrupt(Outcome<bool, Never>.Interrupted(), outcome);
 
             var decision = await DecideAsync(policy, new RepeatContext<T>(repetition, outcome.Value), env, context).ConfigureAwait(false);
-            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome, context);
+            if (decision.Kind != OutcomeKind.Ok) return Interrupt<T, E>(decision, outcome);
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
@@ -122,19 +122,13 @@ internal static class Recurrence
     private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last, RunContext context)
     {
         UnobservedFailures.ReportDefects(decision.Suppressed, context);
-        return Interrupt(Outcome<bool, Never>.Interrupted(), last, context);
+        return Interrupt(Outcome<bool, Never>.Interrupted(), last);
     }
 
-    // The policy failed, so the last attempt's outcome stays as context.
-    private static Outcome<T, E> Interrupt<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last, RunContext context)
+    // The policy failed or was interrupted, so the last attempt's outcome stays as context.
+    private static Outcome<T, E> Interrupt<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last)
     {
         var failure = decision.WithTypes<T, E>();
-        if (decision.Kind == OutcomeKind.Interrupted)
-        {
-            UnobservedFailures.ReportDefects(last.Suppressed, context);
-            return failure;
-        }
-
         var lastFailure = ExitCases.FailureOf(last);
         if (failure.Suppressed.Length == SuppressedContext.MAX)
             return failure.WithSuppressed(failure.Suppressed, failure.Omitted + last.Omitted + last.Suppressed.Length + (lastFailure is null ? 0 : 1));
