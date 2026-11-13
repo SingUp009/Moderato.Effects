@@ -33,6 +33,8 @@ dotnet_diagnostic.MEFF307.severity = warning
 
 When MEFF103 or MEFF104 is reported, nothing is generated for that environment.
 
+MEFF103 also covers a parameter whose service the type already provides through a hand-written explicit `IHas<T>.Service` implementation. Remove that implementation, or expose the parameter as another type.
+
 ## Gen blocks
 
 | ID | Severity | Reports | Fix |
