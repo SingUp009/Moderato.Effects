@@ -118,6 +118,7 @@ EffectDiagnostics.UnobservedFailureHandler = failure => logger.LogError("Unobser
 ```
 
 - The handler receives a `Die` or a `Failed`.
+- The default writes a defect's exception, and for an unjoined Err only the error's type name, so error values do not reach the error stream.
 - `null` restores the default.
 - Exceptions thrown by the handler are ignored, and reporting never changes an outcome.
 - The handler is global, so tests that replace it cannot run in parallel.

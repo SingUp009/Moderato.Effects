@@ -800,6 +800,57 @@ public class DiagnosticsOutputTests
         }
     }
 
+    private sealed record Credentials(string Password);
+
+    [Fact]
+    public async Task RunExitAsync_NoHandlerAndAnUnjoinedErr_WritesItsTypeWithoutItsValue()
+    {
+        // Given
+        var original = Console.Error;
+        var written = new StringWriter();
+        Console.SetError(written);
+        var work = SucceedsWithAnUnjoinedFailure(new Credentials("p@ss"));
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
+            Assert.Contains("unobserved Err of type Credentials", written.ToString());
+            Assert.DoesNotContain("p@ss", written.ToString());
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+    }
+
+    [Fact]
+    public async Task RunExitAsync_NoHandlerAndAnUnjoinedNullErr_WritesNull()
+    {
+        // Given
+        var original = Console.Error;
+        var written = new StringWriter();
+        Console.SetError(written);
+        var work = SucceedsWithAnUnjoinedFailure<string?>(null);
+
+        try
+        {
+            // When
+            var exit = await work.RunExitAsync(TestContext.Current.CancellationToken);
+
+            // Then
+            Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
+            Assert.Contains("unobserved Err of type null", written.ToString());
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+    }
+
     [Fact]
     public async Task RunExitAsync_NoHandlerAndAnErrorThatCannotBePrinted_KeepsTheResult()
     {
