@@ -65,7 +65,7 @@ A `nameof` operand does not count as scope use for MEFF301 or MEFF303: it neithe
 
 MEFF301 and MEFF302 recognize `catch (ScopeFailure)` and filters that accept it based on the caught exception's type, such as `when (ex is not OperationCanceledException)`. Filters that call application code may require manual review.
 
-MEFF304 treats a local or parameter declared outside the Gen block as storage that outlives it, because the block captures it. Assigning the scope to a local declared inside the block is not reported.
+MEFF304 treats a local or parameter declared outside the Gen block as storage that outlives it, because the block captures it. An `out` or `ref` parameter is reported even when the block declares it, since it writes to the caller's variable. Assigning the scope to a local or by-value parameter declared inside the block is not reported.
 
 MEFF305 includes tuple-deconstructing `foreach` and `await foreach` loops. Use a nested Gen block per iteration when its resources should be released before the next iteration.
 
