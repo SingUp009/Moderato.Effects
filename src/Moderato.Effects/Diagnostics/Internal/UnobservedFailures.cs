@@ -14,6 +14,15 @@ internal static class UnobservedFailures
         }
     }
 
+    /// <summary>Reports the defects and Errs that an interruption drops, since Interrupted carries no context.</summary>
+    internal static void ReportInterrupted(ImmutableArray<Suppressed> suppressed, RunContext context)
+    {
+        foreach (var failure in suppressed)
+        {
+            if (failure.Case is Die or Failed) Report(failure.Case, context);
+        }
+    }
+
     /// <summary>Reports a failure that would otherwise disappear.</summary>
     internal static void Report(ExitCase failure, RunContext context)
         => Report(failure, context.UnobservedFailureHandler);

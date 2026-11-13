@@ -108,7 +108,8 @@ Some failures have no outcome to travel in:
 
 - defects suppressed under an Err or Ok that reaches `RunAsync` (a `Result` cannot carry them);
 - defects suppressed under an Err that `OrElse`, `Retry`, `CatchCase` or `Attempt` handled;
-- the Err of a fiber that was never joined.
+- the Err of a fiber that was never joined;
+- defects and Errs suppressed under an `Interrupted` that reaches `RunAsync` or `RunExitAsync`, such as a `CommitNotConfirmed` that a group turned into context when the caller canceled.
 
 These go to `EffectDiagnostics.UnobservedFailureHandler`, which by default writes to `Console.Error`:
 
@@ -121,7 +122,7 @@ EffectDiagnostics.UnobservedFailureHandler = failure => logger.LogError("Unobser
 - Exceptions thrown by the handler are ignored, and reporting never changes an outcome.
 - The handler is global, so tests that replace it cannot run in parallel.
 
-Suppressed Errs are not reported; they are dropped with the Err that handled them.
+Errs suppressed under an Err or Ok are not reported; they are dropped with the outcome that handled them. An `Interrupted` cannot carry context at all, so both the defects and the Errs under it are reported.
 
 A defect already transferred from a scope step to a Task before Gen's body snapshot follows normal Task observation rules instead of this handler. Await the adapter's result; see [ValueTask adapters and failure ownership](/gen-blocks/#valuetask-adapters-and-failure-ownership).
 

@@ -41,7 +41,7 @@ The sequence overloads of `All`, `AllSettled` and `AllErrors` capture a copy of 
 | `Effect.AllSettled(effects)` | `Effect<Exit<T, E>[], Never, R>` | Runs every effect to the end and collects how each ended |
 | `Effect.AllErrors(effects)` | `Effect<T[], E[], R>` | Collects every error instead of stopping at the first, as input validation needs; a defect still cancels the rest |
 
-If the caller cancels and an effect turns that cancellation into an Err (for example `catch (OperationCanceledException)` followed by `scope.Fail`), `All` and `AllErrors` end with `Interrupted` and keep that Err as context. `AllSettled` collects it like any other Err.
+If the caller cancels and an effect turns that cancellation into an Err (for example `catch (OperationCanceledException)` followed by `scope.Fail`), `All` and `AllErrors` end with `Interrupted` and keep that Err as context. When that interruption reaches `RunAsync` or `RunExitAsync`, the Err goes to the [unobserved-failure handler](/failures/#failures-nobody-sees), since `Interrupted` carries no context. `AllSettled` collects it like any other Err.
 
 An interrupted child does not always mean the caller canceled: joining a fiber whose scope has ended can also return `Interrupted`. `AllErrors` returns `Interrupted` rather than a partial validation result in that case, unless a defect takes priority. `AllSettled` can represent it directly: with an uncanceled caller, it succeeds with an `Exit[]` containing that child's `Interrupted`. If caller cancellation leaves children unrun or interrupted, the group itself is interrupted.
 

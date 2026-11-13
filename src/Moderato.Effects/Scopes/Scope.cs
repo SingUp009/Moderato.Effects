@@ -12,6 +12,7 @@ namespace Moderato.Effects;
 public sealed class Scope<E, R>
 {
     private readonly RunContext context;
+    private readonly CancellationToken callerToken;
     private readonly Cancellation cancellation;
     private readonly Releases<R> releases;
     // An unawaited step records from another thread, so recording and the block's end take turns.
@@ -27,6 +28,7 @@ public sealed class Scope<E, R>
     private Scope(R env, RunContext context)
     {
         Env = env;
+        callerToken = context.CancellationToken;
         cancellation = new Cancellation(context);
         releases = new Releases<R>(cancellation);
         this.context = releases.BodyContext;
@@ -361,9 +363,9 @@ public sealed class Scope<E, R>
 
                 // An Ok block takes the step's failure, while a failed block keeps its own first.
                 if (outcome.Kind == OutcomeKind.Ok && step.Defect is { } defect)
-                    outcome = Outcome<T, E>.Die(defect, consequential: step.Consequential, failureOrder: step.FailureOrder);
+                    outcome = Outcome<T, E>.Die(defect, consequential: FollowsOuterCancellation(step.Consequential), failureOrder: step.FailureOrder);
                 else if (outcome.Kind == OutcomeKind.Ok && failure.Value is Failed)
-                    outcome = RecordedError<T>();
+                    outcome = Outcome<T, E>.Err(failures!.Error, FollowsOuterCancellation(failures.ErrorConsequential), failures.ErrorOrder);
                 else
                     AddSuppressed(new Suppressed(failure.Value is Failed error ? ExitCases.Failed(error.Error) : failure, Relation.Sequential));
             }
@@ -371,6 +373,10 @@ public sealed class Scope<E, R>
 
         return outcome;
     }
+
+    // Closing the block cancels only its own token, so outside the block a late step's failure is independent.
+    private bool FollowsOuterCancellation(bool consequential)
+        => consequential && (cancellation.Reason != CancellationReason.ParentScopeClosed || callerToken.IsCancellationRequested);
 
     private T Unwrap<T>(Outcome<T, E> outcome)
     {
