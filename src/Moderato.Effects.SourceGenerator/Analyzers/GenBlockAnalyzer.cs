@@ -129,7 +129,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 if (asyncSteps.Contains(name) && !AwaitedOrReturned(context.SemanticModel, step, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepNotAwaited, step.GetLocation(), access.ToString()));
             }
-            else if (Escapes(context.SemanticModel, identifier))
+            else if (Escapes(context.SemanticModel, identifier, function))
             {
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ScopeEscapes, identifier.GetLocation(), parameter.Name));
             }
@@ -222,13 +222,21 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             });
 
     // Passing the scope on is fine, but storing it where it can outlive the block is not.
-    private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
+    private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier, SyntaxNode function) => identifier.Parent switch
     {
         AssignmentExpressionSyntax assignment when assignment.Right == identifier
-            => model.GetSymbolInfo(assignment.Left).Symbol is IFieldSymbol or IPropertySymbol,
+            => assignment.Left is ElementAccessExpressionSyntax || Outlives(model.GetSymbolInfo(assignment.Left).Symbol, function),
         ReturnStatementSyntax or ArrowExpressionClauseSyntax => true,
         InitializerExpressionSyntax or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax => true,
         ArgumentSyntax { Parent: TupleExpressionSyntax } => true,
+        _ => false,
+    };
+
+    // A variable of the enclosing member is captured, so it outlives the block like a field.
+    private static bool Outlives(ISymbol? target, SyntaxNode function) => target switch
+    {
+        IFieldSymbol or IPropertySymbol => true,
+        ILocalSymbol or IParameterSymbol => target.DeclaringSyntaxReferences.All(reference => !function.Span.Contains(reference.Span)),
         _ => false,
     };
 

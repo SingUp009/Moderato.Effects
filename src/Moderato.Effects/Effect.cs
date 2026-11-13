@@ -39,6 +39,14 @@ public readonly partial struct Effect<T, E, R>
         trackingName = name;
     }
 
+    // A constant rebuilt for other type arguments stays the operation its source was recorded as.
+    private Effect(Result<T, E> constant, string? name, string? location)
+    {
+        this.constant = constant;
+        trackingName = name;
+        trackingLocation = location;
+    }
+
     private Effect(Effect<T, E, R> source, string name, string location)
     {
         constant = source.constant;
@@ -102,7 +110,8 @@ public readonly partial struct Effect<T, E, R>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
     {
         effect = effect.Validate();
-        if (effect.constant.TryGetOk(out var value)) return new(new Result<T, E>(new Ok<T>(value)));
+        if (effect.constant.TryGetOk(out var value))
+            return new(new Result<T, E>(new Ok<T>(value)), effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<T, Never, R> effect)
@@ -113,7 +122,8 @@ public readonly partial struct Effect<T, E, R>
     public static implicit operator Effect<T, E, R>(Effect<Never, E, R> effect)
     {
         effect = effect.Validate();
-        if (effect.constant.TryGetErr(out var error)) return new(new Result<T, E>(new Err<E>(error)));
+        if (effect.constant.TryGetErr(out var error))
+            return new(new Result<T, E>(new Err<E>(error)), effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<Never, E, R> effect)
@@ -260,7 +270,7 @@ public readonly partial struct Effect<T, E, R>
                 AttachSuppressed(exception, outcome.Suppressed, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
                 // An inner cancellation can interrupt the run while the caller's token is not canceled.
                 return ValueTask.FromCanceled<Result<T, E>>(context.CancellationToken.IsCancellationRequested
                     ? context.CancellationToken : new CancellationToken(canceled: true));

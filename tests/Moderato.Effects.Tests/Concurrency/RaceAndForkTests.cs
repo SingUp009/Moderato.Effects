@@ -161,6 +161,76 @@ public class RaceTests
         // Then
         Assert.True(exit.TryGetValue(out Interrupted? _));
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RaceOrRaceFirst_CallerCancelsWhileTheLoserEnds_KeepsTheWinner(bool raceFirst, bool winnerFails)
+    {
+        // Given
+        using var caller = new CancellationTokenSource();
+        var loserStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var winner = Effect<EmptyEnvironment>.FromResultAsync<int, string>(async _ =>
+        {
+            await loserStarted.Task;
+            return winnerFails ? Result.Err("lost") : Result.Ok(1);
+        });
+        var loser = Effect<EmptyEnvironment>.FromResultAsync<int, string>(async ct =>
+        {
+            loserStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // The caller cancels only after the winner has canceled this loser.
+                caller.Cancel();
+                throw;
+            }
+            return Result.Ok(2);
+        });
+        var race = raceFirst ? Effect.RaceFirst(winner, loser) : Effect.Race(winner, loser);
+
+        // When
+        var exit = await race.RunExitAsync(EmptyEnvironment.Value, caller.Token)
+            .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(caller.IsCancellationRequested);
+        Assert.Equal(winnerFails ? new Err<string>("lost") : new Ok<int>(1), exit);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RaceOrRaceFirst_ChildSucceedsAfterTheCallerCanceled_IsInterrupted(bool raceFirst)
+    {
+        // Given
+        using var caller = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Effect<string, AppError, EmptyEnvironment> late = Effect<EmptyEnvironment>.Async(async _ =>
+        {
+            started.SetResult();
+            await canceled.Task;
+            return "late";
+        });
+        var log = new List<string>();
+        var waiting = Steps.WaitUntilCanceled(log, "waiting");
+        var race = raceFirst ? Effect.RaceFirst(late, waiting) : Effect.Race(late, waiting);
+
+        // When
+        var running = race.RunExitAsync(EmptyEnvironment.Value, caller.Token).AsTask();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await caller.CancelAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        canceled.SetResult();
+        var exit = await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+    }
 }
 
 public class ForkTests

@@ -654,7 +654,9 @@ public class ScopeMisuseTests
         var effect = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
             await Task.Yield();
+#pragma warning disable MEFF304
             escaped = scope;
+#pragma warning restore MEFF304
             return 1;
         });
         await effect.RunAsync(TestContext.Current.CancellationToken);
