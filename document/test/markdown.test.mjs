@@ -20,6 +20,20 @@ test('the agent index links to published Markdown guides', () => {
 
   assert.ok(links.some((link) => link.pathname === '/tutorial/01-results.md'));
   assert.ok(links.some((link) => link.pathname === '/tutorial/02-first-effect.md'));
+  assert.ok(links.some((link) => link.pathname === '/agents.md'));
+  const agentsHtml = readFileSync(new URL('../dist/agents/index.html', import.meta.url), 'utf8');
+  assert.match(agentsHtml, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
   assert.ok(links.every((link) => !link.pathname.includes('_Sidebar')));
   assert.match(readFileSync(new URL('../dist/gen-blocks.md', import.meta.url), 'utf8'), /```csharp/);
+});
+
+test('chapter links resolve from the Markdown asset URL', () => {
+  const index = readFileSync(new URL('../dist/llms.txt', import.meta.url), 'utf8');
+  for (const [page] of index.matchAll(/https:\/\/[^)]+\/tutorial\/[^)]+\.md/g)) {
+    const markdown = readFileSync(new URL(`../dist${new URL(page).pathname}`, import.meta.url), 'utf8');
+    for (const [, link] of markdown.matchAll(/\]\(((?:\/tutorial\/|\.\.?\/)[^)]+)\)/g)) {
+      const target = new URL(link, page);
+      assert.doesNotThrow(() => readFileSync(new URL(`../dist${target.pathname}index.html`, import.meta.url)), `${page} links to ${target.href}`);
+    }
+  }
 });

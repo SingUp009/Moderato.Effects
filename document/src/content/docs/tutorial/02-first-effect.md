@@ -5,7 +5,7 @@ description: Turn order validation into a deferred C# effect with Effect.Gen, ru
 
 # Your First Effect
 
-In [chapter 1](../01-results/), you returned a `Result` from a method. Calling the method ran the validation immediately. An effect lets you describe work first and choose when to run it.
+In [chapter 1](/tutorial/01-results/), you returned a `Result` from a method. Calling the method ran the validation immediately. An effect lets you describe work first and choose when to run it.
 
 In this chapter, you will write an effect with `Effect.Gen`, execute it and read its result. You need the console project from chapter 1 and basic `async` / `await`: an `async` method or lambda can use `await` to wait for an asynchronous operation to finish.
 
@@ -24,7 +24,7 @@ The completed code is in [02_FirstEffect.cs](https://github.com/SingUp009/Modera
 From the console project's directory, add Moderato.Effects:
 
 ```sh
-dotnet add package Moderato.Effects
+dotnet add package Moderato.Effects --prerelease
 ```
 
 Keep the Moderato.Results reference from chapter 1. Moderato.Effects uses the same result types.
@@ -150,4 +150,4 @@ You can now describe work with `Effect.Gen`, execute it and read its successful 
 
 ## Next
 
-In the [next chapter](../03-expected-errors/), use the quantity validation result from chapter 1 inside a Gen block. An expected failure will stop the work and become an `Err` for the caller.
+In the [next chapter](/tutorial/03-expected-errors/), use the quantity validation result from chapter 1 inside a Gen block. An expected failure will stop the work and become an `Err` for the caller.
