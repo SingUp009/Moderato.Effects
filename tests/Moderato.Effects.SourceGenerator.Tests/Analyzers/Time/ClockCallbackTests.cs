@@ -72,4 +72,33 @@ public class ClockCallbackTests
         Assert.Empty(build.Errors);
         Assert.Equal(expected, build.Diagnostics.Count(static diagnostic => diagnostic.Id == "MEFF307"));
     }
+
+    [Fact]
+    public void Callback_PassedToApplicationCodeInALibraryLikeNamespace_ReportsNothing()
+    {
+        // Given
+        const string SOURCE = """
+            namespace Moderato.Effects.MyApp
+            {
+                public static class Util
+                {
+                    public static T Twice<T>(Func<T> callback) { callback(); return callback(); }
+                }
+            }
+
+            namespace App
+            {
+                public static class Clock
+                {
+                    public static DateTime Now() => Moderato.Effects.MyApp.Util.Twice(() => DateTime.UtcNow);
+                }
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
 }
