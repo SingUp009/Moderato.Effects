@@ -29,7 +29,13 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(
             AnalyzeFunction, SyntaxKind.ParenthesizedLambdaExpression, SyntaxKind.SimpleLambdaExpression, SyntaxKind.AnonymousMethodExpression,
-            SyntaxKind.MethodDeclaration, SyntaxKind.LocalFunctionStatement);
+            SyntaxKind.MethodDeclaration, SyntaxKind.LocalFunctionStatement,
+            SyntaxKind.ConstructorDeclaration, SyntaxKind.OperatorDeclaration, SyntaxKind.ConversionOperatorDeclaration,
+            SyntaxKind.GetAccessorDeclaration, SyntaxKind.SetAccessorDeclaration, SyntaxKind.InitAccessorDeclaration,
+            SyntaxKind.IndexerDeclaration);
+        context.RegisterSyntaxNodeAction(
+            AnalyzePrimaryConstructor, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration,
+            SyntaxKind.RecordDeclaration, SyntaxKind.RecordStructDeclaration);
     }
 
     /// <summary>Whether the type is <c>Moderato.Effects.Scope&lt;E, R&gt;</c>.</summary>
@@ -37,29 +43,34 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         => type is INamedTypeSymbol { Name: "Scope", Arity: 2 } named && named.ContainingNamespace.ToDisplayString() == "Moderato.Effects";
 
     internal static bool IsFunction(SyntaxNode node)
-        => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax or MethodDeclarationSyntax;
+        => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax or BaseMethodDeclarationSyntax
+            or AccessorDeclarationSyntax or IndexerDeclarationSyntax { ExpressionBody: not null };
 
-    // A method or local function that takes a scope is a Gen block's body too, whether passed to Gen or called as a helper.
+    // Any member that takes a scope is a Gen block's body too, whether passed to Gen or called as a helper.
     internal static IMethodSymbol? FunctionSymbol(SemanticModel model, SyntaxNode function, System.Threading.CancellationToken cancellationToken = default)
         => function switch
         {
             AnonymousFunctionExpressionSyntax => model.GetSymbolInfo(function, cancellationToken).Symbol as IMethodSymbol,
-            MethodDeclarationSyntax or LocalFunctionStatementSyntax => model.GetDeclaredSymbol(function, cancellationToken) as IMethodSymbol,
+            BaseMethodDeclarationSyntax or LocalFunctionStatementSyntax or AccessorDeclarationSyntax
+                => model.GetDeclaredSymbol(function, cancellationToken) as IMethodSymbol,
+            IndexerDeclarationSyntax => (model.GetDeclaredSymbol(function, cancellationToken) as IPropertySymbol)?.GetMethod,
             _ => null,
         };
 
     private static SyntaxNode? FunctionBody(SyntaxNode function) => function switch
     {
         AnonymousFunctionExpressionSyntax anonymous => (SyntaxNode?)anonymous.Block ?? anonymous.ExpressionBody,
-        MethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
+        BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
         LocalFunctionStatementSyntax local => (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression,
+        AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
+        IndexerDeclarationSyntax indexer => indexer.ExpressionBody?.Expression,
         _ => null,
     };
 
     private static bool IsAsync(SyntaxNode function) => function switch
     {
         AnonymousFunctionExpressionSyntax anonymous => !anonymous.AsyncKeyword.IsKind(SyntaxKind.None),
-        MethodDeclarationSyntax method => method.Modifiers.Any(SyntaxKind.AsyncKeyword),
+        BaseMethodDeclarationSyntax method => method.Modifiers.Any(SyntaxKind.AsyncKeyword),
         LocalFunctionStatementSyntax local => local.Modifiers.Any(SyntaxKind.AsyncKeyword),
         _ => false,
     };
@@ -86,6 +97,21 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         AnalyzeScopeUses(context, function, body, scopes, scopeFailure);
         AnalyzeCatchClauses(context, body, scopes, scopeFailure);
         AnalyzeBlockingWaits(context, body);
+    }
+
+    // A primary constructor parameter lives as long as the instance once a member or initializer uses it.
+    private static void AnalyzePrimaryConstructor(SyntaxNodeAnalysisContext context)
+    {
+        var type = (TypeDeclarationSyntax)context.Node;
+        if (type.ParameterList is not { } parameters) return;
+        foreach (var syntax in parameters.Parameters)
+        {
+            if (context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken) is not { } parameter || !IsScope(parameter.Type)) continue;
+            var kept = type is RecordDeclarationSyntax || type.Members.SelectMany(static member => member.DescendantNodes()).OfType<IdentifierNameSyntax>()
+                .Any(identifier => identifier.Identifier.ValueText == parameter.Name
+                    && SymbolEqualityComparer.Default.Equals(context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol, parameter));
+            if (kept) context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ScopeEscapes, syntax.Identifier.GetLocation(), parameter.Name));
+        }
     }
 
     private static void AnalyzeScopeUses(SyntaxNodeAnalysisContext context, SyntaxNode function, SyntaxNode body,
