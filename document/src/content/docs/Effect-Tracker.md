@@ -1,5 +1,6 @@
 ---
 title: Effect Tracker
+description: Inspect active scopes, fibers, and resources with Effect Tracker. Record execution details and correlate them with OpenTelemetry traces.
 ---
 
 # Effect Tracker
@@ -48,7 +49,7 @@ Stack capture and snapshot allocation have a cost. Enable them deliberately duri
 
 Starts and completions may race with a snapshot. Enabling tracks future starts, and disabling clears the registry; re-enabling does not reconstruct existing work. The switches are process-wide, so coordinate them between tests and debugging tools.
 
-Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](opentelemetry). Its instrumentation is independent of these Tracker switches.
+Core provides the data API. For standard tracing and process-wide runtime metrics, see [OpenTelemetry](/opentelemetry/). Its instrumentation is independent of these Tracker switches.
 
 ## Record execution details
 
@@ -59,6 +60,8 @@ using var recording = EffectTracker.Record();
 await effect.WithName("Orders.Create").RunExitAsync(environment, cancellationToken);
 var snapshot = recording.GetSnapshot();
 ```
+
+Each operation is recorded under the member that built it (`Map`, `AndThen`, `Timeout`, `Select`, `CatchCase`, ...) unless `WithName` names it. An implicit conversion from a `Never`-typed effect is recorded as `Widen`. Nothing is hidden: an operator the library builds from others, such as a tuple `All`, shows each of its steps (`Map`, `All`, and one `Map` per child).
 
 Recording captures roots started during that session, including detailed operations and retry attempts. It is separate from the active-lifetime registry above: neither `EnableTracking` nor stack capture is required. Only one recording can be active per process. Disposing stops new root capture; already captured executions can finish in their original recording.
 
@@ -96,7 +99,7 @@ Durations include waiting and cleanup, and nested intervals overlap. A completed
 
 ## Correlate with OpenTelemetry
 
-Execution recording and standard telemetry use the same internal observation points. Enable [OpenTelemetry](opentelemetry) normally, then start a recording when detailed local inspection is needed. No second instrumentation wrapper is required.
+Execution recording and standard telemetry use the same internal observation points. Enable [OpenTelemetry](/opentelemetry/) normally, then start a recording when detailed local inspection is needed. No second instrumentation wrapper is required.
 
 An entry's `TraceId` and `SpanId` let you look up the surrounding request in your monitoring tool:
 

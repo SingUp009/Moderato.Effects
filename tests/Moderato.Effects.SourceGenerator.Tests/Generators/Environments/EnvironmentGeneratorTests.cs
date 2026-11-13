@@ -126,6 +126,84 @@ public class EnvironmentGeneratorTests
     }
 
     [Fact]
+    public void Environment_ExplicitImplementationOfAParameterService_ReportsMEFF103()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            [Environment]
+            public sealed partial class AppEnv(IUserRepository users, TimeProvider clock) : IHas<IUserRepository>
+            {
+                IUserRepository IHas<IUserRepository>.Service => users;
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        var message = build.Single("MEFF103").GetMessage();
+        Assert.Contains("IHas<IUserRepository>.Service", message);
+        Assert.Contains("users", message);
+        Assert.Equal(["MEFF103"], build.Errors);
+        Assert.Empty(build.Generated);
+    }
+
+    [Fact]
+    public void Environment_ExplicitImplementationOfAnotherService_KeepsBoth()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            public sealed class NullAudit : IAuditLogger;
+
+            [Environment]
+            public sealed partial class AppEnv(IUserRepository users) : IHas<IAuditLogger>
+            {
+                IAuditLogger IHas<IAuditLogger>.Service { get; } = new NullAudit();
+            }
+
+            public static class Use
+            {
+                public static IUserRepository Users(AppEnv env) => env.Resolve<IUserRepository>();
+                public static IAuditLogger Audit(AppEnv env) => env.Resolve<IAuditLogger>();
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+    }
+
+    [Fact]
+    public void Environment_PublicServicePropertyForAParameterService_GeneratesTheExplicitImplementation()
+    {
+        // Given
+        const string SOURCE = SERVICES + """
+
+            [Environment]
+            public sealed partial class AppEnv(IUserRepository users)
+            {
+                public IUserRepository Service => users;
+            }
+
+            public static class Use
+            {
+                public static IUserRepository Users(AppEnv env) => env.Resolve<IUserRepository>();
+            }
+            """;
+
+        // When
+        var build = Compiler.Build(SOURCE);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Single(build.Generated);
+    }
+
+    [Fact]
     public void Environment_ExposedTypeNotImplemented_ReportsMEFF104()
     {
         // Given

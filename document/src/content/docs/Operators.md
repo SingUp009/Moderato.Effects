@@ -1,5 +1,6 @@
 ---
 title: Operators
+description: Compose effects with Map, Bind, and LINQ query syntax while preserving deferred execution, typed errors, and environment requirements.
 ---
 
 # Operators

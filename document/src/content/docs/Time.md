@@ -1,5 +1,6 @@
 ---
 title: Time
+description: Use TimeProvider for delays and cooperative timeouts in Moderato.Effects, and test time-dependent work with a fake clock.
 ---
 
 # Time
@@ -65,7 +66,7 @@ If the caller cancels while the timeout fires, the caller wins: the result is `I
 
 ## The system clock inside effects
 
-Reading the system clock inside an effect bypasses the environment, and tests cannot control it. The analyzer MEFF307 reports these inside Gen blocks and inside the arguments of `Effect<R>` factories:
+Reading the system clock inside an effect bypasses the environment, and tests cannot control it. The analyzer MEFF307 reports these inside Gen blocks, inside the arguments of `Effect<R>` factories and inside callbacks passed to operators such as `Map`, `AndThen`, `Resource.Make` and `Retry`:
 
 `DateTime.Now`, `DateTime.UtcNow`, `DateTime.Today`, `DateTimeOffset.Now`, `DateTimeOffset.UtcNow`, `TimeProvider.System`, `Task.Delay`, `Thread.Sleep`, `Stopwatch.GetTimestamp`, `Stopwatch.StartNew`, `Environment.TickCount`, `Environment.TickCount64`
 

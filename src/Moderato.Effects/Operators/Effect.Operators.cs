@@ -5,26 +5,33 @@ namespace Moderato.Effects;
 
 public readonly partial struct Effect<T, E, R>
 {
-    public Effect<U, E, R> Map<U>(Func<T, U> mapper)
+    public Effect<U, E, R> Map<U>(Func<T, U> mapper) => Map(mapper, nameof(Map));
+
+    // Operators built on another one are recorded under the member the user wrote.
+    internal Effect<U, E, R> Map<U>(Func<T, U> mapper, string name)
     {
         ArgumentNullException.ThrowIfNull(mapper);
         return Then<U, E, Func<T, U>>(mapper, static (outcome, _, _, map) => new(outcome.Kind == OutcomeKind.Ok
             ? Outcome<U, E>.Ok(map(outcome.Value)).After(outcome)
-            : outcome.WithValueType<U>()));
+            : outcome.WithValueType<U>()), name);
     }
 
-    public Effect<T, F, R> MapErr<F>(Func<E, F> mapper)
+    public Effect<T, F, R> MapErr<F>(Func<E, F> mapper) => MapErr(mapper, nameof(MapErr));
+
+    private Effect<T, F, R> MapErr<F>(Func<E, F> mapper, string name)
     {
         ArgumentNullException.ThrowIfNull(mapper);
         return Then<T, F, Func<E, F>>(mapper, static (outcome, _, _, map) => new(outcome.Kind == OutcomeKind.Err
             ? outcome.WithError<T, F>(map(outcome.Error))
-            : outcome.WithErrorType<F>()));
+            : outcome.WithErrorType<F>()), name);
     }
 
-    public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder)
+    public Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder) => AndThen(binder, nameof(AndThen));
+
+    internal Effect<U, E, R> AndThen<U>(Func<T, Effect<U, E, R>> binder, string name)
     {
         ArgumentNullException.ThrowIfNull(binder);
-        return new(new AndThenInstruction<T, U, E, R>(Validate(), binder));
+        return new(new AndThenInstruction<T, U, E, R>(Validate(), binder), name);
     }
 
     /// <summary>Runs a check on the value and keeps the value if the check succeeds.</summary>
@@ -136,7 +143,7 @@ public readonly partial struct Effect<T, E, R>
     }
 
     /// <summary>Widens the error to a union that has it as a case.</summary>
-    public Effect<T, F, R> Widen<F>() where F : IUnionCase<F, E> => MapErr(static error => F.From(error));
+    public Effect<T, F, R> Widen<F>() where F : IUnionCase<F, E> => MapErr(static error => F.From(error), nameof(Widen));
 
     /// <summary>Runs with an environment built from a wider one.</summary>
     public Effect<T, E, R2> Provide<R2>(Func<R2, R> build)
@@ -149,7 +156,7 @@ public readonly partial struct Effect<T, E, R>
     public Effect<T, E, R2> WidenEnv<R2>() where R2 : R
     {
         var effect = Validate();
-        if (effect.constant.HasValue) return new(effect.constant);
+        if (effect.constant.HasValue) return new(effect.constant, effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R2> Deferred(Effect<T, E, R> effect)

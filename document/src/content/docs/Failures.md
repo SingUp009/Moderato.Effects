@@ -1,5 +1,6 @@
 ---
 title: Failures
+description: Distinguish expected errors, defects, and interruption. Learn which failure reaches the caller and how to inspect suppressed failures.
 ---
 
 # Failures
@@ -70,7 +71,7 @@ if (exit is Die die)
 
 The labels describe how failures are combined; they are not timestamps relative to the primary failure. If the body returns an Err and a later release dies, the earlier Err is `Sequential` context on the release's Die. `Parallel` does not require failures to be observed at the same instant.
 
-`Suppressed.Case` is an `ExitCase`: `Failed`, `Die` or `Interrupted`. At most 100 are kept per outcome; `Die.OmittedSuppressed` counts the rest. `RunAsync` attaches the suppressed failures to the rethrown exception's `Data` under `Effect<T, E, R>.SUPPRESSED_DATA_KEY`.
+`Suppressed.Case` is an `ExitCase`: `Failed`, `Die` or `Interrupted`. At most 100 are kept per outcome; `Die.OmittedSuppressed` counts the rest. `RunAsync` attaches the suppressed failures to the rethrown exception's `Data` under `Effect<T, E, R>.SUPPRESSED_DATA_KEY`, and the number left out under `Effect<T, E, R>.OMITTED_SUPPRESSED_DATA_KEY` when it is not zero.
 
 Separate throws of the same exception instance are separate failures. A child's failure propagated through `Join` is counted once; if the parent's body throws that exception again in a separate operation, its failure is also kept as context.
 
@@ -107,7 +108,8 @@ Some failures have no outcome to travel in:
 
 - defects suppressed under an Err or Ok that reaches `RunAsync` (a `Result` cannot carry them);
 - defects suppressed under an Err that `OrElse`, `Retry`, `CatchCase` or `Attempt` handled;
-- the Err of a fiber that was never joined.
+- the Err of a fiber that was never joined;
+- defects and Errs suppressed under an `Interrupted` that reaches `RunAsync` or `RunExitAsync`, such as a `CommitNotConfirmed` that a group turned into context when the caller canceled.
 
 These go to `EffectDiagnostics.UnobservedFailureHandler`, which by default writes to `Console.Error`:
 
@@ -116,11 +118,12 @@ EffectDiagnostics.UnobservedFailureHandler = failure => logger.LogError("Unobser
 ```
 
 - The handler receives a `Die` or a `Failed`.
+- The default writes a defect's exception, and for an unjoined Err only the error's type name, so error values do not reach the error stream.
 - `null` restores the default.
 - Exceptions thrown by the handler are ignored, and reporting never changes an outcome.
 - The handler is global, so tests that replace it cannot run in parallel.
 
-Suppressed Errs are not reported; they are dropped with the Err that handled them.
+Errs suppressed under an Err or Ok are not reported; they are dropped with the outcome that handled them. An `Interrupted` cannot carry context at all, so both the defects and the Errs under it are reported.
 
 A defect already transferred from a scope step to a Task before Gen's body snapshot follows normal Task observation rules instead of this handler. Await the adapter's result; see [ValueTask adapters and failure ownership](/gen-blocks/#valuetask-adapters-and-failure-ownership).
 

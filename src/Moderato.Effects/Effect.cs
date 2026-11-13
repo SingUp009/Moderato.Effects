@@ -14,6 +14,9 @@ public readonly partial struct Effect<T, E, R>
 {
     private const string RUN_OPTIONS_JUSTIFICATION = "The original overload preserves compatibility; explicit options require a token to keep default arguments unambiguous.";
 
+    // A conversion has no member name a user wrote, so recordings show it as the widening it performs.
+    private const string WIDEN_NAME = nameof(Widen);
+
     private readonly Result<T, E> constant;
     private readonly Func<R, RunContext, ValueTask<Outcome<T, E>>>? run;
 
@@ -37,6 +40,14 @@ public readonly partial struct Effect<T, E, R>
     {
         this.constant = constant;
         trackingName = name;
+    }
+
+    // A constant rebuilt for other type arguments stays the operation its source was recorded as.
+    private Effect(Result<T, E> constant, string? name, string? location)
+    {
+        this.constant = constant;
+        trackingName = name;
+        trackingLocation = location;
     }
 
     private Effect(Effect<T, E, R> source, string name, string location)
@@ -102,22 +113,24 @@ public readonly partial struct Effect<T, E, R>
     public static implicit operator Effect<T, E, R>(Effect<T, Never, R> effect)
     {
         effect = effect.Validate();
-        if (effect.constant.TryGetOk(out var value)) return new(new Result<T, E>(new Ok<T>(value)));
+        if (effect.constant.TryGetOk(out var value))
+            return new(new Result<T, E>(new Ok<T>(value)), effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<T, Never, R> effect)
-            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithErrorType<E>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithErrorType<E>()), WIDEN_NAME);
     }
 
     /// <summary>An effect that cannot succeed can stand in for one with any value type.</summary>
     public static implicit operator Effect<T, E, R>(Effect<Never, E, R> effect)
     {
         effect = effect.Validate();
-        if (effect.constant.TryGetErr(out var error)) return new(new Result<T, E>(new Err<E>(error)));
+        if (effect.constant.TryGetErr(out var error))
+            return new(new Result<T, E>(new Err<E>(error)), effect.trackingName, effect.trackingLocation);
         return Deferred(effect);
 
         static Effect<T, E, R> Deferred(Effect<Never, E, R> effect)
-            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithValueType<T>()));
+            => effect.Then<T, E, Unit>(Unit.Value, static (outcome, _, _, _) => new(outcome.WithValueType<T>()), WIDEN_NAME);
     }
 
     /// <summary>An effect that ends in the result.</summary>
@@ -257,10 +270,10 @@ public readonly partial struct Effect<T, E, R>
                 return new(new Result<T, E>(new Err<E>(outcome.Error)));
             case OutcomeKind.Die:
                 var exception = outcome.Defect!.SourceException;
-                AttachSuppressed(exception, outcome.Suppressed, context);
+                AttachSuppressed(exception, outcome.Suppressed, outcome.Omitted, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
                 // An inner cancellation can interrupt the run while the caller's token is not canceled.
                 return ValueTask.FromCanceled<Result<T, E>>(context.CancellationToken.IsCancellationRequested
                     ? context.CancellationToken : new CancellationToken(canceled: true));
@@ -270,20 +283,25 @@ public readonly partial struct Effect<T, E, R>
     private static Exit<T, E> ToExit(Outcome<T, E> outcome, RunContext context) => Exits.From(outcome, context);
 
     // Overwritten, so a rethrown exception does not accumulate stale entries.
-    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed, RunContext context)
+    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed, int omitted, RunContext context)
     {
         try
         {
             if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);
             else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
+            if (omitted == 0) exception.Data.Remove(OMITTED_SUPPRESSED_DATA_KEY);
+            else exception.Data[OMITTED_SUPPRESSED_DATA_KEY] = omitted;
         }
         catch (Exception metadataFailure)
         {
             // Metadata failures must not replace the exception being rethrown.
-            UnobservedFailures.Report(new Die(metadataFailure, suppressed), context);
+            UnobservedFailures.Report(new Die(metadataFailure, suppressed) { OmittedSuppressed = omitted }, context);
         }
     }
 
     /// <summary>The <see cref="Exception.Data"/> key holding a rethrown defect's suppressed failures.</summary>
     public const string SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed";
+
+    /// <summary>The <see cref="Exception.Data"/> key holding how many suppressed failures a rethrown defect left out, as an <see cref="int"/>; absent when none were.</summary>
+    public const string OMITTED_SUPPRESSED_DATA_KEY = "Moderato.Effects.OmittedSuppressed";
 }

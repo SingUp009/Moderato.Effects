@@ -1,5 +1,6 @@
 ---
 title: Caveats
+description: Review SDK requirements and known limitations involving C# type inference, cooperative timeouts, cancellation, and effect lifetimes.
 ---
 
 # Caveats

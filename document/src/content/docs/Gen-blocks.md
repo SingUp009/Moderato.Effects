@@ -1,5 +1,6 @@
 ---
 title: Gen blocks
+description: Write effects as C# async lambdas with Gen blocks. Use the scope to run steps, access services, and propagate typed failures.
 ---
 
 # Gen blocks

@@ -50,20 +50,29 @@ public static class Compiler
             buildReferences = buildReferences.Add(MetadataReference.CreateFromImage(image.ToArray()));
         }
 
-        var compilation = CSharpCompilation.Create(
+        return Build(CreateCompilation(source, buildReferences));
+    }
+
+    internal static CSharpCompilation CreateCompilation(string source, ImmutableArray<MetadataReference> buildReferences = default)
+        => CSharpCompilation.Create(
             "UserCode",
             [CSharpSyntaxTree.ParseText(USINGS, parseOptions), CSharpSyntaxTree.ParseText(source, parseOptions)],
-            buildReferences,
+            buildReferences.IsDefault ? references : buildReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
-
-        return Build(compilation);
-    }
 
     public static Build Build(CSharpCompilation compilation)
     {
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+        var driver = CreateDriver();
+        return Build(compilation, ref driver);
+    }
+
+    internal static GeneratorDriver CreateDriver()
+        => CSharpGeneratorDriver.Create(
             [new ErrorGenerator().AsSourceGenerator(), new EnvironmentGenerator().AsSourceGenerator(), new RestOfGenerator().AsSourceGenerator()],
             parseOptions: parseOptions);
+
+    internal static Build Build(CSharpCompilation compilation, ref GeneratorDriver driver)
+    {
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 
         var generated = driver.GetRunResult().Results

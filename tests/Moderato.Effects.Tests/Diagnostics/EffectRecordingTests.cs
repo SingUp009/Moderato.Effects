@@ -25,6 +25,114 @@ public sealed class EffectRecordingTests
         Assert.DoesNotContain("Running", tree);
     }
 
+    [Theory]
+    [InlineData("error")]
+    [InlineData("value")]
+    [InlineData("environment")]
+    public async Task Record_NamedConstantWidened_KeepsItsNameAndLocation(string widened)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var succeed = Effect<EmptyEnvironment>.Succeed(1).WithName("Constant");
+        var fail = Effect<EmptyEnvironment>.Fail("unavailable").WithName("Constant");
+        Effect<int, string, EmptyEnvironment> effect = widened switch
+        {
+            "error" => succeed,
+            "value" => fail,
+            _ => succeed.WidenEnv<EmptyEnvironment>(),
+        };
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(widened == "value" ? new Err<string>("unavailable") : new Ok<int>(1), exit);
+        var entry = Assert.Single(recording.GetSnapshot().Entries, static entry => entry.Kind == "op");
+        Assert.Equal("Constant", entry.Name);
+        Assert.StartsWith("EffectRecordingTests.cs:", entry.Location);
+    }
+
+    [Fact]
+    public async Task Record_UnnamedConstantWidened_KeepsItsFactoryName()
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        Effect<int, string, EmptyEnvironment> effect = Effect<EmptyEnvironment>.Succeed(1);
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(new Ok<int>(1), exit);
+        var entry = Assert.Single(recording.GetSnapshot().Entries, static entry => entry.Kind == "op");
+        Assert.Equal("Succeed", entry.Name);
+        Assert.Null(entry.Location);
+    }
+
+    [Theory]
+    [InlineData("Timeout", 5)]
+    [InlineData("Timeout", 0)]
+    [InlineData("TimeoutResult", 5)]
+    [InlineData("TimeoutResult", 0)]
+    public async Task Record_Timeout_UsesThePublicOperationName(string operation, int seconds)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var source = Effect<DefaultEnvironment>.Sync(static () => 1);
+        var after = TimeSpan.FromSeconds(seconds);
+        var effect = operation == "Timeout"
+            ? source.Timeout(after).Map(static _ => Unit.Value)
+            : source.TimeoutResult(after).Map(static _ => Unit.Value).MapErr(static _ => new TimeoutError(TimeSpan.Zero));
+
+        // When
+        await effect.RunExitAsync(DefaultEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        var names = recording.GetSnapshot().Entries.Where(static entry => entry.Kind == "op").Select(static entry => entry.Name).ToArray();
+        Assert.Contains(operation, names);
+        Assert.DoesNotContain("Create", names);
+    }
+
+    [Theory]
+    [InlineData("implicit", "Widen")]
+    [InlineData("widen", "Widen")]
+    [InlineData("select", "Select")]
+    [InlineData("selectMany", "SelectMany")]
+    [InlineData("query", "SelectMany")]
+    [InlineData("catchCase", "CatchCase")]
+    [InlineData("map", "Map")]
+    [InlineData("mapErr", "MapErr")]
+    [InlineData("andThen", "AndThen")]
+    public async Task Record_OperatorBuiltOnAnother_UsesTheMemberTheUserWrote(string composition, string expected)
+    {
+        // Given
+        using var recording = EffectTracker.Record();
+        var source = Effect<EmptyEnvironment>.Sync(static () => 1).WithName("Source");
+        Effect<int, NotFound, EmptyEnvironment> typed = Effect<EmptyEnvironment>.Sync(static () => 1).WithName("Source").MapErr(static _ => new NotFound(1));
+        Effect<int, AppError, EmptyEnvironment> effect = composition switch
+        {
+            "implicit" => source,
+            "widen" => typed.Widen<AppError>(),
+            "select" => from value in typed.Widen<AppError>() select value + 1,
+            "selectMany" => typed.Widen<AppError>().SelectMany(static value => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(value)),
+            "query" => from first in typed.Widen<AppError>() from second in typed.Widen<AppError>() select first + second,
+            "catchCase" => typed.Widen<AppError>().CatchCase((NotFound _) => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(0)),
+            "map" => typed.Widen<AppError>().Map(static value => value + 1),
+            "mapErr" => typed.MapErr(static error => (AppError)error),
+            _ => typed.Widen<AppError>().AndThen(static value => (Effect<int, AppError, EmptyEnvironment>)Effect<EmptyEnvironment>.Succeed(value)),
+        };
+
+        // When
+        var exit = await effect.RunExitAsync(EmptyEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Ok<int> _));
+        var entries = recording.GetSnapshot().Entries.Where(static entry => entry.Kind == "op").ToArray();
+        Assert.Equal(expected, entries[0].Name);
+        Assert.Contains(entries, static entry => entry.Name == "Source");
+        Assert.DoesNotContain(entries, static entry => entry.Name is "op_Implicit" or "Bind");
+    }
+
     [Fact]
     public async Task Record_FailedBodyAndBlockedRelease_ShowsBodyAndFinalSeparately()
     {

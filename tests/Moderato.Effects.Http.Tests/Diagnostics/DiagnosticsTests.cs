@@ -265,6 +265,85 @@ public class DiagnosticsTests
         }
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(102)]
+    public async Task RunAsync_UnobservedDefectWithContext_LogsRetainedFailuresInOrder(int priorErrors)
+    {
+        // Given
+        var provider = new RecordingProvider();
+        using var services = Services(provider);
+        using var scope = services.CreateScope();
+        var request = scope.ServiceProvider.GetRequiredService<EffectRequest>();
+        var token = TestContext.Current.CancellationToken;
+        var original = new IOException("child");
+        var defect = new InvalidOperationException("mapper");
+        var entered = LifetimeTests.Signal();
+        var context = Effect.All(Enumerable.Range(0, priorErrors).Select(_ => SucceedWithSuppressedError()));
+        var child = context.AndThen(_ => Effect<object>.TryAsync<IOException, Unit, PrivateError>(async ct =>
+        {
+            entered.SetResult();
+            try { await Task.Delay(Timeout.InfiniteTimeSpan, ct); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw original; }
+            return Unit.Value;
+        }, _ => throw defect));
+        var effect = Scope<string, object>.Gen<Unit>(async execution =>
+        {
+            await execution.Fork(child);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), execution.CancellationToken);
+            throw execution.Fail("body");
+        });
+
+        // When
+        var result = await request.RunAsync(effect, new object()).AsTask().WaitAsync(TimeSpan.FromSeconds(10), token);
+
+        // Then
+        Assert.Equal("body", Assert.IsType<Err<string>>(result.Value).Error);
+        var entries = provider.Entries.ToArray();
+        var retained = Math.Min(priorErrors + 1, 100);
+        Assert.Equal(retained + 1, entries.Length);
+        Assert.Equal(1001, entries[0].Id);
+        Assert.Same(defect, entries[0].Exception);
+        Assert.Equal(retained, entries[0].Fields["SuppressedCount"]);
+        Assert.Equal(priorErrors + 1 - retained, entries[0].Fields["OmittedSuppressed"]);
+        for (var index = 0; index < retained; index++)
+        {
+            var entry = entries[index + 1];
+            Assert.Equal(1003, entry.Id);
+            Assert.Equal(index, entry.Fields["Index"]);
+            if (index == priorErrors)
+            {
+                Assert.Equal(Relation.Sequential, entry.Fields["Relation"]);
+                Assert.Same(original, entry.Exception);
+            }
+            else
+            {
+                Assert.Equal(Relation.Consequence, entry.Fields["Relation"]);
+                Assert.Null(entry.Exception);
+                Assert.Equal(nameof(PrivateError), entry.Fields["ErrorType"]);
+                Assert.DoesNotContain(entry.Fields.Values, value => value is PrivateError);
+            }
+        }
+
+        static Effect<Unit, PrivateError, object> SucceedWithSuppressedError()
+        {
+            var ready = LifetimeTests.Signal();
+            var loser = Effect<object>.FromResultAsync<Unit, PrivateError>(async ct =>
+            {
+                ready.SetResult();
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, ct); }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { return new Err<PrivateError>(new PrivateError()); }
+                return new Ok<Unit>(Unit.Value);
+            });
+            Effect<Unit, PrivateError, object> winner = Effect<object>.Async<Unit>(async ct =>
+            {
+                await ready.Task.WaitAsync(ct);
+                return Unit.Value;
+            });
+            return Effect.RaceFirst(winner, loser);
+        }
+    }
+
     internal static Effect<int, Never, object> UnjoinedError() => Scope<Never, object>.Gen(async scope =>
     {
         var ended = LifetimeTests.Signal();
@@ -289,7 +368,7 @@ public class DiagnosticsTests
         public override string ToString() => throw new InvalidOperationException("Do not format error values.");
     }
 
-    private sealed record Entry(string Category, LogLevel Level, Dictionary<string, object?> Fields);
+    private sealed record Entry(string Category, LogLevel Level, int Id, Exception? Exception, Dictionary<string, object?> Fields);
 
     private sealed class RecordingProvider : ILoggerProvider
     {
@@ -313,7 +392,8 @@ public class DiagnosticsTests
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
                 if (owner.Disposed) Interlocked.Increment(ref owner.afterDisposalCalls);
-                owner.Entries.Enqueue(new(category, logLevel, ((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value)));
+                owner.Entries.Enqueue(new(category, logLevel, eventId.Id, exception,
+                    ((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value)));
                 if (owner.Throws) throw new IOException("logger");
             }
         }

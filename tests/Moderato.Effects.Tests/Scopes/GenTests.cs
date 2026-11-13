@@ -437,10 +437,12 @@ public class SwallowedErrTests
             {
                 throw scope.Fail(new NotFound(1));
             }
+#pragma warning disable MEFF301
             catch (ScopeFailure)
             {
                 throw new InvalidOperationException("wrapped");
             }
+#pragma warning restore MEFF301
         });
 
         // When
@@ -652,7 +654,9 @@ public class ScopeMisuseTests
         var effect = Scope<Never, EmptyEnvironment>.Gen(async scope =>
         {
             await Task.Yield();
+#pragma warning disable MEFF304
             escaped = scope;
+#pragma warning restore MEFF304
             return 1;
         });
         await effect.RunAsync(TestContext.Current.CancellationToken);

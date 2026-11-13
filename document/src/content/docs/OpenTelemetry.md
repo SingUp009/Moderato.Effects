@@ -1,5 +1,6 @@
 ---
 title: OpenTelemetry
+description: Export effect execution traces and metrics with OpenTelemetry using .NET ActivitySource and Meter. Connect recorded work to traces in Aspire.
 ---
 
 # OpenTelemetry
@@ -8,7 +9,7 @@ Collect Effect execution telemetry using .NET's standard `ActivitySource` and `M
 
 [![Aspire displaying the HTTP request and effect lifetime spans, with the resource span and its outcome selected.](/opentelemetry/demo.png)](/opentelemetry/demo.png)
 
-Aspire shows the same request as the [local viewer](effect-tracker#use-the-local-viewer), after it has completed. Its duration includes waiting for the upload. Select the image to view it at full size.
+Aspire shows the same request as the [local viewer](/effect-tracker/#use-the-local-viewer), after it has completed. Its duration includes waiting for the upload. Select the image to view it at full size.
 
 ## Register collection
 
@@ -61,7 +62,7 @@ Both use only `effect.kind` and `effect.outcome` as dimensions. They do not incl
 
 ## Interpretation
 
-Tracing can be sampled, and exporters can drop queued data. Standard span exporters report completed intervals, so a resource that has not finished may not appear yet. Use the [Effect Tracker](effect-tracker) for a local view of active lifetimes.
+Tracing can be sampled, and exporters can drop queued data. Standard span exporters report completed intervals, so a resource that has not finished may not appear yet. Use the [Effect Tracker](/effect-tracker/) for a local view of active lifetimes.
 
 Durations include waits, scheduling and instrumentation. Nested or parallel intervals overlap: their sum is not request latency or CPU time. Metrics count completed observations, not physical resource objects or bytes retained.
 
@@ -69,7 +70,7 @@ Core emits no environment, resource value, typed error payload, exception messag
 
 ## Inspect the same request locally
 
-Start `EffectTracker.Record()` to collect detailed execution metadata alongside standard telemetry. The two outputs share lifecycle observations and monotonic duration measurements. Snapshot entries expose `TraceId` and `SpanId` for correlation; operation and retry entries refer to their nearest traced parent rather than generating extra spans. See [execution recording](effect-tracker#record-execution-details).
+Start `EffectTracker.Record()` to collect detailed execution metadata alongside standard telemetry. The two outputs share lifecycle observations and monotonic duration measurements. Snapshot entries expose `TraceId` and `SpanId` for correlation; operation and retry entries refer to their nearest traced parent rather than generating extra spans. See [execution recording](/effect-tracker/#record-execution-details).
 
 The recording's bounded history and the exporter's sampling/queue limits remain independent. The active-lifetime debug registry also remains available without either output.
 
@@ -84,8 +85,8 @@ OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
 dotnet watch --project samples/Moderato.Effects.Tracking.Samples
 ```
 
-Open `http://127.0.0.1:5217` and send `POST /sha256` requests as described in the [local viewer guide](effect-tracker#use-the-local-viewer). The exported service name is `Moderato.Effects.Tracking.Samples`. Selecting **Open trace** takes you from a recorded entry to the corresponding trace in a local Aspire dashboard. The collector and dashboard run separately; starting the sample does not start them.
+Open `http://127.0.0.1:5217` and send `POST /sha256` requests as described in the [local viewer guide](/effect-tracker/#use-the-local-viewer). The exported service name is `Moderato.Effects.Tracking.Samples`. Selecting **Open trace** takes you from a recorded entry to the corresponding trace in a local Aspire dashboard. The collector and dashboard run separately; starting the sample does not start them.
 
 `DOTNET_CLI_TELEMETRY_OPTOUT=1` excludes the .NET CLI's own telemetry from this example; application export still follows its OpenTelemetry configuration. Without a collector, the recording viewer remains usable. Set `OTEL_SDK_DISABLED=true` to disable the sample's OpenTelemetry collection and export.
 
-The viewer shows active work and detailed operations that completed-span exporters may not show yet. It does not add per-Effect allocation attribution or guarantee that a sampled trace was exported. See [recording limits](effect-tracker#record-execution-details) before enabling capture in an application.
+The viewer shows active work and detailed operations that completed-span exporters may not show yet. It does not add per-Effect allocation attribution or guarantee that a sampled trace was exported. See [recording limits](/effect-tracker/#record-execution-details) before enabling capture in an application.

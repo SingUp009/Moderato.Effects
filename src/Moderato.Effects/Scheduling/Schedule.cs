@@ -85,12 +85,9 @@ internal sealed record ScheduleSpec(TimeSpan BaseDelay, double Factor)
         return this with { MaxDelay = max };
     }
 
-    /// <summary>The wait before recurrence number <paramref name="recurrence"/> (starting at 1), or <see langword="null"/> to stop.</summary>
-    internal TimeSpan? Next(int recurrence, TimeSpan elapsed, Random? random)
+    /// <summary>The wait before recurrence number <paramref name="recurrence"/> (starting at 1).</summary>
+    internal TimeSpan Delay(int recurrence, Random? random)
     {
-        if (recurrence > MaxRecurrences) return null;
-        if (elapsed >= MaxElapsed) return null;
-
         // 0 × ∞ = NaN once Pow overflows, so a zero base is kept at zero explicitly.
         var ticks = BaseDelay == TimeSpan.Zero ? 0 : BaseDelay.Ticks * Math.Pow(Factor, recurrence - 1);
         if (Jittered && random is not null) ticks *= 0.8 + (random.NextDouble() * 0.4);

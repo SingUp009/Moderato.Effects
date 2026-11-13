@@ -1,7 +1,67 @@
+using Microsoft.Extensions.Time.Testing;
+
 namespace Moderato.Effects.Tests;
 
 public class SchedulingContinuationTests
 {
+    [Theory]
+    [InlineData(false, 0, false)]
+    [InlineData(false, 1, false)]
+    [InlineData(false, 1, true)]
+    [InlineData(true, 0, false)]
+    [InlineData(true, 1, false)]
+    [InlineData(true, 1, true)]
+    public async Task RetryOrRepeat_ScheduleExhausted_DoesNotEvaluateFilter(bool repeat, int recurrences, bool elapsedLimit)
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var duration = TimeSpan.FromSeconds(1);
+        var attempts = 0;
+        var filterCalls = 0;
+        var schedule = elapsedLimit ? Schedule.Immediately.During(duration) : Schedule.Immediately.UpTo(recurrences);
+        Effect<int, string, TimeEnvironment> source = Effect<TimeEnvironment>.Sync(() =>
+        {
+            if (++attempts == 2 && elapsedLimit) time.Advance(duration);
+            return attempts;
+        });
+        Effect<int, string, TimeEnvironment> effect = repeat
+            ? source.Repeat(schedule, when: _ => Continue())
+            : source.AndThen<int>(attempt => Effect<TimeEnvironment>.Fail($"attempt {attempt}"))
+                .Retry(schedule, when: _ => Continue());
+
+        bool Continue() => ++filterCalls <= recurrences ? true : throw new InvalidOperationException("schedule exhausted");
+
+        // When
+        var exit = await effect.RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(recurrences + 1, attempts);
+        Assert.Equal(recurrences, filterCalls);
+        if (repeat) Assert.Equal(attempts, Assert.IsType<Ok<int>>(exit.Value).Value);
+        else Assert.Equal($"attempt {attempts}", Assert.IsType<Err<string>>(exit.Value).Error);
+    }
+
+    [Fact]
+    public async Task Repeat_FilterConsumesRemainingTime_DoesNotStartAnotherAttempt()
+    {
+        // Given
+        var time = new FakeTimeProvider();
+        var duration = TimeSpan.FromSeconds(1);
+        var attempts = 0;
+        var effect = Effect<TimeEnvironment>.Sync(() => ++attempts).Repeat(Schedule.Immediately.During(duration), _ =>
+        {
+            time.Advance(duration);
+            return true;
+        });
+
+        // When
+        var exit = await effect.RunExitAsync(new TimeEnvironment(time), TestContext.Current.CancellationToken);
+
+        // Then
+        Assert.Equal(1, Assert.IsType<Ok<int>>(exit.Value).Value);
+        Assert.Equal(1, attempts);
+    }
+
     [Fact]
     public async Task Retry_NullEnvironment_DiesWithArgumentNullException()
     {

@@ -63,7 +63,7 @@ internal static class HttpChecks
         }).ExcludeFromDescription();
     }
 
-    internal static async Task Run(WebApplication app, string address)
+    internal static async Task Run(WebApplication app, string address, string connectionString)
     {
         using var client = new HttpClient { BaseAddress = new Uri(address) };
 
@@ -145,6 +145,7 @@ internal static class HttpChecks
         await observed.DisconnectCleaned.Task.WaitAsync(TimeSpan.FromSeconds(10));
         // Then
         Check(observed.DisconnectCleaned.Task.IsCompletedSuccessfully, "real client disconnection finishes effect cleanup");
+        await TransactionDisconnectCheck.Run(client, observed, connectionString);
         Console.WriteLine("PASS: HTTP and OpenAPI checks complete");
     }
 

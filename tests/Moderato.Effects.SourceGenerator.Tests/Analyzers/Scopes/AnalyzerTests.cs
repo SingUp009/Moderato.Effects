@@ -84,6 +84,29 @@ public class CatchAllInGenTests
         Assert.Contains("MEFF301", build.Ids);
     }
 
+    [Theory]
+    [InlineData("catch (ScopeFailure)", true)]
+    [InlineData("catch (Exception ex) when (ex is not OperationCanceledException)", true)]
+    [InlineData("catch (Exception ex) when (ex is ScopeFailure)", true)]
+    [InlineData("catch (Exception ex) when (ex is Exception and not OperationCanceledException)", true)]
+    [InlineData("catch (Exception) when (true)", true)]
+    [InlineData("catch (Exception ex) when (ex is OperationCanceledException)", false)]
+    [InlineData("catch (Exception ex) when (ex is not (ScopeFailure or OperationCanceledException))", false)]
+    [InlineData("catch (Exception ex) when (ex is not ScopeFailure && ex.Message.Length > 0)", false)]
+    [InlineData("catch (Exception) when (false)", false)]
+    public void GenBlock_TypedOrFilteredCatch_WarnsWhenItCatchesScopeFailure(string clause, bool warns)
+    {
+        // Given
+        var source = Code.InGen($"try {{ return await scope.Run(Load()); }} {clause} {{ return 0; }}");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Equal(warns, build.Ids.Contains("MEFF301"));
+    }
+
     [Fact]
     public void GenBlock_CatchAllThatFiltersOutScopeFailure_ReportsNothing()
     {
@@ -178,6 +201,24 @@ public class CatchAllInGenTests
 
 public class StepInCleanupTests
 {
+    [Theory]
+    [InlineData("catch (ScopeFailure)", true)]
+    [InlineData("catch (Exception ex) when (ex is not OperationCanceledException)", true)]
+    [InlineData("catch (Exception ex) when (ex is not ScopeFailure)", false)]
+    public void GenBlock_StepInTypedOrFilteredCatch_WarnsWhenItCatchesScopeFailure(string clause, bool warns)
+    {
+        // Given
+        var source = Code.InGen($"try {{ return await scope.Run(Load()); }} {clause} {{ await scope.Run(Load()); throw; }}");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.DoesNotContain("MEFF301", build.Ids);
+        Assert.Equal(warns, build.Ids.Contains("MEFF302"));
+    }
+
     [Fact]
     public void GenBlock_ScopeRunInFinally_ReportsMEFF302()
     {
@@ -299,6 +340,48 @@ public class ScopeEscapesTests
 
         // Then
         Assert.Contains("MEFF304", build.Ids);
+    }
+
+    [Theory]
+    [InlineData("", "Scope<string, R>? leaked = null;", "leaked = scope;")]
+    [InlineData("Scope<string, R>? leaked", "", "leaked = scope;")]
+    [InlineData("", "var slots = new Scope<string, R>?[1];", "slots[0] = scope;")]
+    public void GenBlock_ScopeStoredInAVariableOrElementOfTheEnclosingMember_ReportsMEFF304(string parameter, string local, string store)
+    {
+        // Given
+        var source = Code.InClass($$"""
+            static Effect<int, string, R> Load() => Effect<R>.Succeed(1);
+
+            public static Effect<int, string, R> Work({{parameter}})
+            {
+                {{local}}
+                return Scope<string, R>.Gen(async scope =>
+                {
+                    {{store}}
+                    return await scope.Run(Load());
+                });
+            }
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("'scope'", build.Single("MEFF304").GetMessage());
+        Assert.Empty(build.Errors);
+    }
+
+    [Fact]
+    public void GenBlock_ScopeAssignedToALocalOfTheBlock_ReportsNothing()
+    {
+        // Given
+        var source = Code.InGen("Scope<AppError, R> alias; alias = scope; return await alias.Run(Load());");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
     }
 }
 

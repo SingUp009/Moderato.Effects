@@ -1,5 +1,6 @@
 ---
 title: Error unions
+description: Use C# 15 unions to model expected errors, combine error cases across effects, and recover from individual cases.
 ---
 
 # Error unions
