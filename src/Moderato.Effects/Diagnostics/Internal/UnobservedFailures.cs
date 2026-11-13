@@ -14,6 +14,15 @@ internal static class UnobservedFailures
         }
     }
 
+    /// <summary>Reports the defects and Errs that an interruption drops, since Interrupted carries no context.</summary>
+    internal static void ReportInterrupted(ImmutableArray<Suppressed> suppressed, RunContext context)
+    {
+        foreach (var failure in suppressed)
+        {
+            if (failure.Case is Die or Failed) Report(failure.Case, context);
+        }
+    }
+
     /// <summary>Reports a failure that would otherwise disappear.</summary>
     internal static void Report(ExitCase failure, RunContext context)
         => Report(failure, context.UnobservedFailureHandler);
@@ -52,7 +61,8 @@ internal static class UnobservedFailures
     private static string Describe(ExitCase failure) => failure.Value switch
     {
         Die die => die.Exception.ToString(),
-        Failed failed => $"unjoined Err: {failed.Error}",
+        // An error value can carry application data, so only its type reaches the process's error stream.
+        Failed failed => $"unobserved Err of type {failed.Error?.GetType().Name ?? "null"}",
         var other => other?.ToString() ?? "",
     };
 }

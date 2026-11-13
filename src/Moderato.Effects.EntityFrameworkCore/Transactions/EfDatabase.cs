@@ -10,7 +10,7 @@ public static class EfDatabase<R>
 {
     /// <summary>Commits a successful body after its children and releases have completed.</summary>
     /// <param name="contexts">The borrowed context factory.</param>
-    /// <returns>An effect retaining unconfirmed commits in its error union.</returns>
+    /// <returns>An effect retaining unconfirmed commits, and database failures before the body starts, in its error union.</returns>
     public static Effect<T, E, R> Transaction<TContext, T, E, RBody>(
         Func<R, IDbContextFactory<TContext>> contexts,
         Func<R, TContext, RBody> environment,
@@ -21,9 +21,21 @@ public static class EfDatabase<R>
     {
         ArgumentNullException.ThrowIfNull(contexts);
         ArgumentNullException.ThrowIfNull(environment);
-        Resource<TContext, E, R> context = Resource.Make(
-            Effect<R>.AccessAsync<TContext>(async (env, token) =>
-                await contexts(env).CreateDbContextAsync(token).ConfigureAwait(false)),
+        // The body is first composed per run, which would reject a default effect only after a context was created.
+        _ = body.WidenEnv<RBody>();
+        Effect<Result<TContext, E>, E, R> create = Effect<R>.AccessAsync<Result<TContext, E>>(async (env, token) =>
+        {
+            try
+            {
+                return new Ok<TContext>(await contexts(env).CreateDbContextAsync(token).ConfigureAwait(false));
+            }
+            catch (DbException exception)
+            {
+                return new Err<E>(E.From(DatabaseFailures.From(exception)));
+            }
+        });
+        var context = Resource.Make(
+            create.AndThen(static created => Effect<R>.FromResult(created)),
             (db, _) => Effect<R>.Async<Unit>(async _ =>
             {
                 await db.DisposeAsync().ConfigureAwait(false);
@@ -32,13 +44,21 @@ public static class EfDatabase<R>
 
         return context.Use(db =>
         {
-            Effect<Lease, E, R> begin = Effect<R>.Async<Lease>(async token =>
+            var begin = Effect<R>.FromResultAsync<Lease, E>(async token =>
             {
                 if (db.Database.CreateExecutionStrategy().RetriesOnFailure)
                     throw new NotSupportedException("Retrying execution strategies require an explicit transaction retry policy.");
                 if (db.Database.CurrentTransaction is not null)
                     throw new InvalidOperationException("The factory must return a context without an existing transaction.");
-                return new(await db.Database.BeginTransactionAsync(token).ConfigureAwait(false));
+                try
+                {
+                    return new Ok<Lease>(new(await db.Database.BeginTransactionAsync(token).ConfigureAwait(false)));
+                }
+                catch (DbException exception)
+                {
+                    // Nothing has been written yet, so the failure is an expected error the caller can retry.
+                    return new Err<E>(E.From(DatabaseFailures.From(exception)));
+                }
             });
 
             return Resource.Make(begin, (lease, _) => Scope<Never, R>.Gen(async cleanup =>

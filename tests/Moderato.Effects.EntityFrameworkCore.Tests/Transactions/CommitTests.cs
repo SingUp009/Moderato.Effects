@@ -122,6 +122,32 @@ public sealed class CommitTests
     }
 
     [Fact]
+    public async Task Transaction_CanceledDuringCommitInsideAGroup_ReportsTheUnconfirmedCommit()
+    {
+        // Given
+        await using var store = await Store.Open();
+        using var cancellation = new CancellationTokenSource();
+        store.Probe.BeforeCommit = token =>
+        {
+            cancellation.Cancel();
+            throw new OperationCanceledException(token);
+        };
+        List<ExitCase> reported = [];
+        var options = new EffectRunOptions { UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); } };
+        var transaction = EfDatabase<Store>.Transaction(
+            contexts: env => env, environment: (_, db) => db, body: TestEffects.Insert(1));
+
+        // When
+        var exit = await Effect.All([transaction]).RunExitAsync(store, cancellation.Token, options);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        var failed = Assert.IsType<Failed>(Assert.Single(reported).Value);
+        Assert.IsType<CommitNotConfirmed>(failed.Error);
+        Assert.Equal(0, await store.Count());
+    }
+
+    [Fact]
     public async Task Transaction_CanceledBeforeCommit_DoesNotCallCommit()
     {
         // Given

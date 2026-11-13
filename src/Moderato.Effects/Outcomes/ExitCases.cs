@@ -6,6 +6,20 @@ namespace Moderato.Effects;
 /// <param name="Suppressed">Failures alongside the defect that were not chosen as the outcome.</param>
 public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppressed)
 {
+    /// <summary>The defect that ended the run.</summary>
+    public Exception Exception
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(Exception));
+    } = Exception ?? throw new ArgumentNullException(nameof(Exception));
+
+    /// <summary>Failures alongside the defect that were not chosen as the outcome.</summary>
+    public IReadOnlyList<Suppressed> Suppressed
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(Suppressed));
+    } = Suppressed ?? throw new ArgumentNullException(nameof(Suppressed));
+
     /// <summary>Enables <c>Die(var exception)</c> patterns.</summary>
     public void Deconstruct(out Exception exception) => exception = Exception;
 
@@ -73,7 +87,14 @@ public enum Relation
 public sealed record Suppressed(ExitCase Case, Relation Relation)
 {
     /// <summary>How it failed, never <see cref="Succeeded"/>.</summary>
-    public ExitCase Case { get; init; } = Case.Value is null or Succeeded
+    public ExitCase Case
+    {
+        get;
+        // A with expression assigns through init, bypassing the constructor's check.
+        init => field = Validate(value);
+    } = Validate(Case);
+
+    private static ExitCase Validate(ExitCase failure) => failure.Value is null or Succeeded
         ? throw new ArgumentException("A suppressed failure must be a Failed, Die or Interrupted case.", nameof(Case))
-        : Case;
+        : failure;
 }
