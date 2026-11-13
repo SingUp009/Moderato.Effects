@@ -1,1 +1,2 @@
 #nullable enable
+const Moderato.Effects.Effect<T, E, R>.OMITTED_SUPPRESSED_DATA_KEY = "Moderato.Effects.OmittedSuppressed" -> string!

@@ -270,7 +270,7 @@ public readonly partial struct Effect<T, E, R>
                 return new(new Result<T, E>(new Err<E>(outcome.Error)));
             case OutcomeKind.Die:
                 var exception = outcome.Defect!.SourceException;
-                AttachSuppressed(exception, outcome.Suppressed, context);
+                AttachSuppressed(exception, outcome.Suppressed, outcome.Omitted, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
                 UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
@@ -283,20 +283,25 @@ public readonly partial struct Effect<T, E, R>
     private static Exit<T, E> ToExit(Outcome<T, E> outcome, RunContext context) => Exits.From(outcome, context);
 
     // Overwritten, so a rethrown exception does not accumulate stale entries.
-    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed, RunContext context)
+    private static void AttachSuppressed(Exception exception, ImmutableArray<Suppressed> suppressed, int omitted, RunContext context)
     {
         try
         {
             if (suppressed.IsEmpty) exception.Data.Remove(SUPPRESSED_DATA_KEY);
             else exception.Data[SUPPRESSED_DATA_KEY] = suppressed;
+            if (omitted == 0) exception.Data.Remove(OMITTED_SUPPRESSED_DATA_KEY);
+            else exception.Data[OMITTED_SUPPRESSED_DATA_KEY] = omitted;
         }
         catch (Exception metadataFailure)
         {
             // Metadata failures must not replace the exception being rethrown.
-            UnobservedFailures.Report(new Die(metadataFailure, suppressed), context);
+            UnobservedFailures.Report(new Die(metadataFailure, suppressed) { OmittedSuppressed = omitted }, context);
         }
     }
 
     /// <summary>The <see cref="Exception.Data"/> key holding a rethrown defect's suppressed failures.</summary>
     public const string SUPPRESSED_DATA_KEY = "Moderato.Effects.Suppressed";
+
+    /// <summary>The <see cref="Exception.Data"/> key holding how many suppressed failures a rethrown defect left out, as an <see cref="int"/>; absent when none were.</summary>
+    public const string OMITTED_SUPPRESSED_DATA_KEY = "Moderato.Effects.OmittedSuppressed";
 }

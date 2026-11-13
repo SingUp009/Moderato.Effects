@@ -156,6 +156,50 @@ public class ExceptionDataTests
         }
     }
 
+    [Theory]
+    [InlineData(100, null)]
+    [InlineData(150, 50)]
+    public async Task RunAsync_DefectWithManySuppressedFailures_AttachesTheOmittedCountWhenAnyWereLeftOut(int releases, int? omitted)
+    {
+        // Given
+        var effect = Effect.Gen<int, string, EmptyEnvironment>(async scope =>
+        {
+            for (var i = 0; i <= releases; i++)
+            {
+                var failure = new IOException($"release {i}");
+#pragma warning disable MEFF305
+                scope.Defer(_ => Effect<EmptyEnvironment>.Sync<Unit>(() => throw failure));
+#pragma warning restore MEFF305
+            }
+            await Task.Yield();
+            return 1;
+        });
+
+        // When
+        var thrown = await Assert.ThrowsAsync<IOException>(async () => await effect.RunAsync(TestContext.Current.CancellationToken));
+
+        // Then
+        var attached = Assert.IsType<ImmutableArray<Suppressed>>(thrown.Data[Effect<int, string, EmptyEnvironment>.SUPPRESSED_DATA_KEY]);
+        Assert.Equal(100, attached.Length);
+        Assert.Equal(omitted, (int?)thrown.Data[Effect<int, string, EmptyEnvironment>.OMITTED_SUPPRESSED_DATA_KEY]);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReusedExceptionWithAStaleOmittedCount_RemovesIt()
+    {
+        // Given
+        var original = new IOException("original");
+        original.Data[Effect<int, Never, EmptyEnvironment>.OMITTED_SUPPRESSED_DATA_KEY] = 7;
+        var source = Effect<EmptyEnvironment>.Sync<int>(() => throw original);
+
+        // When
+        var thrown = await Assert.ThrowsAsync<IOException>(async () => await source.RunAsync(TestContext.Current.CancellationToken));
+
+        // Then
+        Assert.Same(original, thrown);
+        Assert.False(original.Data.Contains(Effect<int, Never, EmptyEnvironment>.OMITTED_SUPPRESSED_DATA_KEY));
+    }
+
     [Fact]
     public async Task RunAsync_ReusedMutableException_ReplacesThenRemovesOnlyLibraryMetadata()
     {
