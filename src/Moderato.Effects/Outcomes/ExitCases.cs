@@ -87,7 +87,14 @@ public enum Relation
 public sealed record Suppressed(ExitCase Case, Relation Relation)
 {
     /// <summary>How it failed, never <see cref="Succeeded"/>.</summary>
-    public ExitCase Case { get; init; } = Case.Value is null or Succeeded
+    public ExitCase Case
+    {
+        get;
+        // A with expression assigns through init, bypassing the constructor's check.
+        init => field = Validate(value);
+    } = Validate(Case);
+
+    private static ExitCase Validate(ExitCase failure) => failure.Value is null or Succeeded
         ? throw new ArgumentException("A suppressed failure must be a Failed, Die or Interrupted case.", nameof(Case))
-        : Case;
+        : failure;
 }
