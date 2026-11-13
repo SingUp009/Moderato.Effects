@@ -1,5 +1,6 @@
 ---
 title: 07 - Running Effects Concurrently
+description: Run a shipping quote and stock check together with Effect.All, and see how the group waits for cleanup after cancellation.
 ---
 
 # Running Effects Concurrently

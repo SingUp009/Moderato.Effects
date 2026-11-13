@@ -1,5 +1,6 @@
 ---
 title: 03 - Handling Expected Errors
+description: Use scope.Get in an Effect.Gen block to stop order preparation when validation returns an expected error.
 ---
 
 # Handling Expected Errors

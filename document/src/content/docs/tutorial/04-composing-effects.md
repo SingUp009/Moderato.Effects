@@ -1,5 +1,6 @@
 ---
 title: 04 - Composing Effects
+description: Run effects in sequence with scope.Run and pass a prepared order to the confirmation step.
 ---
 
 # Composing Effects

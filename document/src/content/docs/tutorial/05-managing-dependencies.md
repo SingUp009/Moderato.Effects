@@ -1,5 +1,6 @@
 ---
 title: 05 - Managing Dependencies
+description: Supply a TextWriter through an effect's environment and choose where order preparation writes its progress.
 ---
 
 # Managing Dependencies

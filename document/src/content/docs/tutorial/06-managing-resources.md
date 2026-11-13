@@ -1,5 +1,6 @@
 ---
 title: 06 - Managing Resources
+description: Acquire a writer with Resource.Make and scope.Acquire, then observe its release on success and expected failure.
 ---
 
 # Managing Resources
