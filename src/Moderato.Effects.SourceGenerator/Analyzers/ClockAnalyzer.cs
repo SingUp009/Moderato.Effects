@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
@@ -59,7 +60,8 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(Diagnostics.SystemClock, context.Operation.Syntax.GetLocation(), shortName, instead));
     }
 
-    // Effect code = a Gen block ∪ arguments to Effect<R> factories, Succeed's value included.
+    // Effect code = a function taking a scope ∪ arguments to Effect<R> factories, Succeed's value included
+    // ∪ callbacks passed to the library, which run as part of an effect.
     private static bool InEffect(SemanticModel model, SyntaxNode node)
     {
         foreach (var ancestor in node.Ancestors())
@@ -69,7 +71,16 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
                 case AnonymousFunctionExpressionSyntax function
                     when model.GetSymbolInfo(function).Symbol is IMethodSymbol method && method.Parameters.Any(static p => GenBlockAnalyzer.IsScope(p.Type)):
                     return true;
-                case ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } } when IsFactory(model, invocation):
+                case ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation } } argument
+                    when IsFactory(model, invocation) || argument.Expression is AnonymousFunctionExpressionSyntax && IsLibraryCall(model, invocation):
+                    return true;
+                // Query syntax passes its clauses to the library's Select and SelectMany as lambdas.
+                case SelectClauseSyntax select when IsLibraryMethod(model.GetSymbolInfo(select).Symbol as IMethodSymbol):
+                    return true;
+                case QueryClauseSyntax clause when IsLibraryMethod(model.GetQueryClauseInfo(clause).OperationInfo.Symbol as IMethodSymbol):
+                    return true;
+                case MethodDeclarationSyntax or LocalFunctionStatementSyntax
+                    when model.GetDeclaredSymbol(ancestor) is IMethodSymbol declared && declared.Parameters.Any(static p => GenBlockAnalyzer.IsScope(p.Type)):
                     return true;
                 case MemberDeclarationSyntax:
                     return false;
@@ -77,6 +88,18 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         }
 
         return false;
+    }
+
+    private static bool IsLibraryCall(SemanticModel model, InvocationExpressionSyntax invocation)
+    {
+        var info = model.GetSymbolInfo(invocation);
+        return IsLibraryMethod(info.Symbol as IMethodSymbol ?? info.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault());
+    }
+
+    private static bool IsLibraryMethod(IMethodSymbol? method)
+    {
+        var name = method?.ContainingNamespace?.ToDisplayString();
+        return name == "Moderato.Effects" || name?.StartsWith("Moderato.Effects.", System.StringComparison.Ordinal) == true;
     }
 
     private static bool IsFactory(SemanticModel model, InvocationExpressionSyntax invocation)

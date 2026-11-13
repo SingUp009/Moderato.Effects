@@ -21,6 +21,8 @@ public static class EfDatabase<R>
     {
         ArgumentNullException.ThrowIfNull(contexts);
         ArgumentNullException.ThrowIfNull(environment);
+        // The body is first composed per run, which would reject a default effect only after a context was created.
+        _ = body.WidenEnv<RBody>();
         Effect<Result<TContext, E>, E, R> create = Effect<R>.AccessAsync<Result<TContext, E>>(async (env, token) =>
         {
             try

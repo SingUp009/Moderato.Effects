@@ -28,31 +28,58 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.RegisterSyntaxNodeAction(
-            AnalyzeFunction, SyntaxKind.ParenthesizedLambdaExpression, SyntaxKind.SimpleLambdaExpression, SyntaxKind.AnonymousMethodExpression);
+            AnalyzeFunction, SyntaxKind.ParenthesizedLambdaExpression, SyntaxKind.SimpleLambdaExpression, SyntaxKind.AnonymousMethodExpression,
+            SyntaxKind.MethodDeclaration, SyntaxKind.LocalFunctionStatement);
     }
 
     /// <summary>Whether the type is <c>Moderato.Effects.Scope&lt;E, R&gt;</c>.</summary>
     internal static bool IsScope(ITypeSymbol? type)
         => type is INamedTypeSymbol { Name: "Scope", Arity: 2 } named && named.ContainingNamespace.ToDisplayString() == "Moderato.Effects";
 
-    internal static bool IsFunction(SyntaxNode node) => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax;
+    internal static bool IsFunction(SyntaxNode node)
+        => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax or MethodDeclarationSyntax;
+
+    // A method or local function that takes a scope is a Gen block's body too, whether passed to Gen or called as a helper.
+    internal static IMethodSymbol? FunctionSymbol(SemanticModel model, SyntaxNode function, System.Threading.CancellationToken cancellationToken = default)
+        => function switch
+        {
+            AnonymousFunctionExpressionSyntax => model.GetSymbolInfo(function, cancellationToken).Symbol as IMethodSymbol,
+            MethodDeclarationSyntax or LocalFunctionStatementSyntax => model.GetDeclaredSymbol(function, cancellationToken) as IMethodSymbol,
+            _ => null,
+        };
+
+    private static SyntaxNode? FunctionBody(SyntaxNode function) => function switch
+    {
+        AnonymousFunctionExpressionSyntax anonymous => (SyntaxNode?)anonymous.Block ?? anonymous.ExpressionBody,
+        MethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
+        LocalFunctionStatementSyntax local => (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression,
+        _ => null,
+    };
+
+    private static bool IsAsync(SyntaxNode function) => function switch
+    {
+        AnonymousFunctionExpressionSyntax anonymous => !anonymous.AsyncKeyword.IsKind(SyntaxKind.None),
+        MethodDeclarationSyntax method => method.Modifiers.Any(SyntaxKind.AsyncKeyword),
+        LocalFunctionStatementSyntax local => local.Modifiers.Any(SyntaxKind.AsyncKeyword),
+        _ => false,
+    };
 
     internal static bool IsNameOf(SemanticModel model, SyntaxNode node)
         => node.Ancestors().OfType<InvocationExpressionSyntax>().Any(invocation => model.GetOperation(invocation) is INameOfOperation);
 
     private static bool IsGenBlock(SemanticModel model, SyntaxNode node)
-        => node is AnonymousFunctionExpressionSyntax function
-            && model.GetSymbolInfo(function).Symbol is IMethodSymbol method
+        => node is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax
+            && FunctionSymbol(model, node) is { } method
             && method.Parameters.Any(static p => IsScope(p.Type));
 
     private static void AnalyzeFunction(SyntaxNodeAnalysisContext context)
     {
-        var function = (AnonymousFunctionExpressionSyntax)context.Node;
-        if (context.SemanticModel.GetSymbolInfo(function, context.CancellationToken).Symbol is not IMethodSymbol method) return;
+        var function = context.Node;
+        if (FunctionSymbol(context.SemanticModel, function, context.CancellationToken) is not { } method) return;
         var scopes = method.Parameters.Where(static p => IsScope(p.Type)).ToImmutableArray();
         if (scopes.IsEmpty) return;
 
-        var body = (SyntaxNode?)function.Block ?? function.ExpressionBody;
+        var body = FunctionBody(function);
         if (body is null) return;
 
         var scopeFailure = scopes[0].Type.ContainingAssembly?.GetTypeByMetadataName("Moderato.Effects.ScopeFailure");
@@ -102,7 +129,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                 if (asyncSteps.Contains(name) && !AwaitedOrReturned(context.SemanticModel, step, function))
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.StepNotAwaited, step.GetLocation(), access.ToString()));
             }
-            else if (Escapes(context.SemanticModel, identifier))
+            else if (Escapes(context.SemanticModel, identifier, function))
             {
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.ScopeEscapes, identifier.GetLocation(), parameter.Name));
             }
@@ -113,7 +140,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     private static bool AwaitedOrReturned(SemanticModel model, InvocationExpressionSyntax step, SyntaxNode function)
     {
         // Gen awaits the callback's outer ValueTask, not an async callback's result value.
-        var canReturn = function is AnonymousFunctionExpressionSyntax anonymous && anonymous.AsyncKeyword.IsKind(SyntaxKind.None);
+        var canReturn = !IsAsync(function);
         var taskType = model.GetTypeInfo(step).Type?.ContainingAssembly?.GetTypeByMetadataName("System.Threading.Tasks.Task");
         SyntaxNode node = step;
         while (true)
@@ -149,6 +176,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
                     return true;
                 case ReturnStatementSyntax:
                     return canReturn;
+                case ArrowExpressionClauseSyntax arrow:
+                    return arrow.Parent == function && canReturn;
                 case var parent:
                     return parent == function && canReturn;
             }
@@ -193,13 +222,21 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
             });
 
     // Passing the scope on is fine, but storing it where it can outlive the block is not.
-    private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier) => identifier.Parent switch
+    private static bool Escapes(SemanticModel model, IdentifierNameSyntax identifier, SyntaxNode function) => identifier.Parent switch
     {
         AssignmentExpressionSyntax assignment when assignment.Right == identifier
-            => model.GetSymbolInfo(assignment.Left).Symbol is IFieldSymbol or IPropertySymbol,
+            => assignment.Left is ElementAccessExpressionSyntax || Outlives(model.GetSymbolInfo(assignment.Left).Symbol, function),
         ReturnStatementSyntax or ArrowExpressionClauseSyntax => true,
         InitializerExpressionSyntax or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax => true,
         ArgumentSyntax { Parent: TupleExpressionSyntax } => true,
+        _ => false,
+    };
+
+    // A variable of the enclosing member is captured, so it outlives the block like a field.
+    private static bool Outlives(ISymbol? target, SyntaxNode function) => target switch
+    {
+        IFieldSymbol or IPropertySymbol => true,
+        ILocalSymbol or IParameterSymbol => target.DeclaringSyntaxReferences.All(reference => !function.Span.Contains(reference.Span)),
         _ => false,
     };
 

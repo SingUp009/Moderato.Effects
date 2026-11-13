@@ -89,6 +89,8 @@ Constraint kinds are `Unique` (including a primary key), `ForeignKey`, `NotNull`
 
 The transaction requires an error type containing `DatabaseFailure`. A database exception thrown while the context is created or the transaction begins is returned through that case as Err, normally as `UnclassifiedDatabaseFailure`: the body has not started and nothing was written, so the caller can retry or report the database as unavailable. Other exceptions at that point, such as a misconfigured factory, remain a Die. An unmapped `CommitNotConfirmed` is returned through that case as Err. A confirmed commit rejection without a successful custom mapper remains a Die. A later cleanup failure can still become the primary Die and retain the earlier error as context.
 
+If the caller cancels during the commit while the transaction runs inside `Effect.All`, `Race` or `RaceFirst`, the group ends with `Interrupted` and the `CommitNotConfirmed` is not the result. It is reported to the unobserved-failure handler instead, so log or reconcile it there.
+
 Do not blindly retry an unconfirmed commit: the write may already exist. Reconcile with the database or use an application idempotency protocol first.
 
 ## Current limits
