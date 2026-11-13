@@ -818,7 +818,7 @@ public class DiagnosticsOutputTests
 
             // Then
             Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
-            Assert.Contains("unjoined Err of type Credentials", written.ToString());
+            Assert.Contains("unobserved Err of type Credentials", written.ToString());
             Assert.DoesNotContain("p@ss", written.ToString());
         }
         finally
@@ -843,7 +843,7 @@ public class DiagnosticsOutputTests
 
             // Then
             Assert.Equal<Exit<int, Never>>(new Ok<int>(7), exit);
-            Assert.Contains("unjoined Err of type null", written.ToString());
+            Assert.Contains("unobserved Err of type null", written.ToString());
         }
         finally
         {

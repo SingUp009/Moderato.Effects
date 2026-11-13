@@ -62,7 +62,7 @@ internal static class UnobservedFailures
     {
         Die die => die.Exception.ToString(),
         // An error value can carry application data, so only its type reaches the process's error stream.
-        Failed failed => $"unjoined Err of type {failed.Error?.GetType().Name ?? "null"}",
+        Failed failed => $"unobserved Err of type {failed.Error?.GetType().Name ?? "null"}",
         var other => other?.ToString() ?? "",
     };
 }
