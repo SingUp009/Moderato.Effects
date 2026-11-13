@@ -37,6 +37,10 @@ then commits. The factory is not disposed. Neither context nor transaction may e
 The body must await its database operations and must not commit, roll back or dispose them.
 Unjoined child `Err` retains Core's existing semantics; it is not automatically promoted.
 
+A database exception thrown while the context is created or the transaction begins is returned
+as `Err(DatabaseFailure)`, normally holding `UnclassifiedDatabaseFailure`: the body has not
+started and nothing was written. Other exceptions at that point remain `Die`.
+
 Saving uses native EF APIs, or `db.SaveChangesAsync(scope, saveFailure)` to map selected update
 failures to application errors. The mapping can be omitted. Unmapped ordinary save/update
 exceptions remain `Die`. The adapter does not make a DbContext safe for concurrent operations.
@@ -58,6 +62,10 @@ while typed `Err<OrderError>` keeps the nested `DatabaseFailure` union.
 Rollback after an unconfirmed commit is best effort and cannot prove the prior commit outcome.
 No retry or idempotency is provided. Retrying EF execution strategies and pre-existing
 transactions are rejected before starting the owned transaction.
+
+Do not run a `Transaction` inside another transaction's body. The inner call does not join the
+outer one: it begins its own transaction on another context. SQLite cannot start it while the
+outer transaction is open, so the inner call fails and the outer transaction rolls back.
 
 SQLite constraint codes are decoded without parsing messages. Constraint names, tables and
 schemas are not inferred; this initial implementation does not expose that metadata. The
