@@ -341,6 +341,48 @@ public class ScopeEscapesTests
         // Then
         Assert.Contains("MEFF304", build.Ids);
     }
+
+    [Theory]
+    [InlineData("", "Scope<string, R>? leaked = null;", "leaked = scope;")]
+    [InlineData("Scope<string, R>? leaked", "", "leaked = scope;")]
+    [InlineData("", "var slots = new Scope<string, R>?[1];", "slots[0] = scope;")]
+    public void GenBlock_ScopeStoredInAVariableOrElementOfTheEnclosingMember_ReportsMEFF304(string parameter, string local, string store)
+    {
+        // Given
+        var source = Code.InClass($$"""
+            static Effect<int, string, R> Load() => Effect<R>.Succeed(1);
+
+            public static Effect<int, string, R> Work({{parameter}})
+            {
+                {{local}}
+                return Scope<string, R>.Gen(async scope =>
+                {
+                    {{store}}
+                    return await scope.Run(Load());
+                });
+            }
+            """);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Contains("'scope'", build.Single("MEFF304").GetMessage());
+        Assert.Empty(build.Errors);
+    }
+
+    [Fact]
+    public void GenBlock_ScopeAssignedToALocalOfTheBlock_ReportsNothing()
+    {
+        // Given
+        var source = Code.InGen("Scope<AppError, R> alias; alias = scope; return await alias.Run(Load());");
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Diagnostics);
+    }
 }
 
 public class ResourceInLoopTests
