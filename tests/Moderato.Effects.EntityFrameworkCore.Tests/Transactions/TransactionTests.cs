@@ -119,4 +119,22 @@ public sealed class TransactionTests
         Assert.Equal(1, store.Probe.Rollbacks);
         Assert.Equal(1, store.Probe.Disposals);
     }
+
+    [Fact]
+    public async Task Transaction_DefaultBody_RejectsBeforeCreatingAContext()
+    {
+        // Given
+        await using var store = await Store.Open();
+        var contextsRequested = false;
+        Effect<int, TestError, TestDb> body = default;
+
+        // When
+        var exception = Assert.Throws<InvalidOperationException>(() => EfDatabase<Store>.Transaction(
+            contexts: env => { contextsRequested = true; return env; }, environment: (_, db) => db, body: body));
+
+        // Then
+        Assert.NotNull(exception);
+        Assert.False(contextsRequested);
+        Assert.Equal(0, store.Probe.Disposals);
+    }
 }
