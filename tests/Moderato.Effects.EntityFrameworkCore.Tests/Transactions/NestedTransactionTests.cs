@@ -20,7 +20,7 @@ public sealed class NestedTransactionTests
         });
 
     [Fact]
-    public async Task Transaction_NestedOnSeparateConnections_WaitsForTheOuterLockThenDies()
+    public async Task Transaction_NestedOnSeparateConnections_WaitsForTheOuterLockThenFails()
     {
         // Given
         var connectionString = $"Data Source=file:{Guid.NewGuid():N}?mode=memory&cache=shared;Default Timeout=1";
@@ -40,8 +40,9 @@ public sealed class NestedTransactionTests
             .RunExitAsync(factory, TestContext.Current.CancellationToken);
 
         // Then
-        Assert.True(exit.TryGetValue(out Die? die));
-        Assert.IsType<SqliteException>(die.Exception);
+        Assert.True(exit.TryGetValue(out Err<TestError> error));
+        var database = Assert.IsType<DatabaseFailure>(error.Error.Value);
+        Assert.IsType<SqliteException>(database.Cause);
         await using var count = keepAlive.CreateCommand();
         count.CommandText = "SELECT COUNT(*) FROM Rows";
         Assert.Equal(0L, await count.ExecuteScalarAsync(TestContext.Current.CancellationToken));

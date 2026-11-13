@@ -100,10 +100,10 @@ Running `EfDatabase.Transaction` inside the body of another `Transaction` does n
 
 On SQLite the inner transaction cannot start:
 
-- if both contexts share one connection, the provider rejects a second transaction at once;
-- on separate connections, the inner transaction waits for the outer one's write lock until the connection's timeout expires.
+- if both contexts share one connection, the provider rejects a second transaction at once, which is a Die;
+- on separate connections, the inner transaction waits for the outer one's write lock until the connection's timeout expires, then fails with a `DatabaseFailure`.
 
-Either way the inner failure is a Die, and the outer transaction rolls back. Other providers have not been validated; where a second transaction can start, it commits or rolls back independently of the outer one.
+Either way the outer body fails with it, and the outer transaction rolls back. Other providers have not been validated; where a second transaction can start, it commits or rolls back independently of the outer one.
 :::
 
 Do all the work of one unit in a single `Transaction` body, and pass its context to helpers through the body's environment.
