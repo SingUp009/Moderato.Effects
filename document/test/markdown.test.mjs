@@ -37,7 +37,10 @@ test('the Coding Agents overview links to the technical guide and preserves lega
   assert.match(overview, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
   assert.equal([...overview.matchAll(/<h1\b/g)].length, 1);
   assert.match(overview, /href="\/agent-guide\.md"/);
-  assert.ok(querySelector(parse(overview), 'main a[href="/agent-dx/"]'));
+  const researchLink = 'a[href="https://moderato-effects-agent-dx.009singup.workers.dev/"]';
+  const page = parse(overview);
+  assert.ok(querySelector(page, `main ${researchLink}`));
+  assert.ok(querySelector(page, `#starlight__sidebar ${researchLink}`));
   assert.match(markdown, /^# Agent Guide\n/);
   assert.equal(readOutput('agents.md'), markdown);
   assert.equal([...markdown.matchAll(/^```csharp$/gm)].length, 3);

@@ -92,4 +92,4 @@ Consult the [MEFF analyzer reference](/analyzers/) when diagnostics appear, and 
 
 ## How well do agents use Moderato.Effects?
 
-We evaluate coding agents on runnable C# tasks and measure whether their implementations pass behavioral tests. See the [Agent DX research](/agent-dx/) for the methods and results.
+We evaluate coding agents on runnable C# tasks and measure whether their implementations pass behavioral tests. See the [Agent DX research](https://moderato-effects-agent-dx.009singup.workers.dev/) for the methods and results.
