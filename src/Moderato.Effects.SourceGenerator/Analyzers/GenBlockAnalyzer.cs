@@ -92,7 +92,8 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         ImmutableArray<IParameterSymbol> scopes, INamedTypeSymbol? scopeFailure)
     {
         var reportedNested = new HashSet<SyntaxNode>();
-        foreach (var identifier in body.DescendantNodes().OfType<IdentifierNameSyntax>())
+        // An expression body can itself be the scope, so the walk starts at the body.
+        foreach (var identifier in body.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>())
         {
             if (context.SemanticModel.GetSymbolInfo(identifier, context.CancellationToken).Symbol is not IParameterSymbol parameter
                 || !scopes.Contains(parameter, SymbolEqualityComparer.Default))
@@ -227,6 +228,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
         AssignmentExpressionSyntax assignment when assignment.Right == identifier
             => assignment.Left is ElementAccessExpressionSyntax || Outlives(model.GetSymbolInfo(assignment.Left).Symbol, function),
         ReturnStatementSyntax or ArrowExpressionClauseSyntax => true,
+        AnonymousFunctionExpressionSyntax lambda when lambda.ExpressionBody == identifier => true,
         InitializerExpressionSyntax or ExpressionElementSyntax or AnonymousObjectMemberDeclaratorSyntax => true,
         ArgumentSyntax { Parent: TupleExpressionSyntax } => true,
         _ => false,
@@ -325,7 +327,7 @@ public sealed class GenBlockAnalyzer : DiagnosticAnalyzer
     {
         // A lambda runs on the block's flow, while a nested Gen block is analyzed separately.
         var model = context.SemanticModel;
-        foreach (var access in body.DescendantNodes(n => !IsGenBlock(model, n)).OfType<MemberAccessExpressionSyntax>())
+        foreach (var access in body.DescendantNodesAndSelf(n => !IsGenBlock(model, n)).OfType<MemberAccessExpressionSyntax>())
         {
             var name = access.Name.Identifier.ValueText;
             if (name is not ("Result" or "Wait" or "GetResult")) continue;
