@@ -47,11 +47,11 @@ if (results && (results.planned !== results.observed ||
 
 <section class="dx-holdout" id="holdout" aria-labelledby="holdout-heading">
     <p class="dx-kicker">{results ? 'HOLDOUT EVALUATION' : 'HOLDOUT EVALUATION · PENDING'}</p>
-    <h2 id="holdout-heading">Does the frozen guide help on new tasks?</h2>
+    <h2 id="holdout-heading">Does improved documentation help on new tasks?</h2>
     {results ? (
         <>
             <p>{results.positiveSignal
-                ? 'The frozen guide met the registered criterion by improving full passes for both models overall and matching or improving their pass counts on Replica read.'
+                ? 'Both models had more full-pass submissions with the improved documentation, with no decline on Replica read. This met the registered evaluation criterion.'
                 : 'The registered criterion required more full passes overall and at least as many Replica read passes for each model.'}</p>
             <p>{results.observed} trials across three tasks. Each cell shows full passes and a 95% Wilson interval. The intervals describe uncertainty in each pass rate.</p>
             <div class="dx-holdout-models">
@@ -70,7 +70,7 @@ if (results && (results.planned !== results.observed ||
                                     </dd>
                                 </div>
                                 <div data-condition="frozen">
-                                    <dt>Frozen</dt>
+                                    <dt>Improved</dt>
                                     <dd>
                                         {model.frozen}/{total}
                                         <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * model.frozen / total + '%' }}></div></div>
@@ -85,7 +85,7 @@ if (results && (results.planned !== results.observed ||
                 <table>
                     <thead><tr>
                         <th scope="col">Task</th><th scope="col">Model</th>
-                        <th scope="col">Original guide</th><th scope="col">Frozen guide</th>
+                        <th scope="col">Original documentation</th><th scope="col">Improved documentation</th>
                     </tr></thead>
                     <tbody>
                         {pairs.map(({ baseline, frozen }) => (
@@ -115,7 +115,7 @@ if (results && (results.planned !== results.observed ||
                             {results.rows.map(row => (
                                 <tr>
                                     <th scope="row">{taskNames[row.task]}</th><td>{modelNames[row.model]}</td>
-                                    <td>{row.condition === 'baseline' ? 'Original' : 'Frozen'}</td>
+                                    <td>{row.condition === 'baseline' ? 'Original' : 'Improved'}</td>
                                     <td>{row.firstBuild}/{row.firstBuildObserved} observed</td>
                                     <td>{row.timelyPass}/{row.planned}</td>
                                     <td>{(row.medianDurationMs / 1_000).toFixed(1)} s</td>
