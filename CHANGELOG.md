@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Cover a `Transaction` nested in another transaction's body on SQLite: it fails at once on a shared connection and after the connection timeout on separate connections, and the outer transaction rolls back. ([#474](https://github.com/SingUp009/Moderato.Effects/issues/474))
 
+- Run the allocation tests with a silent unobserved-failure handler. Their prebuilt suppressed Errs are reported since #493, and the default handler's writes to stderr were being measured. ([#493](https://github.com/SingUp009/Moderato.Effects/issues/493))
 ## [0.1.0-preview.6] - 2026-11-09
 
 ### Added

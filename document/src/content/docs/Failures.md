@@ -96,7 +96,8 @@ A failure classified as a consequence of cancellation is only context (`Conseque
 | Timeout, then a release throws | `Die`, with the timeout as context |
 | Timeout, then the work throws `ObjectDisposedException` | `Err(TimeoutError)`; the suppressed `Die` is [reported to diagnostics](#failures-nobody-sees) |
 | Timeout, then the work turns the cancellation into an Err | `Err(TimeoutError)`; the suppressed Err is [reported to diagnostics](#failures-nobody-sees) |
-| `All`: A fails, and B throws when canceled | `Err(A)`, with B's `Die` as context |
+| `All`: A's Err cancels B, then B's body throws a non-cancellation exception | `Err(A)`, with B's `Die` as context |
+| `All`: A returns an Err, and B's release throws during cleanup | `Die` from the release, with `Err(A)` as context |
 | `All`: A fails, and B dies independently before the cancellation | `Die(B)`, with `Err(A)` as context |
 | `Race`: the loser's release throws after a winner is chosen | `Die`; the winner's Ok is dropped |
 | `Race`: the caller cancels after a winner is chosen | the winner |

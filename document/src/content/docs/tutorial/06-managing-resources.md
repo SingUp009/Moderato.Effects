@@ -5,7 +5,7 @@ description: Acquire a writer with Resource.Make and scope.Acquire, then observe
 
 # Managing Resources
 
-In [chapter 5](../05-managing-dependencies/), the caller supplied a `TextWriter` and disposed of it when it was finished. Now the effect opens its own writer for an order draft. The writer needs to be closed even when order preparation ends with an expected error.
+In [chapter 5](/tutorial/05-managing-dependencies/), the caller supplied a `TextWriter` and disposed of it when it was finished. Now the effect opens its own writer for an order draft. The writer needs to be closed even when order preparation ends with an expected error.
 
 ## Run the chapter
 
@@ -95,4 +95,4 @@ When the quantity is invalid, `throw scope.Fail(...)` ends the block with an exp
 
 ## Next
 
-In [chapter 7](../07-concurrent-effects/), run two independent effects together and see how the group waits for cleanup when one fails.
+In [chapter 7](/tutorial/07-concurrent-effects/), run two independent effects together and see how the group waits for cleanup when one fails.

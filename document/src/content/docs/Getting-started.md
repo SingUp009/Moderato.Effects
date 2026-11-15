@@ -14,7 +14,7 @@ The package includes its source generators and analyzers. Core supports Native A
 
 ```bash
 dotnet new console --framework net11.0
-dotnet add package Moderato.Effects
+dotnet add package Moderato.Effects --prerelease
 ```
 
 Pin the SDK and package version in your application. See [Installation](/installation/) for the other integration packages and source builds.
