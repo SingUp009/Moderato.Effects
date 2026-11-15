@@ -56,6 +56,8 @@ public class DiagnosticsTests
             var entry = Assert.Single(provider.Entries);
             Assert.Equal("Moderato.Effects.Http", entry.Category);
             Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Equal(1002, entry.Id);
+            Assert.Equal("Unobserved effect error of type {ErrorType}", entry.Fields["{OriginalFormat}"]);
             Assert.Equal(nameof(PrivateError), entry.Fields["ErrorType"]);
             Assert.DoesNotContain(entry.Fields.Values, value => value is PrivateError);
         }

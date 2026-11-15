@@ -126,6 +126,7 @@ public class DiagnosticsTests
         // Then
         var entry = Assert.Single(provider.Entries);
         Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal("Unobserved effect error {FailureKind} of type {ErrorType}", entry.Fields["{OriginalFormat}"]);
         Assert.Equal("Failed", entry.Fields["FailureKind"]);
         Assert.Equal(nameof(SecretError), entry.Fields["ErrorType"]);
         Assert.DoesNotContain(entry.Fields.Values, value => value is SecretError);

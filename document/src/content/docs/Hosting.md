@@ -77,8 +77,10 @@ Default log events use category `Moderato.Effects.Hosting`:
 | Event | Level | Fields |
 |---|---|---|
 | 1001 UnobservedDefect | Error | FailureKind, SuppressedCount, OmittedSuppressed; original exception |
-| 1002 UnjoinedError | Warning | FailureKind, ErrorType |
+| 1002 UnobservedError | Warning | FailureKind, ErrorType |
 | 1003 SuppressedFailure | Error | SuppressedIndex (zero-based), Relation, FailureKind, ErrorType; exception when present |
+
+`UnobservedError` covers every Err that no outcome carried: the Err of a fiber that was never joined, and an Err dropped as context, for example when the host stops and a child turns the cancellation into an Err.
 
 Retained context is emitted in order; omitted context has a count, not invented records. `ErrorType` is the short runtime name of `Failed.Error` (for example, `Rejected`), not a unique type identifier. It is null for a null error or a non-Failed context entry. Arbitrary typed error values are not automatically formatted or exposed, and union values are not projected again. Disabled logs do not fetch type names or enumerate context. Diagnostic failures do not replace the business outcome; the Host itself owns logging the primary service fault.
 

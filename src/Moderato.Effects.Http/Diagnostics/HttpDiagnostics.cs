@@ -5,7 +5,7 @@ namespace Moderato.Effects.Http;
 internal sealed class HttpDiagnostics(ILoggerFactory factory) : IDisposable
 {
     private static readonly Action<ILogger, string?, Exception?> error = LoggerMessage.Define<string?>(
-        LogLevel.Warning, new EventId(1002, "UnjoinedError"), "Unjoined effect error of type {ErrorType}");
+        LogLevel.Warning, new EventId(1002, "UnobservedError"), "Unobserved effect error of type {ErrorType}");
     private static readonly Action<ILogger, int, int, Exception?> defect = LoggerMessage.Define<int, int>(
         LogLevel.Error, new EventId(1001, "UnobservedDefect"), "Unobserved defect; retained {SuppressedCount}, omitted {OmittedSuppressed}");
     private static readonly Action<ILogger, int, Relation, string?, Exception?> suppressed = LoggerMessage.Define<int, Relation, string?>(
@@ -50,7 +50,7 @@ internal sealed class HttpDiagnostics(ILoggerFactory factory) : IDisposable
         {
             Console.Error.WriteLine(failure.Value is Die die
                 ? $"Moderato.Effects.Http late diagnostic: {die.Exception}"
-                : "Moderato.Effects.Http late diagnostic: unjoined error");
+                : "Moderato.Effects.Http late diagnostic: unobserved error");
         }
     }
 

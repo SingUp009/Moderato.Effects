@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Return a database exception thrown while `EfDatabase.Transaction` creates its context or begins its transaction as an Err holding the `DatabaseFailure`, instead of a Die. The body has not started at that point. ([#473](https://github.com/SingUp009/Moderato.Effects/issues/473))
 - Analyze constructors, operators, conversion operators and indexer or property accessors that take a `Scope<E, R>` like a Gen block, and report MEFF304 for a primary constructor parameter that keeps a scope. Existing code can get new warnings. ([#498](https://github.com/SingUp009/Moderato.Effects/issues/498))
 - Report every Err among suppressed failures wherever they are dropped, exactly as defects are: under an Ok or Err at a run boundary, and under an Err that `OrElse`, `Retry`, `CatchCase`, `Attempt`, `Match` or `UnwrapOr` handled. An Err that a `Timeout` or a group turned into context is no longer lost. Handlers receive more `Failed` cases. ([#493](https://github.com/SingUp009/Moderato.Effects/issues/493))
+- Rename the Hosting and HTTP log event `1002 UnjoinedError` to `1002 UnobservedError` and its message to "Unobserved effect error", since it also covers Errs dropped as context, not only an unjoined fiber's. The event number is unchanged; filters on the event name or message text need updating. ([#499](https://github.com/SingUp009/Moderato.Effects/issues/499))
 
 ### Fixed
 
