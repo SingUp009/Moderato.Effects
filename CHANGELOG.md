@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Record operators under the member the user wrote: an implicit `Never` conversion as `Widen` instead of `op_Implicit`, `Widen` instead of `MapErr`, query syntax as `Select` / `SelectMany` instead of `Map` / `AndThen` / `Bind`, and `CatchCase` instead of `Catch`. No operation is hidden from recordings. ([#470](https://github.com/SingUp009/Moderato.Effects/issues/470))
 - Decide what counts as a library callback for MEFF307 by assembly, so a lambda passed to application code in a `Moderato.Effects.*` namespace is no longer reported. ([#495](https://github.com/SingUp009/Moderato.Effects/issues/495))
 - Report MEFF306 and MEFF304 when a lambda's or method's expression body is itself the blocking access or the returned scope. ([#496](https://github.com/SingUp009/Moderato.Effects/issues/496))
+- Report MEFF304 when a scope is assigned to the function's own `out` or `ref` parameter. ([#497](https://github.com/SingUp009/Moderato.Effects/issues/497))
 
 ### Tests
 
