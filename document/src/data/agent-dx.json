@@ -118,9 +118,9 @@
     },
     {
       "id": "frozen-confirmation",
-      "label": "Frozen guide check",
-      "title": "Can agents compose parallel cleanup?",
-      "description": "Both models used the frozen guide on the same development task. This check informed the decision to freeze the guide.",
+      "label": "Parallel cleanup",
+      "title": "Can agents compose parallel work and resource cleanup?",
+      "description": "The revised documentation was checked on a development task requiring correct parallel execution, cancellation, and resource release. This task informed the final documentation before evaluation.",
       "deadlineSeconds": 240,
       "taskCount": 1,
       "rows": [
@@ -130,7 +130,7 @@
           "planned": 2,
           "firstBuild": 2,
           "finalPass": 2,
-          "label": "Frozen guide"
+          "label": "Improved documentation"
         },
         {
           "model": "Claude Haiku 4.5",
@@ -138,7 +138,7 @@
           "planned": 2,
           "firstBuild": 2,
           "finalPass": 1,
-          "label": "Frozen guide"
+          "label": "Improved documentation"
         }
       ]
     }
