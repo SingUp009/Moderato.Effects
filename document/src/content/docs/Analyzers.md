@@ -47,7 +47,7 @@ MEFF103 also covers a parameter whose service the type already provides through 
 | MEFF306 | Warning | `.Result`, `.Wait()` or `GetAwaiter().GetResult()`, which block the thread | `await` instead |
 | MEFF310 | Warning | `scope.Run` / `Acquire` / `Fork` not awaited at once, including storing it to await later | `await` it, or `return` it |
 
-A method or local function that takes a `Scope<E, R>` is analyzed like a Gen block lambda, whether it is passed to `Gen` as a method group or called as a helper. Its own `catch` clauses, cleanup code, loops and waits are checked; a non-async helper may return its step for the caller to await.
+A method or local function that takes a `Scope<E, R>` is analyzed like a Gen block lambda, whether it is passed to `Gen` as a method group or called as a helper. The same applies to a constructor, an operator, a conversion operator and an indexer or property accessor that receives a scope. A primary constructor parameter of type `Scope<E, R>` reports MEFF304 when a member or initializer of the type uses it, and always on a record, because the instance then keeps the scope. Its own `catch` clauses, cleanup code, loops and waits are checked; a non-async helper may return its step for the caller to await.
 
 Returning a step directly from a non-async Gen body lets Gen await it. An async body must await the step: returning it as the body's result value does not consume it. Awaiting a step whose value itself is a `Task` or `ValueTask` remains valid.
 

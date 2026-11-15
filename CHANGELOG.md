@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyze a method or local function that takes a `Scope<E, R>` like a Gen block lambda, so MEFF301, MEFF302, MEFF304, MEFF305, MEFF306 and MEFF310 also apply to Gen bodies passed as method groups and to scope helpers. Existing helpers can get new warnings. ([#468](https://github.com/SingUp009/Moderato.Effects/issues/468))
 - Report MEFF307 for system-clock reads in callbacks passed to the library (operators, query syntax, `Resource.Make` and `Use`, `Retry` and `Repeat` policies, integration callbacks) and in methods or local functions that take a `Scope<E, R>`. ([#472](https://github.com/SingUp009/Moderato.Effects/issues/472))
 - Return a database exception thrown while `EfDatabase.Transaction` creates its context or begins its transaction as an Err holding the `DatabaseFailure`, instead of a Die. The body has not started at that point. ([#473](https://github.com/SingUp009/Moderato.Effects/issues/473))
+- Analyze constructors, operators, conversion operators and indexer or property accessors that take a `Scope<E, R>` like a Gen block, and report MEFF304 for a primary constructor parameter that keeps a scope. Existing code can get new warnings. ([#498](https://github.com/SingUp009/Moderato.Effects/issues/498))
 
 ### Fixed
 
