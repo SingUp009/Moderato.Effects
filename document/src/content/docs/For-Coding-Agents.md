@@ -6,7 +6,7 @@ description: Give AI coding agents machine-readable C# effect documentation, a r
 
 Moderato.Effects is an effect system for C# designed around **typed errors, explicit dependencies, and managed resource lifetimes**. Coding agents can discover its APIs through Markdown documentation, follow a dedicated implementation guide, and verify generated code with the C# compiler, Roslyn diagnostics, and executable tests.
 
-This page is for developers who want to use Moderato.Effects **with** a coding agent. For the API-level rules an agent should follow, go straight to the [Agent Guide](/agent-guide/).
+This page is for developers who want to use Moderato.Effects **with** a coding agent. For the API-level rules an agent should follow, go straight to the <a id="implementation-guide" href="/agent-guide/">Agent Guide</a>.
 
 ## Why Moderato.Effects works with coding agents
 
@@ -41,7 +41,7 @@ resource ownership, and cleanup semantics.
 Run dotnet build and dotnet test, including relevant failure paths.
 ```
 
-For a working first effect, follow [Getting started](/getting-started/). To compose effects, manage resources, or handle interruption, use the [Agent Guide](/agent-guide/).
+For a working first effect, follow [Getting started](/getting-started/) or <a id="write-and-run-a-first-effect" href="/agent-guide/#write-and-run-a-first-effect">run the Agent Guide example</a>. See the <a id="manage-a-resource-with-asynchronous-cleanup" href="/agent-guide/#manage-a-resource-with-asynchronous-cleanup">asynchronous cleanup example</a> for resource ownership and cancellation during parallel work.
 
 ## Markdown documentation for agents
 
@@ -110,7 +110,7 @@ dotnet test
 
 **Compilation is only the first check.** Test the behaviors a type checker cannot prove: release ordering, cleanup after a defect or cancellation, sibling cancellation, and preservation of original failures.
 
-The [runnable tutorial](/tutorial/00-what-is-an-effect/) and [Agent Guide](/agent-guide/) contain concrete usage patterns. Documentation C# examples are also checked in the repository's [example verification workflow](https://github.com/SingUp009/Moderato.Effects/blob/codex/agent-guide/.github/workflows/docs-examples.yml).
+The [runnable tutorial](/tutorial/00-what-is-an-effect/) contains concrete usage patterns. Use the <a id="verify-the-implementation" href="/agent-guide/#verify-the-implementation">Agent Guide verification checklist</a> to review an implementation. Documentation C# examples are also checked in the repository's [example verification workflow](https://github.com/SingUp009/Moderato.Effects/blob/codex/agent-guide/.github/workflows/docs-examples.yml).
 
 ## Agent DX, measured
 

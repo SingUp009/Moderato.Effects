@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { parse } from 'ultrahtml';
+import { querySelector } from 'ultrahtml/selector';
 
 test('the agent index links to published Markdown guides', () => {
   const index = readFileSync(new URL('../dist/llms.txt', import.meta.url), 'utf8');
@@ -35,7 +37,7 @@ test('the Coding Agents overview links to the technical guide and preserves lega
   assert.match(overview, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
   assert.equal([...overview.matchAll(/<h1\b/g)].length, 1);
   assert.match(overview, /href="\/agent-guide\.md"/);
-  assert.match(overview, /href="\/agent-dx\/">Explore the Agent DX research/);
+  assert.ok(querySelector(parse(overview), 'main a[href="/agent-dx/"]'));
   assert.match(markdown, /^# Agent Guide\n/);
   assert.equal(readOutput('agents.md'), markdown);
   assert.equal([...markdown.matchAll(/^```csharp$/gm)].length, 3);
