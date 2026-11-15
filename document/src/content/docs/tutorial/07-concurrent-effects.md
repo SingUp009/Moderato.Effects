@@ -5,7 +5,7 @@ description: Run a shipping quote and stock check together with Effect.All, and 
 
 # Running Effects Concurrently
 
-In [chapter 4](../04-composing-effects/), each step used the result of the previous one. At checkout, a shipping quote and a stock check can run at the same time. Each has the inputs it needs, and checkout needs both results. This chapter groups them with `Effect.All` and uses the resource cleanup from [chapter 6](../06-managing-resources/) to see what happens when one step fails.
+In [chapter 4](/tutorial/04-composing-effects/), each step used the result of the previous one. At checkout, a shipping quote and a stock check can run at the same time. Each has the inputs it needs, and checkout needs both results. This chapter groups them with `Effect.All` and uses the resource cleanup from [chapter 6](/tutorial/06-managing-resources/) to see what happens when one step fails.
 
 ## Run the chapter
 

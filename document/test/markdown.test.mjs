@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { parse } from 'ultrahtml';
+import { querySelector } from 'ultrahtml/selector';
 
 test('the agent index links to published Markdown guides', () => {
   const index = readFileSync(new URL('../dist/llms.txt', import.meta.url), 'utf8');
@@ -20,6 +22,41 @@ test('the agent index links to published Markdown guides', () => {
 
   assert.ok(links.some((link) => link.pathname === '/tutorial/01-results.md'));
   assert.ok(links.some((link) => link.pathname === '/tutorial/02-first-effect.md'));
+  assert.ok(links.some((link) => link.pathname === '/agent-guide.md'));
+  assert.ok(links.every((link) => link.pathname !== '/agents.md'));
   assert.ok(links.every((link) => !link.pathname.includes('_Sidebar')));
   assert.match(readFileSync(new URL('../dist/gen-blocks.md', import.meta.url), 'utf8'), /```csharp/);
+});
+
+test('the Coding Agents overview links to the technical guide and preserves legacy links', () => {
+  const readOutput = (path) => readFileSync(new URL(`../dist/${path}`, import.meta.url), 'utf8');
+  const overview = readOutput('agents/index.html');
+  const guide = readOutput('agent-guide/index.html');
+  const markdown = readOutput('agent-guide.md');
+
+  assert.match(overview, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
+  assert.equal([...overview.matchAll(/<h1\b/g)].length, 1);
+  assert.match(overview, /href="\/agent-guide\.md"/);
+  const researchLink = 'a[href="https://moderato-effects-agent-dx.009singup.workers.dev/"]';
+  const page = parse(overview);
+  assert.ok(querySelector(page, `main ${researchLink}`));
+  assert.ok(querySelector(page, `#starlight__sidebar ${researchLink}`));
+  assert.match(markdown, /^# Agent Guide\n/);
+  assert.equal(readOutput('agents.md'), markdown);
+  assert.equal([...markdown.matchAll(/^```csharp$/gm)].length, 3);
+  for (const anchor of ['write-and-run-a-first-effect', 'manage-a-resource-with-asynchronous-cleanup', 'verify-the-implementation']) {
+    assert.ok(guide.includes(`id="${anchor}"`), anchor);
+    assert.ok(overview.includes(`id="${anchor}" href="/agent-guide/#${anchor}"`), anchor);
+  }
+});
+
+test('chapter links resolve from the Markdown asset URL', () => {
+  const index = readFileSync(new URL('../dist/llms.txt', import.meta.url), 'utf8');
+  for (const [page] of index.matchAll(/https:\/\/[^)]+\/tutorial\/[^)]+\.md/g)) {
+    const markdown = readFileSync(new URL(`../dist${new URL(page).pathname}`, import.meta.url), 'utf8');
+    for (const [, link] of markdown.matchAll(/\]\(((?:\/tutorial\/|\.\.?\/)[^)]+)\)/g)) {
+      const target = new URL(link, page);
+      assert.doesNotThrow(() => readFileSync(new URL(`../dist${target.pathname}index.html`, import.meta.url)), `${page} links to ${target.href}`);
+    }
+  }
 });

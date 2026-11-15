@@ -32,6 +32,15 @@ Effect<User[], AppError, R> many = Effect.All(ids.Select(FindUser<R>), Concurren
 - **Fail-fast:** the first failure cancels the rest, and the result waits until they have finished, releases included.
 - The failure that started the cancellation is the result. Failures of the others caused by that cancellation are kept as context. A defect that happened independently outranks an Err (see [Failures](/failures/)).
 
+When a resource belongs to one child, wrap that child's work in `Use`:
+
+```csharp
+var readSettings = settingsStore.Use(store => ReadSettings<R>(store, id));
+var profileData = Effect.All(FindUser<R>(id), readSettings, Concurrency.Parallel);
+```
+
+The store's release receives the outcome of `ReadSettings`. If the user lookup fails while the read is pending, `All` cancels the read and waits for its release. A store acquired in an enclosing `Gen` would receive the enclosing block's exit case.
+
 The sequence overloads of `All`, `AllSettled` and `AllErrors` capture a copy of their input descriptions when you build the group. They validate the items then, without running the effects. Later changes to the source array or list do not change a built group; each run executes the captured descriptions again. For iterator inputs, enumeration and its exceptions also occur during construction. Captured objects and environment services keep their normal .NET sharing semantics.
 
 ### AllSettled and AllErrors

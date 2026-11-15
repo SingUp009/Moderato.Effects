@@ -5,7 +5,9 @@ description: Acquire, compose, and release resources in Moderato.Effects. Learn 
 
 # Resources
 
-`Resource<T, E, R>` describes a value that must be released after use: a connection, a transaction, a lock. Its release always runs, and it sees how the use ended.
+`Resource<T, E, R>` describes a value with a managed lifetime, such as a connection, transaction, or lock. A successful acquisition registers a release that runs when the owning scope ends.
+
+The excerpts below use application-specific types and effects.
 
 ```csharp
 static Resource<DbConnection, DbError, R> OpenConnection<R>() where R : IHas<IDbFactory> =>
@@ -19,7 +21,7 @@ static Resource<DbConnection, DbError, R> OpenConnection<R>() where R : IHas<IDb
 
 ## Using a resource
 
-There are two ways to get at the value, and both release it:
+Use `Use` to give an operation its own cleanup scope. Use `scope.Acquire` in a single `Gen` block when several releases need the same body `ExitCase`.
 
 ```csharp
 // Use: released when the use ends
@@ -29,7 +31,7 @@ var rows = OpenConnection<R>().Use(connection => Query<R>(connection));
 var connection = await scope.Acquire(OpenConnection<R>());
 ```
 
-A Gen block is itself a scope. Resources acquired in it are released when it ends, in reverse order of acquisition.
+Resources acquired in a Gen block are released when it ends. A nested `Use` finishes its cleanup before the outer body ends, so a defect in that cleanup can become the outcome the outer release receives. See the [two-resource example](/agent-guide/#manage-a-resource-with-asynchronous-cleanup).
 
 The value must not escape `Use`; the type system cannot prevent that.
 
@@ -55,7 +57,7 @@ Deep `Map`, `AndThen` and LINQ composition uses the same iterative executor as e
 - The release is registered as soon as the value exists, before anything checks the token, so a cancellation right after acquisition cannot leak it.
 - If a release throws, the remaining releases still run. A release failure is a defect (`Die`); body and release failures are combined using the priority rules in [Failures](/failures/).
 - A release that returns `Interrupted` despite its uncanceled token did not complete. It becomes a `Die` with `InvalidOperationException`; all remaining releases still run.
-- The `ExitCase` is fixed when the use ends. A release that fails does not change what later releases see. If one resource must commit before another releases, express that with the order you acquire them in.
+- All releases in a scope receive the same `ExitCase`, captured before cleanup starts. Resources composed with `AndThen` share a scope when used together. If one resource must commit before another releases, express that with the order you acquire them in.
 
 The `ExitCase` makes commit-or-rollback simple:
 
@@ -70,10 +72,10 @@ static Resource<Transaction, DbError, R> BeginTransaction<R>(DbConnection connec
 
 ## Defer
 
-In a Gen block, `scope.Defer` registers a release action without a resource:
+In a Gen block, `scope.Defer` registers a release action. Run the transaction's acquisition effect first, then register the action for when the scope ends.
 
 ```csharp
-var tx = await scope.Run(BeginTransaction<R>());
+var tx = await scope.Run(Begin<R>(connection));
 scope.Defer(exit => exit is Succeeded ? Commit<R>(tx) : Rollback<R>(tx));
 ```
 
@@ -95,8 +97,8 @@ scope.Defer(exit => exit is Succeeded ? Commit<R>(tx) : Rollback<R>(tx));
 Without DI, a resource can build the whole environment, and `Provide` hands it to the effect:
 
 ```csharp
-Resource<AppEnv, AppError, EmptyEnvironment> environment = ...;
+Resource<AppEnv, AppError, EmptyEnvironment> environment = OpenEnvironment();
 Effect<Report, AppError, EmptyEnvironment> app =
-    environment.Use(env => Main<AppEnv>().Provide<EmptyEnvironment>(_ => env));
+    environment.Use(env => BuildReport<AppEnv>().Provide<EmptyEnvironment>(_ => env));
 await app.RunAsync();
 ```
