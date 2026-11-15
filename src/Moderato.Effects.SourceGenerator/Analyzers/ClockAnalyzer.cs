@@ -96,11 +96,10 @@ public sealed class ClockAnalyzer : DiagnosticAnalyzer
         return IsLibraryMethod(info.Symbol as IMethodSymbol ?? info.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault());
     }
 
+    // The assembly decides: application code can live in a Moderato.Effects.* namespace too.
     private static bool IsLibraryMethod(IMethodSymbol? method)
-    {
-        var name = method?.ContainingNamespace?.ToDisplayString();
-        return name == "Moderato.Effects" || name?.StartsWith("Moderato.Effects.", System.StringComparison.Ordinal) == true;
-    }
+        => method?.ContainingAssembly?.Name is "Moderato.Effects" or "Moderato.Effects.Hosting" or "Moderato.Effects.Http"
+            or "Moderato.Effects.EntityFrameworkCore";
 
     private static bool IsFactory(SemanticModel model, InvocationExpressionSyntax invocation)
     {
