@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Report MEFF307 for system-clock reads in callbacks passed to the library (operators, query syntax, `Resource.Make` and `Use`, `Retry` and `Repeat` policies, integration callbacks) and in methods or local functions that take a `Scope<E, R>`. ([#472](https://github.com/SingUp009/Moderato.Effects/issues/472))
 - Return a database exception thrown while `EfDatabase.Transaction` creates its context or begins its transaction as an Err holding the `DatabaseFailure`, instead of a Die. The body has not started at that point. ([#473](https://github.com/SingUp009/Moderato.Effects/issues/473))
 - Analyze constructors, operators, conversion operators and indexer or property accessors that take a `Scope<E, R>` like a Gen block, and report MEFF304 for a primary constructor parameter that keeps a scope. Existing code can get new warnings. ([#498](https://github.com/SingUp009/Moderato.Effects/issues/498))
+- Report every Err among suppressed failures wherever they are dropped, exactly as defects are: under an Ok or Err at a run boundary, and under an Err that `OrElse`, `Retry`, `CatchCase`, `Attempt`, `Match` or `UnwrapOr` handled. An Err that a `Timeout` or a group turned into context is no longer lost. Handlers receive more `Failed` cases. ([#493](https://github.com/SingUp009/Moderato.Effects/issues/493))
 
 ### Fixed
 

@@ -23,7 +23,7 @@ public static class EffectUnionExtensions
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next.WithErrorType<E>());
     }
@@ -34,7 +34,7 @@ public static class EffectUnionExtensions
         {
             if (outcome.Kind != OutcomeKind.Err || !E.TryGet(outcome.Error, out var caught)) return new(outcome);
             var recovery = handle(caught).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next, name: nameof(CatchCase));
 }

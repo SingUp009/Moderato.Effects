@@ -49,9 +49,9 @@ internal static class Recurrence
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
-            // A retried attempt's suppressed failures are dropped, but its defects are still reported.
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
-            UnobservedFailures.ReportDefects(decision.Suppressed, context);
+            // A retried attempt's suppressed failures are dropped, so they are reported.
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(decision.Suppressed, context);
         }
     }
 
@@ -83,8 +83,8 @@ internal static class Recurrence
             if (!decision.Value) return outcome.After(decision);
             if (context.CancellationToken.IsCancellationRequested) return Canceled(decision, outcome, context);
 
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
-            UnobservedFailures.ReportDefects(decision.Suppressed, context);
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(decision.Suppressed, context);
         }
     }
 
@@ -121,7 +121,7 @@ internal static class Recurrence
     // Without this, an attempt or policy that ignores the token could run forever.
     private static Outcome<T, E> Canceled<T, E>(Outcome<bool, Never> decision, Outcome<T, E> last, RunContext context)
     {
-        UnobservedFailures.ReportDefects(decision.Suppressed, context);
+        UnobservedFailures.ReportDropped(decision.Suppressed, context);
         return Interrupt(Outcome<bool, Never>.Interrupted(), last, context);
     }
 
@@ -131,7 +131,7 @@ internal static class Recurrence
         var failure = decision.WithTypes<T, E>();
         if (decision.Kind == OutcomeKind.Interrupted)
         {
-            UnobservedFailures.ReportDefects(last.Suppressed, context);
+            UnobservedFailures.ReportDropped(last.Suppressed, context);
             return failure;
         }
 
