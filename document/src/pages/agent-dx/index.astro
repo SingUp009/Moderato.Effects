@@ -1,0 +1,116 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import AgentDxChart from '../../components/AgentDxChart';
+import HoldoutResults from '../../components/HoldoutResults.astro';
+import holdout from '../../data/holdout-results.json';
+import report from '../../data/agent-dx.json';
+import '../../styles/agent-dx.css';
+
+const data = {
+    title: 'Agent DX Research',
+    description: 'An exploratory study of how coding agents use Moderato.Effects, from compilable examples to cancellation and resource cleanup.',
+    template: 'splash' as const,
+    prev: false as const,
+    next: false as const,
+};
+const date = new Intl.DateTimeFormat('en', { dateStyle: 'long', timeZone: 'Asia/Tokyo' }).format(new Date(report.guide.frozenAt));
+const trialCount = (id: string) => report.experiments.find(experiment => experiment.id === id)?.rows
+    .reduce((total, row) => total + row.planned, 0);
+---
+
+<StarlightPage frontmatter={data}>
+    <div class="agent-dx">
+        <section class="dx-hero" aria-labelledby="research-question">
+            <div>
+                <p class="dx-kicker">MODERATO.EFFECTS RESEARCH</p>
+                <h2 id="research-question">How well do agents use Moderato.Effects?</h2>
+                <p class="dx-deck">We measured how examples and execution rules change the C# agents write, then checked the code for typed failures, cancellation and resource cleanup.</p>
+                <div class="dx-actions">
+                    <a class="dx-primary" href="/agent-guide/">Read the agent guide</a>
+                    <a class="dx-secondary" href={holdout ? '#holdout' : '#results'}>Explore the results <span aria-hidden="true">↓</span></a>
+                </div>
+            </div>
+            <div class="dx-overview">
+                <p class="dx-kicker">THE STUDY</p>
+                <dl>
+                    <div><dt>{trialCount('resource-guidance')}</dt><dd>runs comparing examples and principles</dd></div>
+                    <div><dt>{trialCount('first-build')}</dt><dd>runs measuring first-build accuracy</dd></div>
+                    <div><dt>{report.guide.fileCount}</dt><dd>files in the frozen guide snapshot</dd></div>
+                </dl>
+            </div>
+        </section>
+
+        {holdout && <HoldoutResults />}
+
+        <section class="dx-section" id="results" aria-labelledby="results-heading">
+            <header class="dx-section-heading">
+                <div>
+                    <h2 id="results-heading">Development results</h2>
+                    <p>These experiments shaped the guide. Choose an experiment to see the counts for each model.</p>
+                </div>
+                <a class="dx-download" href="/agent-dx/results.json" download>Download results JSON <span aria-hidden="true">↗</span></a>
+            </header>
+            <AgentDxChart experiments={report.experiments} client:visible />
+            <details class="dx-table">
+                <summary>View all counts as a table</summary>
+                <div class="dx-scroll">
+                    <table>
+                        <thead><tr>
+                            <th scope="col">Experiment</th><th scope="col">Model</th><th scope="col">Condition</th>
+                            <th scope="col">First build</th><th scope="col">All tests</th>
+                        </tr></thead>
+                        <tbody>
+                            {report.experiments.flatMap(experiment => experiment.rows.map(row => (
+                                <tr>
+                                    <td>{experiment.label}</td><td>{row.model}</td><td>{row.label}</td>
+                                    <td>{row.firstBuild}/{row.planned}</td><td>{row.finalPass}/{row.planned}</td>
+                                </tr>
+                            )))}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </section>
+
+        <section class="dx-section" aria-labelledby="findings-heading">
+            <header class="dx-section-heading">
+                <div><h2 id="findings-heading">What changed in the guide</h2></div>
+            </header>
+            <div class="dx-findings">
+                <article>
+                    <h3>Show a compilable API path</h3>
+                    <p>On the single-lease task, Luna’s first builds passed in 6/20 runs with the standard guide and 20/20 with the async example.</p>
+                    <a href="/agent-guide/#manage-a-resource-with-asynchronous-cleanup">Read the working example</a>
+                </article>
+                <article>
+                    <h3>Explain which scope owns cleanup</h3>
+                    <p>Across three Resource tasks, the async example plus principles scored 10/12. The async example alone scored 7/12. The sample is small and the results varied by model.</p>
+                    <a href="/resources/#release-rules">Read the release rules</a>
+                </article>
+                <article>
+                    <h3>Check behavior after a build</h3>
+                    <p>A submission passed all five initial tests and still leaked a lease when cancellation arrived during acquisition. The final guide shows where to put the acquisition callback and when to give a child its own scope.</p>
+                    <a href="/agent-guide/#manage-a-resource-with-asynchronous-cleanup">See the ownership pattern</a>
+                </article>
+            </div>
+        </section>
+
+        <section class="dx-section dx-method" id="methods" aria-labelledby="methods-heading">
+            <div>
+                <h2 id="methods-heading">How we measured</h2>
+                <p>Agents read a fixed guide snapshot and edit a C# submission in an isolated fixture. They receive build diagnostics. A separate grader then checks the last saved file with hidden behavioral tests.</p>
+                <p>First-build passes count the first build of a changed implementation. Final passes require every hidden test. Missing submissions count in the denominator. Timing excludes grading.</p>
+                <p>The harness and analysis were inspired by <a href="https://agent-dx.hono.dev/">Hono Agent DX</a>.</p>
+            </div>
+            <div class="dx-snapshot">
+                <h3>Frozen guide</h3>
+                <p>{date} · Moderato.Effects {report.guide.packageVersion}</p>
+                <p><code>{report.guide.sha256}</code></p>
+                <a href="/agent-dx/guide-snapshots.zip" download>Download both guide snapshots and hashes <span aria-hidden="true">↓</span></a>
+                <a href="https://github.com/SingUp009/Moderato.Effects.AgentDX">View the benchmark repository <span aria-hidden="true">↗</span></a>
+            </div>
+        </section>
+
+        {!holdout && <HoldoutResults />}
+    </div>
+</StarlightPage>

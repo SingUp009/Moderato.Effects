@@ -35,6 +35,12 @@ curl https://moderato-effects.009singup.workers.dev/getting-started.md
 
 HTML URLs are indexable. Workers serves each Markdown asset as `text/markdown` with `X-Robots-Tag: noindex` so it stays readable without competing with its HTML counterpart in search. The crawl policy allows access to the Markdown and to `/llms.txt`. `npm run build` checks the generated Markdown index and its targets.
 
+## Agent DX research
+
+`/agent-dx/` uses the existing Starlight layout and a React chart for development comparisons. The build exports the results as `/agent-dx/results.json`. The guide archive contains both 30-file input snapshots and their SHA-256 hashes. Keep that archive intact for reproducing the first evaluation.
+
+Once all registered live trials have a recorded outcome, use `experiments/holdout/summarize.mts` in the AgentDX checkout to generate `src/data/holdout-results.json`. The page checks the trial count and both snapshot hashes before rendering that result.
+
 ## Search discovery
 
 Starlight generates `sitemap-index.xml` and its child sitemaps. The sitemap lists published HTML URLs with their canonical trailing slashes. `public/robots.txt` advertises the sitemap index. The docs build checks the sitemap, page metadata, and internal links.

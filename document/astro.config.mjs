@@ -24,8 +24,9 @@ export default defineConfig({
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/SingUp009/Moderato.Effects' }],
     sidebar: [
       { label: 'Overview', link: '/' },
+      { label: 'Coding agents', items: ['agents', 'agent-guide', { label: 'Agent DX Research', link: '/agent-dx/' }] },
       { label: 'Tutorial', items: ['tutorial/00-what-is-an-effect', 'tutorial/01-results', 'tutorial/02-first-effect', 'tutorial/03-expected-errors', 'tutorial/04-composing-effects', 'tutorial/05-managing-dependencies', 'tutorial/06-managing-resources', 'tutorial/07-concurrent-effects'] },
-      { label: 'Start here', items: ['getting-started', 'from-results-to-effects', 'installation', 'adopting-in-an-application', 'agents'] },
+      { label: 'Start here', items: ['getting-started', 'from-results-to-effects', 'installation', 'adopting-in-an-application'] },
       { label: 'Write effects', items: ['gen-blocks', 'operators', 'error-unions', 'environments'] },
       { label: 'Control execution', items: ['resources', 'time', 'concurrency', 'retry-and-repeat', 'failures'] },
       { label: 'Integrate and diagnose', items: ['hosting', 'http', 'entity-framework-core', 'effect-tracker', 'opentelemetry', 'analyzers', 'caveats'] },

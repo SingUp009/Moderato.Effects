@@ -20,11 +20,29 @@ test('the agent index links to published Markdown guides', () => {
 
   assert.ok(links.some((link) => link.pathname === '/tutorial/01-results.md'));
   assert.ok(links.some((link) => link.pathname === '/tutorial/02-first-effect.md'));
-  assert.ok(links.some((link) => link.pathname === '/agents.md'));
-  const agentsHtml = readFileSync(new URL('../dist/agents/index.html', import.meta.url), 'utf8');
-  assert.match(agentsHtml, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
+  assert.ok(links.some((link) => link.pathname === '/agent-guide.md'));
+  assert.ok(links.every((link) => link.pathname !== '/agents.md'));
   assert.ok(links.every((link) => !link.pathname.includes('_Sidebar')));
   assert.match(readFileSync(new URL('../dist/gen-blocks.md', import.meta.url), 'utf8'), /```csharp/);
+});
+
+test('the Coding Agents overview links to the technical guide and preserves legacy links', () => {
+  const readOutput = (path) => readFileSync(new URL(`../dist/${path}`, import.meta.url), 'utf8');
+  const overview = readOutput('agents/index.html');
+  const guide = readOutput('agent-guide/index.html');
+  const markdown = readOutput('agent-guide.md');
+
+  assert.match(overview, /<a [^>]*href="\/agents\/"[^>]*aria-current="page"/);
+  assert.equal([...overview.matchAll(/<h1\b/g)].length, 1);
+  assert.match(overview, /href="\/agent-guide\.md"/);
+  assert.match(overview, /href="\/agent-dx\/">Explore the Agent DX research/);
+  assert.match(markdown, /^# Agent Guide\n/);
+  assert.equal(readOutput('agents.md'), markdown);
+  assert.equal([...markdown.matchAll(/^```csharp$/gm)].length, 3);
+  for (const anchor of ['write-and-run-a-first-effect', 'manage-a-resource-with-asynchronous-cleanup', 'verify-the-implementation']) {
+    assert.ok(guide.includes(`id="${anchor}"`), anchor);
+    assert.ok(overview.includes(`id="${anchor}" href="/agent-guide/#${anchor}"`), anchor);
+  }
 });
 
 test('chapter links resolve from the Markdown asset URL', () => {

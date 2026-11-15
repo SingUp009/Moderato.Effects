@@ -1,0 +1,134 @@
+---
+import raw from '../data/holdout-results.json';
+import report from '../data/agent-dx.json';
+
+type Row = {
+    task: string; model: string; condition: string; planned: number;
+    firstBuild: number; firstBuildObserved: number; finalPass: number; finalWilson95: [number, number];
+    timelyPass: number; timeouts: number; missing: number; failedBuilds: number;
+    buildToolErrors: number; gradingErrors: number; harnessErrors: number;
+    medianDurationMs: number;
+};
+type Summary = {
+    planned: number;
+    observed: number;
+    frozenSha256: string;
+    baselineSha256: string;
+    positiveSignal: boolean;
+    models: { model: string; baseline: number; frozen: number; mixedBaseline: number; mixedFrozen: number }[];
+    rows: Row[];
+    replicaComposition: { model: string; baseline: number; frozen: number; perGuide: number }[];
+};
+
+const results = raw as Summary | null;
+const modelNames: Record<string, string> = {
+    'gpt-6-luna': 'GPT-6 Luna',
+    'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
+};
+const taskNames: Record<string, string> = {
+    'replica-read': 'Replica read',
+    'catalog-fallback': 'Catalog fallback',
+    'bounded-validation': 'Bounded validation',
+};
+const pct = (value: number) => `${(100 * value).toFixed(0)}%`;
+const interval = (row: Row) => row.finalWilson95.map(pct).join('–');
+const pairs = results?.rows.filter(row => row.condition === 'baseline').map(baseline => ({
+    baseline,
+    frozen: results.rows.find(row => row.model === baseline.model && row.task === baseline.task && row.condition === 'frozen')!,
+})) ?? [];
+
+if (results && (results.planned !== results.observed ||
+    results.frozenSha256 !== report.guide.sha256 ||
+    results.baselineSha256 !== report.guide.baselineSha256 ||
+    pairs.some(pair => !pair.frozen))) {
+    throw new Error('Holdout result does not match the registered guide comparison.');
+}
+---
+
+<section class="dx-holdout" id="holdout" aria-labelledby="holdout-heading">
+    <p class="dx-kicker">{results ? 'HOLDOUT EVALUATION' : 'HOLDOUT EVALUATION · PENDING'}</p>
+    <h2 id="holdout-heading">Does the frozen guide help on new tasks?</h2>
+    {results ? (
+        <>
+            <p>{results.positiveSignal
+                ? 'The frozen guide met the registered criterion by improving full passes for both models overall and matching or improving their pass counts on Replica read.'
+                : 'The registered criterion required more full passes overall and at least as many Replica read passes for each model.'}</p>
+            <p>{results.observed} trials across three tasks. Each cell shows full passes and a 95% Wilson interval. The intervals describe uncertainty in each pass rate.</p>
+            <div class="dx-holdout-models">
+                {results.models.map(model => {
+                    const total = results.rows.filter(row => row.model === model.model && row.condition === 'frozen')
+                        .reduce((sum, row) => sum + row.planned, 0);
+                    return (
+                        <div>
+                            <h3>{modelNames[model.model]}</h3>
+                            <dl>
+                                <div data-condition="baseline">
+                                    <dt>Original</dt>
+                                    <dd>
+                                        {model.baseline}/{total}
+                                        <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * model.baseline / total + '%' }}></div></div>
+                                    </dd>
+                                </div>
+                                <div data-condition="frozen">
+                                    <dt>Frozen</dt>
+                                    <dd>
+                                        {model.frozen}/{total}
+                                        <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * model.frozen / total + '%' }}></div></div>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    );
+                })}
+            </div>
+            <div class="dx-scroll">
+                <table>
+                    <thead><tr>
+                        <th scope="col">Task</th><th scope="col">Model</th>
+                        <th scope="col">Original guide</th><th scope="col">Frozen guide</th>
+                    </tr></thead>
+                    <tbody>
+                        {pairs.map(({ baseline, frozen }) => (
+                            <tr>
+                                <th scope="row">{taskNames[baseline.task]}</th><td>{modelNames[baseline.model]}</td>
+                                <td>{baseline.finalPass}/{baseline.planned} · {interval(baseline)}</td>
+                                <td>{frozen.finalPass}/{frozen.planned} · {interval(frozen)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <p>Both models gained full passes on Replica read. Every submission passed on Catalog fallback and Bounded validation in both guide conditions.</p>
+            <p>On Replica read, submitted code used <code>Effect.Race</code> together with <code>Resource.Make</code> in
+                {results.replicaComposition.map(row => ` ${row.baseline}/${row.perGuide} → ${row.frozen}/${row.perGuide} (${modelNames[row.model]})`).join(' and')}
+                runs. The experiment evaluated the changes across the full guide together.</p>
+            <details class="dx-table">
+                <summary>View build, time, and submission counts</summary>
+                <div class="dx-scroll">
+                    <table>
+                        <thead><tr>
+                            <th scope="col">Task</th><th scope="col">Model</th><th scope="col">Guide</th>
+                            <th scope="col">First build</th><th scope="col">Timely pass</th>
+                            <th scope="col">Median time</th><th scope="col">Timed out</th><th scope="col">No submission</th>
+                        </tr></thead>
+                        <tbody>
+                            {results.rows.map(row => (
+                                <tr>
+                                    <th scope="row">{taskNames[row.task]}</th><td>{modelNames[row.model]}</td>
+                                    <td>{row.condition === 'baseline' ? 'Original' : 'Frozen'}</td>
+                                    <td>{row.firstBuild}/{row.firstBuildObserved} observed</td>
+                                    <td>{row.timelyPass}/{row.planned}</td>
+                                    <td>{(row.medianDurationMs / 1_000).toFixed(1)} s</td>
+                                    <td>{row.timeouts}</td><td>{row.missing}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            <p><a href="/agent-dx/results.json" download>Download the full results JSON</a></p>
+        </>
+    ) : (
+        <p>The next comparison uses three fresh tasks. Both models receive the original or frozen guide in a seeded order, with the same prompts, package, time limit and grader. We’ll report results by task and model with sample sizes and confidence intervals.</p>
+    )}
+</section>
