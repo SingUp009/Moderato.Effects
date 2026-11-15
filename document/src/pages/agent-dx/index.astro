@@ -26,9 +26,9 @@ const perGuide = holdout.rows.filter(row => row.condition === 'frozen')
     <div class="agent-dx">
         <section class="dx-hero" aria-labelledby="research-question">
             <div class="dx-lead">
-                <p class="dx-kicker">AGENT DX · HOLDOUT FINDINGS</p>
-                <h2 id="research-question">Better guidance. More correct C# effects.</h2>
-                <p class="dx-deck">Coding agents using the frozen Moderato.Effects guide passed every hidden behavioral test in <strong>{frozen} of {perGuide}</strong> held-out submissions, compared with <strong>{original} of {perGuide}</strong> with the original guide.</p>
+                <p class="dx-kicker">AGENT DX · EVALUATION RESULTS</p>
+                <h2 id="research-question">Improved documentation, more correct C# effects.</h2>
+                <p class="dx-deck">Coding agents using the improved Moderato.Effects documentation passed every hidden behavioral test in <strong>{frozen} of {perGuide}</strong> held-out submissions, compared with <strong>{original} of {perGuide}</strong> using the original documentation.</p>
                 <p class="dx-takeaway">The four additional passes came from the replica-read task, which combines parallel work, cancellation and resource cleanup. The other two tasks passed under both guides.</p>
                 <div class="dx-actions">
                     <a class="dx-primary" href="#holdout">See the evaluated results</a>
@@ -38,11 +38,11 @@ const perGuide = holdout.rows.filter(row => row.condition === 'frozen')
             <div class="dx-outcome" aria-label="Held-out full-pass comparison">
                 <p class="dx-kicker">ALL HIDDEN TESTS PASSED</p>
                 <div class="dx-outcome-item" data-condition="baseline">
-                    <div class="dx-outcome-label"><span>Original guide</span><strong>{original}/{perGuide}</strong></div>
+                    <div class="dx-outcome-label"><span>Original documentation</span><strong>{original}/{perGuide}</strong></div>
                     <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * original / perGuide + '%' }}></div></div>
                 </div>
                 <div class="dx-outcome-item" data-condition="frozen">
-                    <div class="dx-outcome-label"><span>Frozen guide</span><strong>{frozen}/{perGuide}</strong></div>
+                    <div class="dx-outcome-label"><span>Improved documentation</span><strong>{frozen}/{perGuide}</strong></div>
                     <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * frozen / perGuide + '%' }}></div></div>
                 </div>
                 <p class="dx-outcome-note">2 models · 3 previously unused tasks · {holdout.observed} submissions in total</p>
