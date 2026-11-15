@@ -27,7 +27,7 @@ public sealed record Die(Exception Exception, IReadOnlyList<Suppressed> Suppress
     public int OmittedSuppressed { get; init; }
 }
 
-/// <summary>The run ended because the caller's token was canceled.</summary>
+/// <summary>The run was interrupted: its caller canceled, or an interruption such as a joined fiber's was propagated to it.</summary>
 public sealed record Interrupted;
 
 /// <summary>The scope finished with a value.</summary>

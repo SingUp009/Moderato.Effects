@@ -52,7 +52,7 @@ public readonly partial struct Effect<T, E, R>
         {
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             var recovery = recover(outcome.Error).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next);
     }
@@ -137,7 +137,7 @@ public readonly partial struct Effect<T, E, R>
             if (outcome.Kind != OutcomeKind.Err) return new(outcome.WithErrorType<F>());
             if (!F.TrySplit(outcome.Error, out var caught, out var rest)) return new(outcome.WithError<T, F>(rest));
             var recovery = handle(caught).Validate();
-            UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+            UnobservedFailures.ReportDropped(outcome.Suppressed, context);
             return new(recovery);
         }, static (next, _, _, _) => next);
     }
@@ -190,10 +190,10 @@ public readonly partial struct Effect<T, E, R>
         _ => outcome.WithTypes<T, Never>(),
     };
 
-    // A handled Err drops its suppressed failures, but their defects must still be reported.
+    // A handled Err drops its suppressed failures, so they are reported.
     private static Outcome<U, Never> Handled<U>(Outcome<T, E> outcome, U value, RunContext context)
     {
-        UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+        UnobservedFailures.ReportDropped(outcome.Suppressed, context);
         return Outcome<U, Never>.Ok(value);
     }
 }

@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Analyze a method or local function that takes a `Scope<E, R>` like a Gen block lambda, so MEFF301, MEFF302, MEFF304, MEFF305, MEFF306 and MEFF310 also apply to Gen bodies passed as method groups and to scope helpers. Existing helpers can get new warnings. ([#468](https://github.com/SingUp009/Moderato.Effects/issues/468))
 - Report MEFF307 for system-clock reads in callbacks passed to the library (operators, query syntax, `Resource.Make` and `Use`, `Retry` and `Repeat` policies, integration callbacks) and in methods or local functions that take a `Scope<E, R>`. ([#472](https://github.com/SingUp009/Moderato.Effects/issues/472))
 - Return a database exception thrown while `EfDatabase.Transaction` creates its context or begins its transaction as an Err holding the `DatabaseFailure`, instead of a Die. The body has not started at that point. ([#473](https://github.com/SingUp009/Moderato.Effects/issues/473))
+- Analyze constructors, operators, conversion operators and indexer or property accessors that take a `Scope<E, R>` like a Gen block, and report MEFF304 for a primary constructor parameter that keeps a scope. Existing code can get new warnings. ([#498](https://github.com/SingUp009/Moderato.Effects/issues/498))
+- Report every Err among suppressed failures wherever they are dropped, exactly as defects are: under an Ok or Err at a run boundary, and under an Err that `OrElse`, `Retry`, `CatchCase`, `Attempt`, `Match` or `UnwrapOr` handled. An Err that a `Timeout` or a group turned into context is no longer lost. Handlers receive more `Failed` cases. ([#493](https://github.com/SingUp009/Moderato.Effects/issues/493))
 
 ### Fixed
 
@@ -31,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Keep the value of a `Race` or `RaceFirst` winner when the caller cancels while the loser is still being awaited, as an Err winner already was. A child that finishes after the cancellation is still not a winner. ([#464](https://github.com/SingUp009/Moderato.Effects/issues/464))
 - Record `Timeout` and `TimeoutResult` under their own names instead of `Create`. ([#466](https://github.com/SingUp009/Moderato.Effects/issues/466))
 - Record operators under the member the user wrote: an implicit `Never` conversion as `Widen` instead of `op_Implicit`, `Widen` instead of `MapErr`, query syntax as `Select` / `SelectMany` instead of `Map` / `AndThen` / `Bind`, and `CatchCase` instead of `Catch`. No operation is hidden from recordings. ([#470](https://github.com/SingUp009/Moderato.Effects/issues/470))
+- Decide what counts as a library callback for MEFF307 by assembly, so a lambda passed to application code in a `Moderato.Effects.*` namespace is no longer reported. ([#495](https://github.com/SingUp009/Moderato.Effects/issues/495))
+- Report MEFF306 and MEFF304 when a lambda's or method's expression body is itself the blocking access or the returned scope. ([#496](https://github.com/SingUp009/Moderato.Effects/issues/496))
+- Report MEFF304 when a scope is assigned to the function's own `out` or `ref` parameter. ([#497](https://github.com/SingUp009/Moderato.Effects/issues/497))
 - Keep the last attempt's Err as context when `Retry` is interrupted between attempts, so it reaches the unobserved-failure handler instead of being discarded. ([#494](https://github.com/SingUp009/Moderato.Effects/issues/494))
 
 ### Tests

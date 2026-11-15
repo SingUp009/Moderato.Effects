@@ -157,4 +157,40 @@ public class NamedGenBodyTests
         // Then
         Assert.Empty(build.Diagnostics);
     }
+
+    [Theory]
+    [InlineData("static int Blocks(Scope<string, R> scope) => Task.FromResult(1).Result;", "MEFF306")]
+    [InlineData("static Scope<string, R> Returns(Scope<string, R> scope) => scope;", "MEFF304")]
+    [InlineData("static Func<Scope<string, R>, int> Blocks() => scope => Task.FromResult(1).Result;", "MEFF306")]
+    [InlineData("static Func<Scope<string, R>, Scope<string, R>> Returns() => scope => scope;", "MEFF304")]
+    [InlineData("static int Blocks(Scope<string, R> scope) { return Task.FromResult(1).Result; }", "MEFF306")]
+    [InlineData("static Scope<string, R> Returns(Scope<string, R> scope) { return scope; }", "MEFF304")]
+    public void GenBlock_ExpressionBodyIsTheReportedExpression_ReportsItLikeABlockBody(string member, string expected)
+    {
+        // Given
+        var source = InClass(member);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Equal([expected], build.Ids);
+    }
+
+    [Theory]
+    [InlineData("static void Keep(Scope<string, R> scope, out Scope<string, R> kept) { kept = scope; }", true)]
+    [InlineData("static void Keep(Scope<string, R> scope, ref Scope<string, R>? kept) => kept = scope;", true)]
+    [InlineData("static void Keep(Scope<string, R> scope, Scope<string, R>? other) { other = scope; _ = other; }", false)]
+    public void GenBlock_ScopeAssignedToTheFunctionsOwnParameter_ReportsMEFF304OnlyForOutAndRef(string member, bool reported)
+    {
+        // Given
+        var source = InClass(member);
+
+        // When
+        var build = Compiler.Build(source);
+
+        // Then
+        Assert.Empty(build.Errors);
+        Assert.Equal(reported ? ["MEFF304"] : [], build.Ids);
+    }
 }

@@ -84,7 +84,7 @@ If reading, replacing or removing that metadata fails, `RunAsync` still rethrows
 ## Which failure wins
 
 1. **Die**, from a body that failed on its own or from a release. The earliest one wins.
-2. **Interrupted**, when the caller canceled before the body ended.
+2. **Interrupted**, when the caller canceled before the body ended. A `Race` or `RaceFirst` that already has a winner has ended in this sense: the winner is kept even if the caller cancels while the loser is still being awaited.
 3. **The outcome the cancellation decided**: `Err(TimeoutError)` for `Timeout`, the first independent failure for `All`, the winner for `Race`.
 4. **The ordinary Ok or Err.**
 
@@ -95,9 +95,12 @@ A failure classified as a consequence of cancellation is only context (`Conseque
 | Timeout, then the work ends with an OCE | `Err(TimeoutError)` |
 | Timeout, then a release throws | `Die`, with the timeout as context |
 | Timeout, then the work throws `ObjectDisposedException` | `Err(TimeoutError)`; the suppressed `Die` is [reported to diagnostics](#failures-nobody-sees) |
+| Timeout, then the work turns the cancellation into an Err | `Err(TimeoutError)`; the suppressed Err is [reported to diagnostics](#failures-nobody-sees) |
 | `All`: A fails, and B throws when canceled | `Err(A)`, with B's `Die` as context |
 | `All`: A fails, and B dies independently before the cancellation | `Die(B)`, with `Err(A)` as context |
 | `Race`: the loser's release throws after a winner is chosen | `Die`; the winner's Ok is dropped |
+| `Race`: the caller cancels after a winner is chosen | the winner |
+| `Race`: a child succeeds only after the caller canceled | `Interrupted` |
 | The caller cancels while a timeout fires | `Interrupted` |
 | The caller cancels, and the work throws `IOException` | `Die` |
 | A fiber dies, and the parent's body then ends with an OCE | the fiber's `Die` |
@@ -106,10 +109,11 @@ A failure classified as a consequence of cancellation is only context (`Conseque
 
 Some failures have no outcome to travel in:
 
-- defects suppressed under an Err or Ok that reaches `RunAsync` (a `Result` cannot carry them);
-- defects suppressed under an Err that `OrElse`, `Retry`, `CatchCase` or `Attempt` handled;
-- the Err of a fiber that was never joined;
-- defects and Errs suppressed under an `Interrupted` that reaches `RunAsync` or `RunExitAsync`, such as a `CommitNotConfirmed` that a group turned into context when the caller canceled.
+- defects and Errs suppressed under an Ok, Err or `Interrupted` that reaches `RunAsync` or `RunExitAsync` (only a `Die` carries its suppressed failures out of a run);
+- defects and Errs suppressed under an Err that `OrElse`, `Retry`, `CatchCase` or `Attempt` handled;
+- the Err of a fiber that was never joined.
+
+The rule is the same everywhere: whenever suppressed failures are dropped, every defect and every Err among them is reported. For example, a `CommitNotConfirmed` that a `Timeout` or a group turned into context still reaches the handler. A suppressed `Interrupted` is not reported.
 
 These go to `EffectDiagnostics.UnobservedFailureHandler`, which by default writes to `Console.Error`:
 
@@ -123,7 +127,7 @@ EffectDiagnostics.UnobservedFailureHandler = failure => logger.LogError("Unobser
 - Exceptions thrown by the handler are ignored, and reporting never changes an outcome.
 - The handler is global, so tests that replace it cannot run in parallel.
 
-Errs suppressed under an Err or Ok are not reported; they are dropped with the outcome that handled them. An `Interrupted` cannot carry context at all, so both the defects and the Errs under it are reported.
+The Err that an operator handles (the one `OrElse` recovers from, or an attempt that `Retry` runs again) is not reported; only the failures suppressed under it are.
 
 A defect already transferred from a scope step to a Task before Gen's body snapshot follows normal Task observation rules instead of this handler. Await the adapter's result; see [ValueTask adapters and failure ownership](/gen-blocks/#valuetask-adapters-and-failure-ownership).
 

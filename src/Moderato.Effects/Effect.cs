@@ -262,18 +262,18 @@ public readonly partial struct Effect<T, E, R>
         switch (outcome.Kind)
         {
             case OutcomeKind.Ok:
-                // Result cannot carry suppressed failures, so their defects are reported here.
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                // Result cannot carry suppressed failures, so they are reported here.
+                UnobservedFailures.ReportDropped(outcome.Suppressed, context);
                 return new(new Result<T, E>(new Ok<T>(outcome.Value)));
             case OutcomeKind.Err:
-                UnobservedFailures.ReportDefects(outcome.Suppressed, context);
+                UnobservedFailures.ReportDropped(outcome.Suppressed, context);
                 return new(new Result<T, E>(new Err<E>(outcome.Error)));
             case OutcomeKind.Die:
                 var exception = outcome.Defect!.SourceException;
                 AttachSuppressed(exception, outcome.Suppressed, outcome.Omitted, context);
                 return ValueTask.FromException<Result<T, E>>(exception);
             default:
-                UnobservedFailures.ReportInterrupted(outcome.Suppressed, context);
+                UnobservedFailures.ReportDropped(outcome.Suppressed, context);
                 // An inner cancellation can interrupt the run while the caller's token is not canceled.
                 return ValueTask.FromCanceled<Result<T, E>>(context.CancellationToken.IsCancellationRequested
                     ? context.CancellationToken : new CancellationToken(canceled: true));
