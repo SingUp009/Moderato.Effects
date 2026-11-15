@@ -3,8 +3,17 @@ using Moderato.Effects.Testing;
 
 namespace Moderato.Effects.Tests;
 
-public class AllocationTests
+[Collection(nameof(DiagnosticsCollection))]
+public sealed class AllocationTests : IDisposable
 {
+    private readonly Action<ExitCase>? previousHandler = EffectDiagnostics.UnobservedFailureHandler;
+
+    // Scenarios carry prebuilt suppressed Errs, which are reported when dropped. The default handler would write
+    // each one to stderr, and those writes would be measured instead of the effect.
+    public AllocationTests() => EffectDiagnostics.UnobservedFailureHandler = static _ => { };
+
+    public void Dispose() => EffectDiagnostics.UnobservedFailureHandler = previousHandler;
+
     private const int WARM_UP_RUNS = 1024;
     private const int RUNS = 4096;
 
@@ -550,7 +559,9 @@ public class AllocationTests
         var source = new Effect<int, string, EmptyEnvironment>((_, _) => new(earlier));
         var next = new Effect<int, string, EmptyEnvironment>((_, _) => new(later));
         var effect = source.AndThen(_ => next);
-        await WarmUpAsync(() => effect.RunAsync(CancellationToken.None));
+        // The dropped Errs are reported at the boundary, so the handler must not allocate either.
+        var options = new EffectRunOptions { UnobservedFailureHandler = static _ => { } };
+        await WarmUpAsync(() => effect.RunAsync(EmptyEnvironment.Value, CancellationToken.None, options));
 
         // When
         var completedAtOnce = true;
@@ -561,7 +572,7 @@ public class AllocationTests
             var before = GC.GetAllocatedBytesForCurrentThread();
             for (var i = 0; i < RUNS; i++)
             {
-                var run = effect.RunAsync(CancellationToken.None);
+                var run = effect.RunAsync(EmptyEnvironment.Value, CancellationToken.None, options);
                 completedAtOnce &= run.IsCompletedSuccessfully;
                 result = await run;
             }

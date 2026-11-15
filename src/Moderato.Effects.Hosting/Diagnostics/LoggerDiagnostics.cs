@@ -9,7 +9,7 @@ public sealed class LoggerDiagnostics : IEffectDiagnostics
         LogLevel.Error, new EventId(1001, "UnobservedDefect"),
         "Unobserved effect failure {FailureKind}; retained {SuppressedCount}, omitted {OmittedSuppressed}");
     private static readonly Action<ILogger, string, string?, Exception?> error = LoggerMessage.Define<string, string?>(
-        LogLevel.Warning, new EventId(1002, "UnjoinedError"), "Unjoined effect error {FailureKind} of type {ErrorType}");
+        LogLevel.Warning, new EventId(1002, "UnobservedError"), "Unobserved effect error {FailureKind} of type {ErrorType}");
     private static readonly Action<ILogger, int, Relation, string, string?, Exception?> suppressed = LoggerMessage.Define<int, Relation, string, string?>(
         LogLevel.Error, new EventId(1003, "SuppressedFailure"),
         "Suppressed effect failure {SuppressedIndex} with {Relation}: {FailureKind}, error type {ErrorType}");

@@ -25,7 +25,7 @@ internal sealed class DiagnosticsConnection(IEffectDiagnostics diagnostics) : ID
         {
             Console.Error.WriteLine(failure.Value is Die die
                 ? $"Moderato.Effects.Hosting late diagnostic: {die.Exception}"
-                : "Moderato.Effects.Hosting late diagnostic: unjoined error");
+                : "Moderato.Effects.Hosting late diagnostic: unobserved error");
         }
     }
 
