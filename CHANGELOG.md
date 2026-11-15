@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Report MEFF306 and MEFF304 when a lambda's or method's expression body is itself the blocking access or the returned scope. ([#496](https://github.com/SingUp009/Moderato.Effects/issues/496))
 - Report MEFF304 when a scope is assigned to the function's own `out` or `ref` parameter. ([#497](https://github.com/SingUp009/Moderato.Effects/issues/497))
 - Keep the last attempt's Err as context when `Retry` is interrupted between attempts, so it reaches the unobserved-failure handler instead of being discarded. ([#494](https://github.com/SingUp009/Moderato.Effects/issues/494))
+- End `EfDatabase.Transaction` with `Interrupted` when a provider reports the caller's cancellation as a database exception while the context is created or the transaction begins, instead of an Err holding that exception. ([#501](https://github.com/SingUp009/Moderato.Effects/issues/501))
 
 ### Tests
 

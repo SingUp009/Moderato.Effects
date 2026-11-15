@@ -39,7 +39,9 @@ Unjoined child `Err` retains Core's existing semantics; it is not automatically 
 
 A database exception thrown while the context is created or the transaction begins is returned
 as `Err(DatabaseFailure)`, normally holding `UnclassifiedDatabaseFailure`: the body has not
-started and nothing was written. Other exceptions at that point remain `Die`.
+started and nothing was written. Other exceptions at that point remain `Die`. Once the caller
+has canceled, a database exception there is interruption, since some providers report
+cancellation as their own exception.
 
 Saving uses native EF APIs, or `db.SaveChangesAsync(scope, saveFailure)` to map selected update
 failures to application errors. The mapping can be omitted. Unmapped ordinary save/update

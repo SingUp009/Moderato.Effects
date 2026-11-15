@@ -29,6 +29,10 @@ public static class EfDatabase<R>
             {
                 return new Ok<TContext>(await contexts(env).CreateDbContextAsync(token).ConfigureAwait(false));
             }
+            catch (DbException exception) when (token.IsCancellationRequested)
+            {
+                throw Canceled(exception, token);
+            }
             catch (DbException exception)
             {
                 return new Err<E>(E.From(DatabaseFailures.From(exception)));
@@ -53,6 +57,10 @@ public static class EfDatabase<R>
                 try
                 {
                     return new Ok<Lease>(new(await db.Database.BeginTransactionAsync(token).ConfigureAwait(false)));
+                }
+                catch (DbException exception) when (token.IsCancellationRequested)
+                {
+                    throw Canceled(exception, token);
                 }
                 catch (DbException exception)
                 {
@@ -99,6 +107,11 @@ public static class EfDatabase<R>
                 })));
         });
     }
+
+    // Some providers report cancellation as their own DbException. Before the body starts nothing was written,
+    // so it is the interruption it would be from a provider that throws OperationCanceledException.
+    private static OperationCanceledException Canceled(DbException exception, CancellationToken token)
+        => new("The operation was canceled before the transaction began.", exception, token);
 
     private sealed class Lease(IDbContextTransaction transaction)
     {
