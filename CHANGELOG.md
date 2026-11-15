@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Decide what counts as a library callback for MEFF307 by assembly, so a lambda passed to application code in a `Moderato.Effects.*` namespace is no longer reported. ([#495](https://github.com/SingUp009/Moderato.Effects/issues/495))
 - Report MEFF306 and MEFF304 when a lambda's or method's expression body is itself the blocking access or the returned scope. ([#496](https://github.com/SingUp009/Moderato.Effects/issues/496))
 - Report MEFF304 when a scope is assigned to the function's own `out` or `ref` parameter. ([#497](https://github.com/SingUp009/Moderato.Effects/issues/497))
+- Keep the last attempt's Err as context when `Retry` is interrupted between attempts, so it reaches the unobserved-failure handler instead of being discarded. ([#494](https://github.com/SingUp009/Moderato.Effects/issues/494))
 
 ### Tests
 

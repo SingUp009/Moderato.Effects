@@ -100,7 +100,7 @@ effect.Retry((RetryContext<AppError> ctx) => ctx.Gen<R>(async scope =>
 - The policy is an `Effect<bool, Never, R>`: `true` tries again, `false` stops. It does its own waiting.
 - A policy cannot return an expected error, so its Gen block is `Scope<Never, R>`; `ctx.Gen<R>(...)` is the shorthand. It can still die or be interrupted.
 - `ctx.Attempt` counts the attempts so far, the failed one included (1 after the first failure).
-- If the policy itself dies or is interrupted, for example while waiting, that is the result, with the last Err as context.
+- If the policy itself dies or is interrupted, for example while waiting, that is the result, with the last Err as context. When the result is `Interrupted`, that Err goes to the [unobserved-failure handler](/failures/#failures-nobody-sees), since `Interrupted` carries no context out of a run.
 
 ## Repeat
 
