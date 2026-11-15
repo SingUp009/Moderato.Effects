@@ -14,7 +14,7 @@ Create a console project and add [Moderato.Results](https://github.com/SingUp009
 ```sh
 dotnet new console --name Moderato.Effects.Tutorial --framework net11.0
 cd Moderato.Effects.Tutorial
-dotnet add package Moderato.Results
+dotnet add package Moderato.Results --prerelease
 ```
 
 Moderato.Effects uses this library's `Result<T, E>` for its execution results. This chapter uses it directly.

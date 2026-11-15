@@ -5,7 +5,7 @@ description: Use scope.Get in an Effect.Gen block to stop order preparation when
 
 # Handling Expected Errors
 
-In [chapter 1](../01-results/), validating an order quantity returned a `Result`. In [chapter 2](../02-first-effect/), an effect prepared an order. Put them together so the order is prepared only when validation succeeds.
+In [chapter 1](/tutorial/01-results/), validating an order quantity returned a `Result`. In [chapter 2](/tutorial/02-first-effect/), an effect prepared an order. Put them together so the order is prepared only when validation succeeds.
 
 ## Run the chapter
 
@@ -89,4 +89,4 @@ The resulting `Effect<string, string, EmptyEnvironment>` succeeds with an order 
 
 ## Next
 
-In the [next chapter](../04-composing-effects/), run effects inside a Gen block and pass a successful value from one step to the next.
+In the [next chapter](/tutorial/04-composing-effects/), run effects inside a Gen block and pass a successful value from one step to the next.

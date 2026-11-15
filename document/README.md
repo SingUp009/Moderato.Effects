@@ -35,6 +35,12 @@ curl https://moderato-effects.009singup.workers.dev/getting-started.md
 
 HTML URLs are indexable. Workers serves each Markdown asset as `text/markdown` with `X-Robots-Tag: noindex` so it stays readable without competing with its HTML counterpart in search. The crawl policy allows access to the Markdown and to `/llms.txt`. `npm run build` checks the generated Markdown index and its targets.
 
+## Agent DX research
+
+`/agent-dx/` uses the existing Starlight layout and a React chart for development comparisons. The build exports the results as `/agent-dx/results.json`. The guide archive contains both 30-file input snapshots and their SHA-256 hashes. Keep that archive intact for reproducing the first evaluation.
+
+Once all registered live trials have a recorded outcome, use `experiments/holdout/summarize.mts` in the AgentDX checkout to generate `src/data/holdout-results.json`. The page checks the trial count and both snapshot hashes before rendering that result.
+
 ## Search discovery
 
 Starlight generates `sitemap-index.xml` and its child sitemaps. The sitemap lists published HTML URLs with their canonical trailing slashes. `public/robots.txt` advertises the sitemap index. The docs build checks the sitemap, page metadata, and internal links.
@@ -65,6 +71,8 @@ Workers Builds owns the website build and deployment. Connect the GitHub reposit
 
 Enable builds for non-production branches so pull requests receive Cloudflare build checks and preview URLs. The `.node-version` file pins Node.js 26.13.0, matching the locally verified runtime. Workers Builds manages its build token; no Cloudflare deployment secret is required in GitHub Actions.
 
-Cloudflare reports website builds on GitHub pull requests. GitHub Actions skips changes confined to `document/`; changes to the runnable C# tutorial still run the .NET test job.
+Cloudflare reports website builds on GitHub pull requests. The main .NET workflow skips changes confined to `document/`. Changes to the runnable C# tutorial still run the .NET test job.
+
+The Documentation examples workflow compiles C# blocks from the core guides, including on documentation-only changes. The build supplies context for excerpts and fills in explicit placeholders in Environments and Gen blocks. Run `node .github/scripts/verify-guide-examples.mjs` from the repository root to repeat the check.
 
 Workers Logs is enabled in `wrangler.jsonc`. Static assets are served directly, so an asset request does not necessarily produce a Worker invocation log.
