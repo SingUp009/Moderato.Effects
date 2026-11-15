@@ -3,8 +3,17 @@ using Moderato.Effects.Testing;
 
 namespace Moderato.Effects.Tests;
 
-public class AllocationTests
+[Collection(nameof(DiagnosticsCollection))]
+public sealed class AllocationTests : IDisposable
 {
+    private readonly Action<ExitCase>? previousHandler = EffectDiagnostics.UnobservedFailureHandler;
+
+    // Scenarios carry prebuilt suppressed Errs, which are reported when dropped. The default handler would write
+    // each one to stderr, and those writes would be measured instead of the effect.
+    public AllocationTests() => EffectDiagnostics.UnobservedFailureHandler = static _ => { };
+
+    public void Dispose() => EffectDiagnostics.UnobservedFailureHandler = previousHandler;
+
     private const int WARM_UP_RUNS = 1024;
     private const int RUNS = 4096;
 
