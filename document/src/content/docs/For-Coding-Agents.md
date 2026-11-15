@@ -116,7 +116,7 @@ The [runnable tutorial](/tutorial/00-what-is-an-effect/) and [Agent Guide](/agen
 
 We also test whether coding agents actually produce correct Moderato.Effects programs—not just code that compiles.
 
-In a **held-out comparison**, coding agents using the improved documentation passed all hidden behavioral tests in **29 of 30 submissions**, compared with **25 of 30** using the original documentation.
+In our evaluation, coding agents using the improved documentation passed all hidden behavioral tests in **29 of 30 submissions**, compared with **25 of 30** using the original documentation.
 
 | Model | Original documentation | Improved documentation |
 | --- | ---: | ---: |
@@ -124,6 +124,6 @@ In a **held-out comparison**, coding agents using the improved documentation pas
 | Claude Haiku 4.5 | 12/15 | 14/15 |
 | **Total** | **25/30** | **29/30** |
 
-These 60 submissions covered three held-out tasks, Moderato.Effects `0.1.0-preview.6`, and .NET 11 in isolated Docker fixtures. All four additional passes came from the **Replica read** task; both guides passed every **Catalog fallback** and **Bounded validation** trial. This is evidence for these complete guide snapshots under the tested conditions—not a general success rate or proof of an individual `llms.txt` or Skill effect.
+The evaluation used two coding-agent models, three previously unused tasks, Moderato.Effects `0.1.0-preview.6`, and .NET 11. The improvement came entirely from **Replica read**; both documentation versions passed every **Catalog fallback** and **Bounded validation** trial. These results apply to the evaluated tasks and models, and do not establish the independent effect of `llms.txt` or the Skill.
 
 **[Explore the full Agent DX research](/agent-dx/)** to inspect experimental design, model-level results, failure cases, and reproducibility data.
