@@ -116,9 +116,9 @@ The [runnable tutorial](/tutorial/00-what-is-an-effect/) and [Agent Guide](/agen
 
 We also test whether coding agents actually produce correct Moderato.Effects programs—not just code that compiles.
 
-In a **held-out comparison**, agents using the frozen guide passed all hidden behavioral tests in **29 of 30 submissions**, compared with **25 of 30** for the original guide.
+In a **held-out comparison**, coding agents using the improved documentation passed all hidden behavioral tests in **29 of 30 submissions**, compared with **25 of 30** using the original documentation.
 
-| Model | Original guide | Frozen guide |
+| Model | Original documentation | Improved documentation |
 | --- | ---: | ---: |
 | GPT-6 Luna | 13/15 | 15/15 |
 | Claude Haiku 4.5 | 12/15 | 14/15 |
