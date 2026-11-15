@@ -39,7 +39,8 @@ Unjoined child `Err` retains Core's existing semantics; it is not automatically 
 
 A database exception thrown while the context is created or the transaction begins is returned
 as `Err(DatabaseFailure)`, normally holding `UnclassifiedDatabaseFailure`: the body has not
-started and nothing was written. Other exceptions at that point remain `Die`. Once the caller
+started and nothing was written. `beginFailure` can map it to an application error, with the
+same delegate signature as the other mappers. Other exceptions at that point remain `Die`. Once the caller
 has canceled, a database exception there is interruption, since some providers report
 cancellation as their own exception.
 

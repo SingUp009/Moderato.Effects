@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - Attach the number of suppressed failures a rethrown defect left out to its `Data` under `Effect<T, E, R>.OMITTED_SUPPRESSED_DATA_KEY`, so `RunAsync` carries the same count as `Die.OmittedSuppressed`. ([#469](https://github.com/SingUp009/Moderato.Effects/issues/469))
+- Add an optional `beginFailure` mapper to `EfDatabase.Transaction`, so a database failure while the context is created or the transaction begins can become an application error like save and commit failures. Adding the parameter changes the method's signature, which is a binary breaking change. ([#500](https://github.com/SingUp009/Moderato.Effects/issues/500))
 
 ### Changed
 

@@ -91,6 +91,33 @@ The transaction requires an error type containing `DatabaseFailure`. A database 
 
 A wrapper can replace that result: inside `Effect.All`, `Race` or `RaceFirst` a caller's cancellation ends the group with `Interrupted`, and a `Timeout` that fires during the commit ends with its timeout error. The `CommitNotConfirmed` is then not the result. It is reported to the unobserved-failure handler instead, so log or reconcile it there.
 
+### Defaults without a mapper
+
+Each point of failure has its own optional mapper with the same `TryMapDatabaseFailure<E>` signature. When the mapper is omitted or returns false:
+
+| Where it fails | Mapper | Result without a mapping |
+|---|---|---|
+| creating the context or beginning the transaction | `beginFailure` | Err holding the `DatabaseFailure` |
+| `SaveChangesAsync(scope, ...)` | `saveFailure` | Die |
+| commit, rejected by the database | `commitFailure` | Die |
+| commit, outcome not confirmed | `commitFailure` | Err holding `CommitNotConfirmed` |
+
+The defaults follow what is known at each point. Before the body starts nothing was written, so a begin failure is safe to return and retry. A failed save or a rejected commit leaves the application to decide what the failure means, so it stays a defect until a mapper claims it. An unconfirmed commit must reach the caller either way.
+
+```csharp
+EfDatabase<AppEnv>.Transaction(
+    contexts: env => env.Contexts,
+    environment: (_, db) => new OrderDb(db),
+    body: body,
+    beginFailure: static (DatabaseFailure failure, out OrderError error) =>
+    {
+        error = new DatabaseUnavailable();
+        return true;
+    });
+```
+
+Here `DatabaseUnavailable` stands for a case of your own error union.
+
 Do not blindly retry an unconfirmed commit: the write may already exist. Reconcile with the database or use an application idempotency protocol first.
 
 ## Do not nest transactions

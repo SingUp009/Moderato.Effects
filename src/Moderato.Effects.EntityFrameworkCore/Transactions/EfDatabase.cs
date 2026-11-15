@@ -10,12 +10,15 @@ public static class EfDatabase<R>
 {
     /// <summary>Commits a successful body after its children and releases have completed.</summary>
     /// <param name="contexts">The borrowed context factory.</param>
+    /// <param name="commitFailure">Maps a commit failure to an application error.</param>
+    /// <param name="beginFailure">Maps a database failure from creating the context or beginning the transaction to an application error.</param>
     /// <returns>An effect retaining unconfirmed commits, and database failures before the body starts, in its error union.</returns>
     public static Effect<T, E, R> Transaction<TContext, T, E, RBody>(
         Func<R, IDbContextFactory<TContext>> contexts,
         Func<R, TContext, RBody> environment,
         Effect<T, E, RBody> body,
-        TryMapDatabaseFailure<E>? commitFailure = null)
+        TryMapDatabaseFailure<E>? commitFailure = null,
+        TryMapDatabaseFailure<E>? beginFailure = null)
         where TContext : DbContext
         where E : IUnionCase<E, DatabaseFailure>
     {
@@ -23,7 +26,10 @@ public static class EfDatabase<R>
         ArgumentNullException.ThrowIfNull(environment);
         // The body is first composed per run, which would reject a default effect only after a context was created.
         _ = body.WidenEnv<RBody>();
-        Effect<Result<TContext, E>, E, R> create = Effect<R>.AccessAsync<Result<TContext, E>>(async (env, token) =>
+        // Nothing has been written before the body starts, so an unmapped failure is an expected error the caller can retry.
+        E BeginError(DatabaseFailure failure) => beginFailure is not null && beginFailure(failure, out var error) ? error : E.From(failure);
+
+        Effect<Result<TContext, DatabaseFailure>, DatabaseFailure, R> create = Effect<R>.AccessAsync<Result<TContext, DatabaseFailure>>(async (env, token) =>
         {
             try
             {
@@ -35,11 +41,11 @@ public static class EfDatabase<R>
             }
             catch (DbException exception)
             {
-                return new Err<E>(E.From(DatabaseFailures.From(exception)));
+                return new Err<DatabaseFailure>(DatabaseFailures.From(exception));
             }
         });
         var context = Resource.Make(
-            create.AndThen(static created => Effect<R>.FromResult(created)),
+            create.AndThen(static created => Effect<R>.FromResult(created)).MapErr(BeginError),
             (db, _) => Effect<R>.Async<Unit>(async _ =>
             {
                 await db.DisposeAsync().ConfigureAwait(false);
@@ -48,7 +54,7 @@ public static class EfDatabase<R>
 
         return context.Use(db =>
         {
-            var begin = Effect<R>.FromResultAsync<Lease, E>(async token =>
+            var begin = Effect<R>.FromResultAsync<Lease, DatabaseFailure>(async token =>
             {
                 if (db.Database.CreateExecutionStrategy().RetriesOnFailure)
                     throw new NotSupportedException("Retrying execution strategies require an explicit transaction retry policy.");
@@ -64,10 +70,9 @@ public static class EfDatabase<R>
                 }
                 catch (DbException exception)
                 {
-                    // Nothing has been written yet, so the failure is an expected error the caller can retry.
-                    return new Err<E>(E.From(DatabaseFailures.From(exception)));
+                    return new Err<DatabaseFailure>(DatabaseFailures.From(exception));
                 }
-            });
+            }).MapErr(BeginError);
 
             return Resource.Make(begin, (lease, _) => Scope<Never, R>.Gen(async cleanup =>
             {
