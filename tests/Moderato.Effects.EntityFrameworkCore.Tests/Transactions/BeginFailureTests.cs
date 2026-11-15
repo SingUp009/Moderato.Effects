@@ -80,4 +80,47 @@ public sealed class BeginFailureTests
         Assert.True(exit.TryGetValue(out Die? die));
         Assert.Same(failure, die.Exception);
     }
+
+    private sealed class CancelsThenThrows(CancellationTokenSource caller) : Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor
+    {
+        public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection, Microsoft.EntityFrameworkCore.Diagnostics.TransactionStartingEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<DbTransaction> result, CancellationToken cancellationToken = default)
+        {
+            caller.Cancel();
+            throw new Unreachable("Operation cancelled by user.");
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Transaction_ProviderReportsCancellationAsADatabaseException_IsInterrupted(bool atContextCreation)
+    {
+        // Given
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var probe = new Probe();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        var options = new DbContextOptionsBuilder<TestDb>().UseSqlite(connection).AddInterceptors(probe, new CancelsThenThrows(caller)).Options;
+        var contexts = new Contexts(() =>
+        {
+            if (!atContextCreation) return new TestDb(options, probe);
+            caller.Cancel();
+            throw new Unreachable("Operation cancelled by user.");
+        });
+        List<ExitCase> reported = [];
+        var runOptions = new EffectRunOptions { UnobservedFailureHandler = failure => { lock (reported) reported.Add(failure); } };
+        var bodyStarted = false;
+
+        // When
+        var exit = await InsertIn(() => bodyStarted = true).RunExitAsync(contexts, caller.Token, runOptions);
+
+        // Then
+        Assert.True(exit.TryGetValue(out Interrupted? _));
+        Assert.False(bodyStarted);
+        Assert.Empty(reported);
+        Assert.Equal(0, probe.Rollbacks);
+        Assert.Equal(atContextCreation ? 0 : 1, probe.Disposals);
+    }
 }
