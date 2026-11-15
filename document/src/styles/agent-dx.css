@@ -55,7 +55,7 @@ main:has(.agent-dx) h1#_top {
 
 .dx-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1.8fr) minmax(13rem, 1fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.85fr);
     align-items: center;
     gap: clamp(1.5rem, 5vw, 4.5rem);
     padding: clamp(1.5rem, 4.6vw, 4rem);
@@ -64,11 +64,12 @@ main:has(.agent-dx) h1#_top {
     border-radius: 1.1rem;
 }
 
+.dx-lead { min-width: 0; }
 .dx-hero h2 {
     margin-block: 0.65rem 1rem;
     max-width: 21ch;
     overflow-wrap: anywhere;
-    font-size: clamp(2.5rem, 6vw, 4.65rem);
+    font-size: clamp(2.3rem, 5vw, 4rem);
     font-weight: 720;
     letter-spacing: -0.055em;
     line-height: 1.02;
@@ -87,7 +88,17 @@ main:has(.agent-dx) h1#_top {
     color: var(--dx-muted);
 }
 
-.dx-deck { max-width: 43ch; font-size: clamp(1rem, 1.7vw, 1.2rem); }
+.dx-deck { max-width: 56ch; font-size: clamp(1rem, 1.7vw, 1.2rem); }
+.dx-deck strong { color: var(--dx-ink); }
+.dx-takeaway { max-width: 61ch; color: var(--dx-ink); font-size: 0.94rem; margin-top: 1rem !important; }
+.dx-outcome { padding: clamp(1.1rem, 2.5vw, 1.6rem); border: 1px solid var(--dx-stroke); border-radius: 0.8rem; background: var(--dx-surface); }
+.dx-outcome-item { margin-top: 1.25rem; }
+.dx-outcome-label { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; font-size: 0.88rem; }
+.dx-outcome-label strong { font-size: 1.55rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.dx-outcome .dx-track { height: 0.85rem; margin-top: 0.5rem; }
+.dx-outcome-note { margin-top: 1rem !important; font-size: 0.78rem; line-height: 1.5; color: var(--dx-muted); }
+.dx-outcome-note + .dx-outcome-note { margin-top: 0.55rem !important; }
+
 .dx-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1.25rem; margin-top: 1.4rem; }
 .dx-actions a, .dx-download { font-weight: 680; text-decoration: none; }
 .dx-actions .dx-primary { display: inline-block; padding: 0.68rem 1rem; background: var(--dx-primary); border-radius: 0.45rem; color: white; }
