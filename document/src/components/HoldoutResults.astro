@@ -46,14 +46,14 @@ if (results && (results.planned !== results.observed ||
 ---
 
 <section class="dx-holdout" id="holdout" aria-labelledby="holdout-heading">
-    <p class="dx-kicker">{results ? 'HOLDOUT EVALUATION' : 'HOLDOUT EVALUATION · PENDING'}</p>
-    <h2 id="holdout-heading">Does improved documentation help on new tasks?</h2>
+    <p class="dx-kicker">{results ? 'RESULTS BY MODEL AND TASK' : 'EVALUATION IN PROGRESS'}</p>
+    <h2 id="holdout-heading">How did each coding agent perform?</h2>
     {results ? (
         <>
             <p>{results.positiveSignal
-                ? 'Both models had more full-pass submissions with the improved documentation, with no decline on Replica read. This met the registered evaluation criterion.'
-                : 'The registered criterion required more full passes overall and at least as many Replica read passes for each model.'}</p>
-            <p>{results.observed} trials across three tasks. Each cell shows full passes and a 95% Wilson interval. The intervals describe uncertainty in each pass rate.</p>
+                ? 'Both models produced more fully correct implementations with the improved documentation. The gains were concentrated in Replica read.'
+                : 'The study checked whether improvements to the documentation changed coding-agent correctness on tasks not used during guide development.'}</p>
+            <p>Each result is the number of submissions passing every hidden test. The table also shows 95% Wilson intervals, which reflect uncertainty from the small sample.</p>
             <div class="dx-holdout-models">
                 {results.models.map(model => {
                     const total = results.rows.filter(row => row.model === model.model && row.condition === 'frozen')
@@ -98,12 +98,12 @@ if (results && (results.planned !== results.observed ||
                     </tbody>
                 </table>
             </div>
-            <p>Both models gained full passes on Replica read. Every submission passed on Catalog fallback and Bounded validation in both guide conditions.</p>
+            <p>Both models improved on Replica read. In Catalog fallback and Bounded validation, every submission passed with both documentation versions.</p>
             <p>On Replica read, submitted code used <code>Effect.Race</code> together with <code>Resource.Make</code> in
                 {results.replicaComposition.map(row => ` ${row.baseline}/${row.perGuide} → ${row.frozen}/${row.perGuide} (${modelNames[row.model]})`).join(' and')}
-                runs. The experiment evaluated the changes across the full guide together.</p>
+                runs. The study compared the complete documentation versions, so this change cannot be attributed to one individual example or instruction.</p>
             <details class="dx-table">
-                <summary>View build, time, and submission counts</summary>
+                <summary>Build results, timing, and incomplete submissions</summary>
                 <div class="dx-scroll">
                     <table>
                         <thead><tr>
@@ -129,6 +129,6 @@ if (results && (results.planned !== results.observed ||
             <p><a href="/agent-dx/results.json" download>Download the full results JSON</a></p>
         </>
     ) : (
-        <p>The next comparison uses three fresh tasks. Both models receive the original or frozen guide in a seeded order, with the same prompts, package, time limit and grader. We’ll report results by task and model with sample sizes and confidence intervals.</p>
+        <p>The evaluation will compare the original and improved documentation on previously unused tasks, with the same task prompts, package, time limit, and hidden tests for each condition.</p>
     )}
 </section>
