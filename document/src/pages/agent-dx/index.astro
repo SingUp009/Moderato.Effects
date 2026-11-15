@@ -8,7 +8,7 @@ import '../../styles/agent-dx.css';
 
 const data = {
     title: 'Agent DX Research',
-    description: 'An exploratory study of how coding agents use Moderato.Effects, from compilable examples to cancellation and resource cleanup.',
+    description: 'How reliably coding agents implement Moderato.Effects: measured correctness, documentation comparisons, and reproducible results.',
     template: 'splash' as const,
     prev: false as const,
     next: false as const,
@@ -16,9 +16,9 @@ const data = {
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'long', timeZone: 'Asia/Tokyo' }).format(new Date(report.guide.frozenAt));
 const original = holdout.rows.filter(row => row.condition === 'baseline')
     .reduce((total, row) => total + row.finalPass, 0);
-const frozen = holdout.rows.filter(row => row.condition === 'frozen')
+const improved = holdout.rows.filter(row => row.condition === 'frozen')
     .reduce((total, row) => total + row.finalPass, 0);
-const perGuide = holdout.rows.filter(row => row.condition === 'frozen')
+const perVersion = holdout.rows.filter(row => row.condition === 'frozen')
     .reduce((total, row) => total + row.planned, 0);
 ---
 
@@ -26,27 +26,27 @@ const perGuide = holdout.rows.filter(row => row.condition === 'frozen')
     <div class="agent-dx">
         <section class="dx-hero" aria-labelledby="research-question">
             <div class="dx-lead">
-                <p class="dx-kicker">AGENT DX · EVALUATION RESULTS</p>
-                <h2 id="research-question">Improved documentation, more correct C# effects.</h2>
-                <p class="dx-deck">Coding agents using the improved Moderato.Effects documentation passed every hidden behavioral test in <strong>{frozen} of {perGuide}</strong> held-out submissions, compared with <strong>{original} of {perGuide}</strong> using the original documentation.</p>
-                <p class="dx-takeaway">The four additional passes came from the replica-read task, which combines parallel work, cancellation and resource cleanup. The other two tasks passed under both guides.</p>
+                <p class="dx-kicker">AGENT DX · RESEARCH RESULTS</p>
+                <h2 id="research-question">Can coding agents write correct C# effects?</h2>
+                <p class="dx-deck">In our evaluation, coding agents using Moderato.Effects and its improved documentation wrote code that passed <strong>every hidden behavioral test in {improved} of {perVersion} attempts</strong>. With the earlier documentation, <strong>{original} of {perVersion}</strong> attempts passed.</p>
+                <p class="dx-takeaway">The improvement was observed in a parallel replica-reading task involving cancellation and resource cleanup. Both documentation versions passed every trial in the other two tasks.</p>
                 <div class="dx-actions">
-                    <a class="dx-primary" href="#holdout">See the evaluated results</a>
-                    <a class="dx-secondary" href="/agents/">Moderato.Effects for coding agents →</a>
+                    <a class="dx-primary" href="#holdout">Explore results by model and task</a>
+                    <a class="dx-secondary" href="/agents/">Use Moderato.Effects with an agent →</a>
                 </div>
             </div>
-            <div class="dx-outcome" aria-label="Held-out full-pass comparison">
-                <p class="dx-kicker">ALL HIDDEN TESTS PASSED</p>
+            <div class="dx-outcome" aria-label="Coding-agent implementation correctness comparison">
+                <p class="dx-kicker">CORRECT IMPLEMENTATIONS</p>
                 <div class="dx-outcome-item" data-condition="baseline">
-                    <div class="dx-outcome-label"><span>Original documentation</span><strong>{original}/{perGuide}</strong></div>
-                    <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * original / perGuide + '%' }}></div></div>
+                    <div class="dx-outcome-label"><span>Original documentation</span><strong>{original}/{perVersion}</strong></div>
+                    <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * original / perVersion + '%' }}></div></div>
                 </div>
                 <div class="dx-outcome-item" data-condition="frozen">
-                    <div class="dx-outcome-label"><span>Improved documentation</span><strong>{frozen}/{perGuide}</strong></div>
-                    <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * frozen / perGuide + '%' }}></div></div>
+                    <div class="dx-outcome-label"><span>Improved documentation</span><strong>{improved}/{perVersion}</strong></div>
+                    <div class="dx-track" aria-hidden="true"><div class="dx-bar" style={{ width: 100 * improved / perVersion + '%' }}></div></div>
                 </div>
-                <p class="dx-outcome-note">2 models · 3 previously unused tasks · {holdout.observed} submissions in total</p>
-                <p class="dx-outcome-note">An exploratory comparison of complete documentation snapshots, not a universal success rate or a test of individual features.</p>
+                <p class="dx-outcome-note">2 models · 3 tasks reserved for evaluation · {holdout.observed} attempts across both documentation versions</p>
+                <p class="dx-outcome-note">Results are specific to the tested models, tasks, and package version—not a general success rate or proof of any single documentation feature.</p>
             </div>
         </section>
 
@@ -113,7 +113,8 @@ const perGuide = holdout.rows.filter(row => row.condition === 'frozen')
                 <p>The harness and analysis were inspired by <a href="https://agent-dx.hono.dev/">Hono Agent DX</a>.</p>
             </div>
             <div class="dx-snapshot">
-                <h3>Frozen guide</h3>
+                <h3>Documentation versions</h3>
+                <p>Versions were fixed before evaluation, with SHA-256 hashes retained for reproducibility.</p>
                 <p>{date} · Moderato.Effects {report.guide.packageVersion}</p>
                 <p><code>{report.guide.sha256}</code></p>
                 <a href="/agent-dx/guide-snapshots.zip" download>Download both guide snapshots and hashes <span aria-hidden="true">↓</span></a>
