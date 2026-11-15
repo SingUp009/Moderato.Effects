@@ -84,7 +84,7 @@ If reading, replacing or removing that metadata fails, `RunAsync` still rethrows
 ## Which failure wins
 
 1. **Die**, from a body that failed on its own or from a release. The earliest one wins.
-2. **Interrupted**, when the caller canceled before the body ended.
+2. **Interrupted**, when the caller canceled before the body ended. A `Race` or `RaceFirst` that already has a winner has ended in this sense: the winner is kept even if the caller cancels while the loser is still being awaited.
 3. **The outcome the cancellation decided**: `Err(TimeoutError)` for `Timeout`, the first independent failure for `All`, the winner for `Race`.
 4. **The ordinary Ok or Err.**
 
@@ -98,6 +98,8 @@ A failure classified as a consequence of cancellation is only context (`Conseque
 | `All`: A fails, and B throws when canceled | `Err(A)`, with B's `Die` as context |
 | `All`: A fails, and B dies independently before the cancellation | `Die(B)`, with `Err(A)` as context |
 | `Race`: the loser's release throws after a winner is chosen | `Die`; the winner's Ok is dropped |
+| `Race`: the caller cancels after a winner is chosen | the winner |
+| `Race`: a child succeeds only after the caller canceled | `Interrupted` |
 | The caller cancels while a timeout fires | `Interrupted` |
 | The caller cancels, and the work throws `IOException` | `Die` |
 | A fiber dies, and the parent's body then ends with an OCE | the fiber's `Die` |
