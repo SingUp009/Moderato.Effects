@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Define the existing execution-recording and telemetry vocabulary, units and lifecycle meanings as the Core 1.0 compatibility contract. ([#530](https://github.com/SingUp009/Moderato.Effects/issues/530))
 - Build with the stable .NET 11 SDK and use Moderato.Results 1.0.0 and Microsoft 11.0.0 dependencies. ([#528](https://github.com/SingUp009/Moderato.Effects/issues/528))
 - Report the Errs suppressed under an `Interrupted` to the unobserved-failure handler when the interruption reaches `RunAsync` or `RunExitAsync`, as its defects already were. A `CommitNotConfirmed` produced while the caller canceled inside `All` or `Race` is no longer lost. ([#463](https://github.com/SingUp009/Moderato.Effects/issues/463))
 - Write only the type name of an unjoined Err from the default unobserved-failure handler, instead of the error value. Set `EffectDiagnostics.UnobservedFailureHandler` to log more. ([#465](https://github.com/SingUp009/Moderato.Effects/issues/465))

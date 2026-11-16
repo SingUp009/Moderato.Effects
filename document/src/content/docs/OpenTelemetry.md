@@ -60,6 +60,30 @@ The `Moderato.Effects` meter exports:
 
 Both use only `effect.kind` and `effect.outcome` as dimensions. They do not include identifiers, names, error types, stack traces or caller paths. The `System.Runtime` meter supplies process-wide allocation, GC, heap and CPU measurements; these cannot be attributed directly to an individual asynchronous Effect.
 
+## Compatibility from 1.0
+
+These names and meanings are part of the Core 1.0 contract, including their casing:
+
+| Surface | Contract |
+| --- | --- |
+| ActivitySource and Meter | `Moderato.Effects` |
+| Span operation names | `Effect run`, `Effect scope`, `Effect fiber`, `Effect acquire`, `Effect resource`, `Effect release` |
+| Span kind | `Internal` |
+| Span status | `Error` for `die`; `Unset` for `ok`, `err` and `interrupted` |
+| Span attributes | `effect.kind`, final `effect.outcome`, and scope `effect.body.outcome` when its body has finished |
+| Outcome codes | `ok`, `err`, `die`, `interrupted` |
+| Completion metric | `moderato.effects.completed`, a `Counter<long>` with unit `{boundary}` |
+| Duration metric | `moderato.effects.duration`, a `Histogram<double>` with unit `s` |
+| Metric dimensions emitted by Core | Exactly `effect.kind` and `effect.outcome` |
+
+`completed` means finished, not successful: `err`, `die` and `interrupted` are counted too. Each completed observed boundary contributes one increment and one duration measurement. Nested boundaries are separate observations; filter on `effect.kind=run` to count public executions rather than adding every kind together. Observer failures or exporter loss can prevent delivery.
+
+The boundary intervals and parenting described above are also part of the contract. Keep body and final outcomes separate: a successful or failed body can still end as `die` if cleanup fails. `interrupted` identifies the observed result, not proof that this caller requested cancellation. Sampling can leave no span, and does not turn a missing span into evidence that the work never ran.
+
+Within 1.x, existing names, outcome meanings, units and metric dimensions will not be renamed, removed or repurposed. The outcome vocabulary remains as listed throughout 1.x. Additional boundary kinds and additive trace attributes may be introduced in minor releases; handle unknown kinds in displays and filter the kinds used by an aggregate. New measurements needing other dimensions require another metric. Additive attributes must preserve the payload policy below. Application processors and exporters can apply their own attributes, resource metadata and histogram aggregation.
+
+[Recording kinds and states](/effect-tracker/#recording-compatibility-from-10) have the same compatibility policy, with different representations for display and telemetry.
+
 ## Interpretation
 
 Tracing can be sampled, and exporters can drop queued data. Standard span exporters report completed intervals, so a resource that has not finished may not appear yet. Use the [Effect Tracker](/effect-tracker/) for a local view of active lifetimes.

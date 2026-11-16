@@ -69,6 +69,37 @@ Recording captures roots started during that session, including detailed operati
 
 The default capacity is 2,048 records. Completed entries can be evicted, and new observations can be dropped when all retained entries are active. `Dropped`, `Evicted` and `IsComplete` describe capture loss, not execution failure. Missing parents and ownership references are reported as unavailable.
 
+## Recording compatibility from 1.0
+
+The recording vocabulary is part of the Core 1.0 contract. Names are case-sensitive:
+
+| `Kind` | Meaning |
+| --- | --- |
+| `run` | A public execution through cleanup |
+| `scope` | A Gen block or Resource.Use through child completion and cleanup |
+| `fiber` | A forked child's execution through completion |
+| `acquire` | A resource acquisition attempt |
+| `resource` | A registered resource's lifetime through the end of its release attempt |
+| `release` | One registered release or deferred callback |
+| `op` | A detailed Effect operation |
+| `attempt` | One execution in Retry or Repeat, including the initial execution |
+
+| `State` | Meaning | OpenTelemetry outcome |
+| --- | --- | --- |
+| `Running` | Completion has not been observed | Not completed yet |
+| `Succeeded` | Finished with `Ok` | `ok` |
+| `Failed` | Finished with a typed `Err` | `err` |
+| `Die` | Finished with a defect | `die` |
+| `Interrupted` | Finished with interruption | `interrupted` |
+
+`Failed` specifically means a typed error; it is not a catch-all for every unsuccessful result. A `Die` observation describes this execution's defect; it does not by itself terminate the process. Scope `BodyState` uses the four completion states and remains null until its body has finished. Final `State` includes cleanup. A resource's successful release can be `Succeeded` even when its owning scope failed; no resource state proves physical closure.
+
+`ParentId` identifies the recorded execution relationship. `OwnerId` identifies the scope managing a resource or fiber, and `AcquiredBy` identifies the operation that registered or spawned it. This can be an `op` entry inside an acquisition, rather than the enclosing `acquire` entry. These relationships have different purposes and must not be inferred from display order. Capacity limits can leave a referenced entry unavailable. Recording parents need not match span parents: `op` and `attempt` do not create their own spans, and sampling can remove other spans. Correlation IDs identify an entry's own span when created, or its nearest available tracing context otherwise.
+
+Within 1.x, existing kind/state strings and their meanings will not be renamed, removed or repurposed. The state vocabulary remains as listed throughout 1.x. New kinds may be added in minor releases; render unknown kinds without failing and keep known-kind filters explicit. The [OpenTelemetry contract](/opentelemetry/#compatibility-from-10) fixes telemetry names, units and dimensions.
+
+`WithName` supplies the application label for an operation. Recording can truncate names and source locations to bound retained text. Application labels, automatically generated display labels, type names, source locations, diagnostic messages, tree formatting and the actual values of IDs are not a fixed aggregation vocabulary. Use `Kind`, `State` and the documented relationships for tooling. Automatically generated names can reflect the implementation's composition; recording does not promise a fixed number of internal operations.
+
 ## Use the local viewer
 
 The [Tracking sample](https://github.com/SingUp009/Moderato.Effects/tree/main/samples/Moderato.Effects.Tracking.Samples) provides a read-only Blazor screen for execution recordings. Build it from source with the SDK selected by `global.json`.
