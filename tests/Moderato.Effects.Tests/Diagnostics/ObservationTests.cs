@@ -359,7 +359,7 @@ public sealed class ObservationTests
     }
 
     [Fact]
-    public async Task RunExitAsync_RecordedResourceAndRepeatedFiber_UsesStableKindsAndOwnership()
+    public async Task RunExitAsync_RecordedResourceAndRepeatedFiber_UsesStableKindsOwnershipAndTraceCorrelation()
     {
         // Given
         ConcurrentQueue<Activity> ended = new();
@@ -396,7 +396,8 @@ public sealed class ObservationTests
         Assert.Equal(owner.Id, fiber.OwnerId);
         var origin = Assert.Single(entries, entry => entry.Id == lifetime.AcquiredBy);
         Assert.Equal("Succeeded", origin.State);
-        Assert.Equal("acquire", Assert.Single(ended, span => span.SpanId.ToHexString() == origin.SpanId).GetTagItem("effect.kind"));
+        var correlatedAcquisitionSpan = Assert.Single(ended, span => span.SpanId.ToHexString() == origin.SpanId);
+        Assert.Equal("acquire", correlatedAcquisitionSpan.GetTagItem("effect.kind"));
         Assert.All(entries.Where(entry => entry.Kind is "op" or "attempt"), entry =>
             Assert.Contains(ended, span => span.SpanId.ToHexString() == entry.SpanId));
     }

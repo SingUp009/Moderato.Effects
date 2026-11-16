@@ -69,6 +69,7 @@ These names and meanings are part of the Core 1.0 contract, including their casi
 | ActivitySource and Meter | `Moderato.Effects` |
 | Span operation names | `Effect run`, `Effect scope`, `Effect fiber`, `Effect acquire`, `Effect resource`, `Effect release` |
 | Span kind | `Internal` |
+| Span status | `Error` for `die`; `Unset` for `ok`, `err` and `interrupted` |
 | Span attributes | `effect.kind`, final `effect.outcome`, and scope `effect.body.outcome` when its body has finished |
 | Outcome codes | `ok`, `err`, `die`, `interrupted` |
 | Completion metric | `moderato.effects.completed`, a `Counter<long>` with unit `{boundary}` |
