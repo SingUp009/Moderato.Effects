@@ -15,6 +15,7 @@ public sealed class ObservationRecordingTests
         ConcurrentQueue<Activity> ended = new();
         using var activities = Listen(ended.Enqueue);
         List<(string Kind, double Seconds)> durations = [];
+        List<(string Kind, long Count)> completions = [];
         using var metrics = new MeterListener();
         metrics.InstrumentPublished = (instrument, listener) =>
         {
@@ -22,6 +23,8 @@ public sealed class ObservationRecordingTests
         };
         metrics.SetMeasurementEventCallback<double>((_, seconds, tags, _) =>
             durations.Add(((string)tags.ToArray().Single(tag => tag.Key == "effect.kind").Value!, seconds)));
+        metrics.SetMeasurementEventCallback<long>((_, count, tags, _) =>
+            completions.Add(((string)tags.ToArray().Single(tag => tag.Key == "effect.kind").Value!, count)));
         metrics.Start();
         using var recording = EffectTracker.Record();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -44,6 +47,9 @@ public sealed class ObservationRecordingTests
             await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
             live = recording.GetSnapshot();
             Assert.DoesNotContain(ended, span => span.GetTagItem("effect.kind") is "run" or "scope" or "resource" or "release");
+            Assert.DoesNotContain(completions, item => item.Kind is "run" or "scope" or "resource" or "release");
+            Assert.DoesNotContain(durations, item => item.Kind is "run" or "scope" or "resource" or "release");
+            Assert.Equal("Running", Assert.Single(live.Entries, entry => entry.Kind == "run").State);
         }
         finally { release.TrySetResult(); }
         var result = await pending;
@@ -54,6 +60,8 @@ public sealed class ObservationRecordingTests
         Assert.True(final.IsComplete);
         Assert.Equal(5, ended.Count);
         Assert.Equal(5, durations.Count);
+        Assert.Equal(5, completions.Count);
+        Assert.All(completions, item => Assert.Equal(1L, item.Count));
         Assert.All(final.Entries, entry => Assert.Equal(parent.TraceId.ToHexString(), entry.TraceId));
         foreach (var entry in final.Entries.Where(entry => entry.Kind is not ("op" or "attempt")))
         {

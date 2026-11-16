@@ -287,6 +287,120 @@ public sealed class ObservationTests
         Assert.Equal(ended.Count, ended.Select(span => span.SpanId).Distinct().Count());
     }
 
+    [Theory]
+    [InlineData("ok", "Succeeded", ActivityStatusCode.Unset)]
+    [InlineData("err", "Failed", ActivityStatusCode.Unset)]
+    [InlineData("die", "Die", ActivityStatusCode.Error)]
+    [InlineData("interrupted", "Interrupted", ActivityStatusCode.Unset)]
+    public async Task RunExitAsync_Outcome_UsesStableRecordingAndTelemetryVocabulary(string outcome, string state, ActivityStatusCode status)
+    {
+        // Given
+        ConcurrentQueue<Activity> ended = new();
+        using var activities = Listen(ended.Enqueue);
+        List<Instrument> instruments = [];
+        List<(Instrument Instrument, double Value, KeyValuePair<string, object?>[] Tags)> measurements = [];
+        using var metrics = new MeterListener();
+        metrics.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name != "Moderato.Effects" || instrument.Name is not ("moderato.effects.completed" or "moderato.effects.duration")) return;
+            instruments.Add(instrument);
+            listener.EnableMeasurementEvents(instrument);
+        };
+        metrics.SetMeasurementEventCallback<long>((instrument, value, tags, _) => measurements.Add((instrument, value, tags.ToArray())));
+        metrics.SetMeasurementEventCallback<double>((instrument, value, tags, _) => measurements.Add((instrument, value, tags.ToArray())));
+        metrics.Start();
+        using var recording = EffectTracker.Record();
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        if (outcome == "interrupted") caller.Cancel();
+        Effect<int, string, EmptyEnvironment> effect = outcome switch
+        {
+            "err" => Effect<EmptyEnvironment>.Fail<string>("private error"),
+            "die" => Effect<EmptyEnvironment>.Sync<int>(() => throw new IOException("private message")),
+            _ => Effect<EmptyEnvironment>.Succeed(42),
+        };
+
+        // When
+        await effect.WithName("private application name").RunExitAsync(EmptyEnvironment.Value, caller.Token);
+
+        // Then
+        var root = Assert.Single(recording.GetSnapshot().Entries, entry => entry.Kind == "run");
+        Assert.Equal(state, root.State);
+        var span = Assert.Single(ended, activity => activity.GetTagItem("effect.kind") is "run");
+        Assert.Equal("Moderato.Effects", span.Source.Name);
+        Assert.Equal("Effect run", span.OperationName);
+        Assert.Equal(ActivityKind.Internal, span.Kind);
+        Assert.Equal(status, span.Status);
+        Assert.Equal("run", span.GetTagItem("effect.kind"));
+        Assert.Equal(outcome, span.GetTagItem("effect.outcome"));
+        Assert.DoesNotContain(span.TagObjects, tag => tag.Value is string text && text.Contains("private", StringComparison.Ordinal));
+        Assert.Collection(instruments.OrderBy(instrument => instrument.Name, StringComparer.Ordinal),
+            instrument =>
+            {
+                Assert.IsType<Counter<long>>(instrument);
+                Assert.Equal("moderato.effects.completed", instrument.Name);
+                Assert.Equal("{boundary}", instrument.Unit);
+            },
+            instrument =>
+            {
+                Assert.IsType<Histogram<double>>(instrument);
+                Assert.Equal("moderato.effects.duration", instrument.Name);
+                Assert.Equal("s", instrument.Unit);
+            });
+        var runs = measurements.Where(measurement => measurement.Tags.Any(tag => tag.Key == "effect.kind" && tag.Value is "run")).ToArray();
+        Assert.Equal(2, runs.Length);
+        Assert.Equal(1, Assert.Single(runs, measurement => measurement.Instrument.Name == "moderato.effects.completed").Value);
+        Assert.Equal(root.Elapsed.TotalSeconds, Assert.Single(runs, measurement => measurement.Instrument.Name == "moderato.effects.duration").Value);
+        Assert.All(runs, measurement =>
+        {
+            Assert.Equal(new[] { "effect.kind", "effect.outcome" }, measurement.Tags.Select(tag => tag.Key).Order(StringComparer.Ordinal));
+            Assert.Equal("run", measurement.Tags.Single(tag => tag.Key == "effect.kind").Value);
+            Assert.Equal(outcome, measurement.Tags.Single(tag => tag.Key == "effect.outcome").Value);
+        });
+    }
+
+    [Fact]
+    public async Task RunExitAsync_RecordedResourceAndRepeatedFiber_UsesStableKindsAndOwnership()
+    {
+        // Given
+        ConcurrentQueue<Activity> ended = new();
+        using var listener = Listen(ended.Enqueue);
+        using var recording = EffectTracker.Record();
+        var resource = Resource.Make(Effect<DefaultEnvironment>.Succeed(new object()),
+            (_, _) => Effect<DefaultEnvironment>.Succeed(Unit.Value));
+        var effect = Scope<Never, DefaultEnvironment>.Gen(async scope =>
+        {
+            await scope.Acquire(resource);
+            var child = await scope.Fork(Effect<DefaultEnvironment>.Succeed(42).Repeat(Schedule.Immediately.UpTo(0)));
+            return await scope.Run(child.Join());
+        });
+
+        // When
+        await effect.RunExitAsync(DefaultEnvironment.Value, TestContext.Current.CancellationToken);
+
+        // Then
+        var entries = recording.GetSnapshot().Entries;
+        Assert.All(new[] { "acquire", "attempt", "fiber", "op", "release", "resource", "run", "scope" },
+            kind => Assert.Contains(entries, entry => entry.Kind == kind));
+        Assert.All(new[] { "acquire", "fiber", "release", "resource", "run", "scope" },
+            kind => Assert.Contains(ended, span => Equals(span.GetTagItem("effect.kind"), kind)));
+        Assert.DoesNotContain(ended, span => span.GetTagItem("effect.kind") is "op" or "attempt");
+        Assert.All(ended, span =>
+        {
+            Assert.Equal($"Effect {span.GetTagItem("effect.kind")}", span.OperationName);
+            Assert.Equal(ActivityKind.Internal, span.Kind);
+        });
+        var owner = Assert.Single(entries, entry => entry.Kind == "scope");
+        var lifetime = Assert.Single(entries, entry => entry.Kind == "resource");
+        var fiber = Assert.Single(entries, entry => entry.Kind == "fiber");
+        Assert.Equal(owner.Id, lifetime.OwnerId);
+        Assert.Equal(owner.Id, fiber.OwnerId);
+        var origin = Assert.Single(entries, entry => entry.Id == lifetime.AcquiredBy);
+        Assert.Equal("Succeeded", origin.State);
+        Assert.Equal("acquire", Assert.Single(ended, span => span.SpanId.ToHexString() == origin.SpanId).GetTagItem("effect.kind"));
+        Assert.All(entries.Where(entry => entry.Kind is "op" or "attempt"), entry =>
+            Assert.Contains(ended, span => span.SpanId.ToHexString() == entry.SpanId));
+    }
+
     private static ActivityListener Listen(Action<Activity> stopped)
     {
         var listener = new ActivityListener
