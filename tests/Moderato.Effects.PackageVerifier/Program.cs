@@ -42,6 +42,8 @@ try
         if (package == "Moderato.Effects")
         {
             Check(analyzers.Any(entry => entry.FullName == "analyzers/dotnet/cs/Moderato.Effects.SourceGenerator.dll"), $"{package}: missing generator/analyzers.");
+            var results = metadata.Descendants(ns + "dependency").SingleOrDefault(item => (string?)item.Attribute("id") == "Moderato.Results");
+            Check(IsMinimum((string?)results?.Attribute("version"), "1.0.0"), $"{package}: unexpected Results dependency.");
         }
         else
         {
@@ -59,7 +61,7 @@ try
             else if (package == "Moderato.Effects.Hosting")
             {
                 Check(dependencies.TryGetValue("Microsoft.Extensions.Logging", out var loggingVersion)
-                    && IsMinimum(loggingVersion, "11.0.0-rc.3.26522.148"), $"{package}: unexpected logging dependency.");
+                    && IsMinimum(loggingVersion, "11.0.0"), $"{package}: unexpected logging dependency.");
             }
             else
             {
