@@ -1,7 +1,7 @@
 # Moderato.Effects.EntityFrameworkCore
 
-Unreleased implementation under review. Core is unchanged. Initial database verification uses
-EF Core / Microsoft.Data.Sqlite 10.0.9 and SQLitePCLRaw native SQLite 3.53.3 on .NET 11 RC3.
+Database verification uses EF Core / Microsoft.Data.Sqlite 10.0.9 and SQLitePCLRaw native
+SQLite 3.53.3 on .NET 11.0.0 with SDK 11.0.100.
 No Native AOT, PostgreSQL or network-failure validation is claimed.
 
 The error union includes `DatabaseFailure`. This lets the transaction return an unconfirmed

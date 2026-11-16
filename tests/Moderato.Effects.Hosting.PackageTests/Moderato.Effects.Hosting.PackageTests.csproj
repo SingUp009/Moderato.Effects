@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Moderato.Effects.Hosting" Version="$(ModeratoEffectsVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.3.26522.148" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(CheckAnalyzers)' != 'true'">
     <Compile Remove="Validation/Misuse.cs" />

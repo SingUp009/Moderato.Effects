@@ -21,7 +21,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
 - [ ] All samples run. `dotnet run --project tests/Moderato.Effects.Http.SampleTests -c Release` passes the real HTTP/OpenAPI checks.
 - [ ] The Core, Hosting and HTTP package consumers pass under JIT and Native AOT; the EF consumer passes under JIT. EF Native AOT is not validated. All integration-only consumers receive the transitive generators and analyzers.
 - [ ] `tests/Moderato.Effects.PackageVerifier` confirms the expected metadata, XML docs, README, symbol packages and SourceLink commit for all four packages.
-- [ ] Review the local HTTP validation notes, HTTP direct/adapter timing and allocation evidence, and the RC3/GA validation boundary.
+- [ ] Review the local HTTP validation notes and timing/allocation evidence. Record the release candidate's exact SDK, runtime, dependency versions and source commit; historical RC3 results do not validate a GA candidate.
 - [ ] Update the English guides in `document/src/content/docs/` for public API and behavior changes. Generate and review the separate Wiki's API reference using [.github/tools/ApiReference](.github/tools/ApiReference/README.md).
 
 Merge the PR once CI is green.

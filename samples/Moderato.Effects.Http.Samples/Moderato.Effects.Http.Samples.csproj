@@ -5,6 +5,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Moderato.Effects.Http/Moderato.Effects.Http.csproj" />
     <ProjectReference Include="../../src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0-rc.3.26522.148" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="11.0.0" />
   </ItemGroup>
 </Project>
