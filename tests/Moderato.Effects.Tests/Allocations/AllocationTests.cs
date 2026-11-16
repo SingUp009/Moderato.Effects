@@ -202,26 +202,36 @@ public sealed class AllocationTests : IDisposable
             });
             return source.Timeout(TimeSpan.FromSeconds(1), _ => throw timeoutFailure);
         }).ToArray();
-        foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(environment, CancellationToken.None));
+        const long NO_GC_BUDGET_BYTES = 64 * 1024 * 1024;
         long[] allocated = [long.MaxValue, long.MaxValue];
         var results = new Exit<int, string>[2];
-
-        // When
         var completedAtOnce = true;
-        for (var scenario = 0; scenario < effects.Length; scenario++)
+        // Runtime exception metrics recreate their type-name cache after GC, outside this comparison's scope.
+        Assert.True(GC.TryStartNoGCRegion(NO_GC_BUDGET_BYTES));
+        try
         {
-            for (var window = 0; window < WINDOWS; window++)
-            {
-                var before = GC.GetAllocatedBytesForCurrentThread();
-                for (var i = 0; i < RUNS; i++)
-                {
-                    var run = effects[scenario].RunExitAsync(environment, CancellationToken.None);
-                    completedAtOnce &= run.IsCompletedSuccessfully;
-                    results[scenario] = await run;
-                }
+            foreach (var effect in effects) await WarmUpAsync(() => effect.RunExitAsync(environment, CancellationToken.None));
 
-                allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+            // When
+            for (var scenario = 0; scenario < effects.Length; scenario++)
+            {
+                for (var window = 0; window < WINDOWS; window++)
+                {
+                    var before = GC.GetAllocatedBytesForCurrentThread();
+                    for (var i = 0; i < RUNS; i++)
+                    {
+                        var run = effects[scenario].RunExitAsync(environment, CancellationToken.None);
+                        completedAtOnce &= run.IsCompletedSuccessfully;
+                        results[scenario] = await run;
+                    }
+
+                    allocated[scenario] = Math.Min(allocated[scenario], GC.GetAllocatedBytesForCurrentThread() - before);
+                }
             }
+        }
+        finally
+        {
+            GC.EndNoGCRegion();
         }
 
         // Then
