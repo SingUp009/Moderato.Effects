@@ -12,6 +12,7 @@ On a branch from `main` (for example `chore/release-0.1.0-preview.1`):
   - Add the plain entries to Shipped.
   - For each `*REMOVED*` entry, delete the matching line from Shipped.
   - Keep Shipped sorted, and leave Unshipped with only `#nullable enable`.
+- [ ] **Observation contract**: check recording kinds/states, span and metric names, outcome semantics, units, metric dimensions and ownership/correlation against the 1.0 compatibility sections in the Tracker and OpenTelemetry guides. Renaming, removing or repurposing an existing contract requires a major release; document any additive kinds or trace attributes.
 - [ ] **Analyzer releases**: move the rules in `src/Moderato.Effects.SourceGenerator/AnalyzerReleases.Unshipped.md` into `AnalyzerReleases.Shipped.md` under a `## Release <Version>` heading.
   - The heading takes a `System.Version`, so a preview uses a fourth number: `0.1.0-preview.1` is `## Release 0.1.0.1`, and `0.1.0` is `## Release 0.1.0`. Do not suppress RS2007: a heading it cannot read leaves that release's rules unchecked.
 - [ ] **Changelog**: in `CHANGELOG.md`, rename `[Unreleased]` to the new version with today's date, add an empty `[Unreleased]` above it, and update the compare links at the bottom. Breaking changes come first, and a source-compatible but binary-breaking change is still a breaking change.
