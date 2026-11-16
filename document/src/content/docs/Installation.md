@@ -28,7 +28,7 @@ Integrations specify a minimum Core version. Add or update `Moderato.Effects` di
 
 ## Build from source
 
-Clone [the repository](https://github.com/SingUp009/Moderato.Effects) and use the SDK pinned in `global.json`. Projects can target `net11.0` or later with C# 15.
+Clone [the repository](https://github.com/SingUp009/Moderato.Effects) and use the stable SDK selected by `global.json` (11.0.100 or a compatible later .NET 11 SDK). Projects can target `net11.0` or later with C# 15.
 
 ```sh
 git clone https://github.com/SingUp009/Moderato.Effects.git
