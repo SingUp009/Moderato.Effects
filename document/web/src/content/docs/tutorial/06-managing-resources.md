@@ -12,10 +12,10 @@ In [chapter 5](/tutorial/05-managing-dependencies/), the caller supplied a `Text
 From the repository root, run the example.
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 06
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 06
 ```
 
-The completed code is in [06_ManagingResources.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/06_ManagingResources.cs).
+The completed code is in [06_ManagingResources.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/06_ManagingResources.cs).
 
 ## Build it yourself
 

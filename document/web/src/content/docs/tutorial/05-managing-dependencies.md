@@ -12,10 +12,10 @@ In [chapter 4](/tutorial/04-composing-effects/), order preparation wrote its pro
 From the repository root, run:
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 05
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 05
 ```
 
-The completed code is in [05_ManagingDependencies.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/05_ManagingDependencies.cs).
+The completed code is in [05_ManagingDependencies.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/05_ManagingDependencies.cs).
 
 ## Build it yourself
 

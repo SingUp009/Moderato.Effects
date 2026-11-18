@@ -63,15 +63,15 @@ Workers Builds owns the website build and deployment. Connect the GitHub reposit
 | --- | --- |
 | Repository | `SingUp009/Moderato.Effects` |
 | Production branch | `main` |
-| Root directory | `document` |
+| Root directory | `document/web` |
 | Build command | `npm run build` |
 | Deploy command | `npx wrangler deploy` |
 | Preview command | `npx wrangler preview` |
-| Build watch include paths | `document/*` |
+| Build watch include paths | `document/web/*` |
 
 Enable builds for non-production branches so pull requests receive Cloudflare build checks and preview URLs. The `.node-version` file pins Node.js 26.13.0, matching the locally verified runtime. Workers Builds manages its build token; no Cloudflare deployment secret is required in GitHub Actions.
 
-Cloudflare reports website builds on GitHub pull requests. The main .NET workflow skips changes confined to `document/`. Changes to the runnable C# tutorial still run the .NET test job.
+Cloudflare reports website builds on GitHub pull requests. The main .NET workflow skips changes confined to `document/web/` and `document/tour/`. Changes to the runnable C# tutorial in `document/tutorial/` still run the .NET test job.
 
 The Documentation examples workflow compiles C# blocks from the core guides, including on documentation-only changes. The build supplies context for excerpts and fills in explicit placeholders in Environments and Gen blocks. Run `node .github/scripts/verify-guide-examples.mjs` from the repository root to repeat the check.
 

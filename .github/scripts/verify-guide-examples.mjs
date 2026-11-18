@@ -9,7 +9,7 @@ const project = join(root, 'tests/Moderato.Effects.Documentation');
 const generated = join(project, 'obj/guide-examples');
 
 function snippets(page, count) {
-  const markdown = readFileSync(join(root, 'document/src/content/docs', page), 'utf8').replaceAll('\r\n', '\n');
+  const markdown = readFileSync(join(root, 'document/web/src/content/docs', page), 'utf8').replaceAll('\r\n', '\n');
   const blocks = [...markdown.matchAll(/^```csharp\n([\s\S]*?)^```[ \t]*$/gm)].map(match => match[1]);
   assert.equal(blocks.length, count, `Update the compilation context for ${page}`);
   return blocks;

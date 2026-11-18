@@ -12,10 +12,10 @@ In [chapter 4](/tutorial/04-composing-effects/), each step used the result of th
 From the repository root, run the example.
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 07
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 07
 ```
 
-The completed code is in [07_ConcurrentEffects.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/07_ConcurrentEffects.cs).
+The completed code is in [07_ConcurrentEffects.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/07_ConcurrentEffects.cs).
 
 ## Build it yourself
 

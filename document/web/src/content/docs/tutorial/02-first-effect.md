@@ -14,10 +14,10 @@ In this chapter, you will write an effect with `Effect.Gen`, execute it and read
 From the repository root, run:
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 02
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 02
 ```
 
-The completed code is in [02_FirstEffect.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/02_FirstEffect.cs).
+The completed code is in [02_FirstEffect.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/02_FirstEffect.cs).
 
 ## Build it yourself
 

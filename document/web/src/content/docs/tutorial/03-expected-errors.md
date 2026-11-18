@@ -12,10 +12,10 @@ In [chapter 1](/tutorial/01-results/), validating an order quantity returned a `
 From the repository root, run:
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 03
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 03
 ```
 
-The completed code is in [03_ExpectedErrors.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/03_ExpectedErrors.cs).
+The completed code is in [03_ExpectedErrors.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/03_ExpectedErrors.cs).
 
 ## Build it yourself
 

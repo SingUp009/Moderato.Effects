@@ -12,10 +12,10 @@ In [chapter 3](/tutorial/03-expected-errors/), `scope.Get` let a validation resu
 From the repository root, run:
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 04
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 04
 ```
 
-The completed code is in [04_ComposingEffects.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/tutorial/Moderato.Effects.Tutorial/Chapters/04_ComposingEffects.cs).
+The completed code is in [04_ComposingEffects.cs](https://github.com/SingUp009/Moderato.Effects/blob/main/document/tutorial/Moderato.Effects.Tutorial/Chapters/04_ComposingEffects.cs).
 
 ## Build it yourself
 
