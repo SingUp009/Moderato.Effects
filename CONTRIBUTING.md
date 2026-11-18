@@ -39,21 +39,21 @@ dotnet run -c Release --project samples/Moderato.Effects.Samples
 
 ### Documentation and tutorial changes
 
-The website source is in [document/src/content/docs](document/src/content/docs/). Use Node.js 26, matching the site's tested build environment. To preview edits with hot reload:
+The website source is in [document/web/src/content/docs](document/web/src/content/docs/). Use Node.js 26, matching the site's tested build environment. To preview edits with hot reload:
 
 ```sh
-cd document
+cd document/web
 npm ci
 npm run dev
 ```
 
-Run `npm run build` from `document/` before submitting website changes. Documentation-only changes do not require the .NET checks or a Cloudflare account.
+Run `npm run build` from `document/web` before submitting website changes. Documentation-only changes do not require the .NET checks or a Cloudflare account.
 
 For changes to the executable tutorial chapters, also build and verify them from the repository root:
 
 ```sh
-dotnet build tutorial/Moderato.Effects.Tutorial -c Release
-bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
+dotnet build document/tutorial/Moderato.Effects.Tutorial -c Release
+bash document/tutorial/verify.sh dotnet document/tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
 ```
 
 ## Code and tests
@@ -69,7 +69,7 @@ Follow the surrounding code and [.editorconfig](.editorconfig):
 
 Add public API changes to the affected package's `PublicAPI.Unshipped.txt`; leave release bookkeeping to the release process. For analyzer changes, update `AnalyzerReleases.Unshipped.md` in the source generator project. Describe breaking changes explicitly, including binary compatibility changes.
 
-Update documentation and samples affected by the change. The website builds from `document/`. The API Reference is generated from the library DLLs and XML documentation using the [API reference tool](.github/tools/ApiReference/README.md). CI checks the generated reference; publishing it to the separate GitHub Wiki repository remains a reviewed, manual step. Describe any required reference changes in your pull request.
+Update documentation and samples affected by the change. The website builds from `document/web/`. The API Reference is generated from the library DLLs and XML documentation using the [API reference tool](.github/tools/ApiReference/README.md). CI checks the generated reference; publishing it to the separate GitHub Wiki repository remains a reviewed, manual step. Describe any required reference changes in your pull request.
 
 ## Commits and pull requests
 
