@@ -25,7 +25,7 @@ switch (args)
         return 0;
     case [] or ["--help"]:
         Console.WriteLine("""
-            Usage: dotnet run --project tutorial/Moderato.Effects.Tutorial -- <chapter>
+            Usage: dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- <chapter>
             01 - Success and Failure with Result
             02 - Your First Effect
             03 - Handling Expected Errors

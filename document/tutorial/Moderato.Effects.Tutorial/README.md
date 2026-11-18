@@ -5,13 +5,13 @@ Executable chapters for the Moderato.Effects tutorial. Use the .NET SDK pinned i
 Run a chapter from the repository root:
 
 ```sh
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 01
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 02
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 03
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 04
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 05
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 06
-dotnet run --project tutorial/Moderato.Effects.Tutorial -- 07
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 01
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 02
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 03
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 04
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 05
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 06
+dotnet run --project document/tutorial/Moderato.Effects.Tutorial -- 07
 ```
 
 | Chapter | Source | Learn |
@@ -26,11 +26,11 @@ dotnet run --project tutorial/Moderato.Effects.Tutorial -- 07
 
 Run without a chapter, or pass `--help`, to list the chapters. Unknown chapters and extra arguments return a nonzero exit code.
 
-The lesson pages are in `document/src/content/docs/tutorial/`. Each chapter runs independently.
+The lesson pages are in `document/web/src/content/docs/tutorial/`. Each chapter runs independently.
 
 To check the expected chapter output and argument handling:
 
 ```sh
-dotnet build tutorial/Moderato.Effects.Tutorial -c Release
-bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
+dotnet build document/tutorial/Moderato.Effects.Tutorial -c Release
+bash document/tutorial/verify.sh dotnet document/tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
 ```
