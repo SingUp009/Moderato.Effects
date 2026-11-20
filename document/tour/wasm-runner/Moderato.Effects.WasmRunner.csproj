@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Moderato.Effects.WasmRunner</RootNamespace>
+    <!-- User code can call any public API, so nothing may be trimmed away. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Keeps the download small and the output identical in every visitor's locale. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <UserCodeReferences>;System.Runtime;System.Console;System.Collections;System.Linq;System.Threading;Moderato.Results;Moderato.Effects;</UserCodeReferences>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
+    <ProjectReference Include="../../../src/Moderato.Effects/Moderato.Effects.csproj" />
+    <ProjectReference Include="../../../src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
+  </ItemGroup>
+
+  <!-- User code compiles against these assemblies, so they ship inside the runner as resources. -->
+  <Target Name="EmbedUserCodeReferences" AfterTargets="ResolveAssemblyReferences" BeforeTargets="PrepareResources">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferencePath)"
+                        Condition="$(UserCodeReferences.Contains(';%(Filename);'))"
+                        LogicalName="refs/%(Filename)%(Extension)"
+                        WithCulture="false"
+                        Type="Non-Resx" />
+    </ItemGroup>
+  </Target>
+
+</Project>
