@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Moderato.Effects.SourceGenerator;
+using Moderato.Results;
 
 namespace Moderato.Effects.WasmRunner;
 
@@ -126,58 +127,57 @@ public static partial class WasmRunner
     }
 
     /// <summary>Runs the assembly produced by the last successful <see cref="Compile"/>.</summary>
-    /// <returns>Elapsed milliseconds.</returns>
+    /// <returns>A JSON object with <c>success</c> and, on success, <c>elapsed</c> milliseconds or, on failure, the <c>error</c> kind.</returns>
     [JSExport]
-    public static async Task<double> ExecuteAsync()
+    public static async Task<string> ExecuteAsync()
     {
-        if (image is null)
-        {
-            throw new InvalidOperationException("No successfully compiled code to run.");
-        }
+        var result = await UserProgram.Run(image).RunAsync().ConfigureAwait(false);
 
-        var watch = Stopwatch.StartNew();
-        try
+        using var buffer = new MemoryStream();
+        using (var json = new Utf8JsonWriter(buffer))
         {
-            var entryPoint = AsyncBody(Assembly.Load(image).EntryPoint
-                ?? throw new InvalidOperationException("The compiled code has no entry point."));
-            object?[]? arguments = entryPoint.GetParameters().Length == 0 ? null : [Array.Empty<string>()];
-
-            if (entryPoint.Invoke(null, arguments) is Task task)
+            json.WriteStartObject();
+            json.WriteBoolean("success", result is Ok<double>);
+            switch (result)
             {
-                await task.ConfigureAwait(false);
+                case Ok<double>(var elapsed):
+                    json.WriteNumber("elapsed", elapsed);
+                    break;
+                case Err<RunError>(ProgramFailed failed):
+                    // The reader sees what their program threw where its own output goes.
+                    Console.Error.WriteLine(failed.Exception);
+                    Console.Error.Flush();
+                    json.WriteString("error", "programFailed");
+                    break;
+                case Err<RunError>(NoEntryPoint):
+                    json.WriteString("error", "noEntryPoint");
+                    break;
+                case Err<RunError>(NothingCompiled):
+                    json.WriteString("error", "nothingCompiled");
+                    break;
             }
-        }
-        catch (Exception exception)
-        {
-            var unwrapped = exception is TargetInvocationException { InnerException: { } inner } ? inner : exception;
-            Console.Error.WriteLine(unwrapped);
-        }
-        finally
-        {
-            Console.Out.Flush();
-            Console.Error.Flush();
+
+            json.WriteEndObject();
         }
 
-        return watch.Elapsed.TotalMilliseconds;
+        return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    // An async Main gets a synchronous wrapper that blocks on the task, which the single-threaded
-    // browser runtime cannot do; awaiting the method the wrapper calls avoids it.
-    private static MethodInfo AsyncBody(MethodInfo entryPoint)
+    /// <summary>Reports memory after a full collection, for measuring growth over many runs.</summary>
+    /// <returns>A JSON object with the loaded assembly count and the managed heap size.</returns>
+    [JSExport]
+    public static string Diagnostics()
     {
-        if (typeof(Task).IsAssignableFrom(entryPoint.ReturnType))
+        using var buffer = new MemoryStream();
+        using (var json = new Utf8JsonWriter(buffer))
         {
-            return entryPoint;
+            json.WriteStartObject();
+            json.WriteNumber("assemblies", AppDomain.CurrentDomain.GetAssemblies().Length);
+            json.WriteNumber("managedBytes", GC.GetTotalMemory(forceFullCollection: true));
+            json.WriteEndObject();
         }
 
-        var parameters = entryPoint.GetParameters().Select(static p => p.ParameterType).ToArray();
-        return entryPoint.DeclaringType!
-            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(m => m != entryPoint
-                && m.Name is "Main" or "<Main>$"
-                && typeof(Task).IsAssignableFrom(m.ReturnType)
-                && m.GetParameters().Select(static p => p.ParameterType).SequenceEqual(parameters))
-            ?? entryPoint;
+        return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
     private static List<MetadataReference> LoadReferences()
