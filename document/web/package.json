@@ -9,7 +9,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "prepare": "panda codegen",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run runner && npm run build && wrangler deploy",
     "runner": "node scripts/build-runner.mjs"
   },
   "dependencies": {

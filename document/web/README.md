@@ -13,7 +13,7 @@ npm run dev
 
 The site is static. Workers serves the generated `dist/` directory with its static assets support; no server adapter is needed.
 
-Authenticate with your Cloudflare account, then build and deploy:
+Authenticate with your Cloudflare account, then build and deploy. This also builds the tutorial playground's runner, so it needs the .NET SDK and the `wasm-tools` workload:
 
 ```sh
 npx wrangler login
@@ -76,21 +76,20 @@ After deployment, check the public host to confirm that `/robots.txt` advertises
 
 ## Automatic builds
 
-Workers Builds owns the website build and deployment. Connect the GitHub repository to the `moderato-effects` Worker and use these settings:
+The Documentation site workflow (`.github/workflows/docs-site.yml`) builds the website, and deploys it on pushes to `main`. Workers Builds cannot do this: its build image has no .NET SDK, which the playground's runner needs. Keep the `moderato-effects` Worker disconnected from Workers Builds so the two do not both deploy.
 
-| Setting | Value |
+The workflow installs the SDK from `global.json` and the `wasm-tools` workload, builds the runner, runs `npm run build` with its tests, and deploys with `npx wrangler deploy`. It runs for changes to `document/web/`, `document/tour/`, and the library and source generator the runner compiles against. Pull requests get the build and tests without a deploy.
+
+Deployment needs two repository secrets:
+
+| Secret | Value |
 | --- | --- |
-| Repository | `SingUp009/Moderato.Effects` |
-| Production branch | `main` |
-| Root directory | `document/web` |
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Preview command | `npx wrangler preview` |
-| Build watch include paths | `document/web/*` |
+| `CLOUDFLARE_API_TOKEN` | An API token with the **Edit Cloudflare Workers** permission |
+| `CLOUDFLARE_ACCOUNT_ID` | The account that owns the `moderato-effects` Worker |
 
-Enable builds for non-production branches so pull requests receive Cloudflare build checks and preview URLs. The `.node-version` file pins Node.js 26.13.0, matching the locally verified runtime. Workers Builds manages its build token; no Cloudflare deployment secret is required in GitHub Actions.
+The `.node-version` file pins Node.js 26.13.0, matching the locally verified runtime.
 
-Cloudflare reports website builds on GitHub pull requests. The main .NET workflow skips changes confined to `document/web/` and `document/tour/`. Changes to the runnable C# tutorial in `document/tutorial/` still run the .NET test job.
+The main .NET workflow skips changes confined to `document/web/` and `document/tour/`. Changes to the runnable C# tutorial in `document/tutorial/` still run the .NET test job.
 
 The Documentation examples workflow compiles C# blocks from the core guides, including on documentation-only changes. The build supplies context for excerpts and fills in explicit placeholders in Environments and Gen blocks. Run `node .github/scripts/verify-guide-examples.mjs` from the repository root to repeat the check.
 
