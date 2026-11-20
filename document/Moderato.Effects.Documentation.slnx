@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/tutorial/">
+    <Project Path="tutorial/Moderato.Effects.Tutorial/Moderato.Effects.Tutorial.csproj" />
+  </Folder>
+  <Folder Name="/tour/">
+    <Project Path="tour/wasm-runner/Moderato.Effects.WasmRunner.csproj" />
+  </Folder>
+</Solution>

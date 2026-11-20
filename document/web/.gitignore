@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+styled-system/
+
+.wrangler/
+
+# Built by npm run runner from document/tour/wasm-runner.
+public/runner/

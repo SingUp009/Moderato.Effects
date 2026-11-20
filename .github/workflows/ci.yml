@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     tags: ['v*', 'Moderato.Effects.Hosting/v*', 'Moderato.Effects.Http/v*', 'Moderato.Effects.EntityFrameworkCore/v*']
-    paths-ignore: ['document/**']
+    paths-ignore: ['document/web/**', 'document/tour/**']
   pull_request:
-    paths-ignore: ['document/**']
+    paths-ignore: ['document/web/**', 'document/tour/**']
 
 permissions:
   contents: read
@@ -66,8 +66,8 @@ jobs:
 
       - name: Verify the tutorial
         run: |
-          dotnet build tutorial/Moderato.Effects.Tutorial -c Release
-          bash tutorial/verify.sh dotnet tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
+          dotnet build document/tutorial/Moderato.Effects.Tutorial -c Release
+          bash document/tutorial/verify.sh dotnet document/tutorial/Moderato.Effects.Tutorial/bin/Release/net11.0/Moderato.Effects.Tutorial.dll
 
       - name: Verify API reference generation
         run: |

@@ -1,0 +1,321 @@
+:root {
+    --playground-code-bg: var(--sl-color-gray-6);
+    --playground-code-active-line: color-mix(in srgb, var(--sl-color-gray-5) 40%, transparent);
+    --playground-code-selection: color-mix(in srgb, var(--sl-color-accent) 30%, transparent);
+    --playground-code-keyword: #81a1c1;
+    --playground-code-string: #a3be8c;
+    --playground-code-number: #b48ead;
+    --playground-code-comment: #7b88a1;
+    --playground-code-type: #8fbcbb;
+    --playground-sheet-height: 60vh;
+}
+
+:root[data-theme='light'] {
+    --playground-code-bg: var(--sl-color-gray-7);
+    --playground-code-keyword: #5e81ac;
+    --playground-code-string: #4c7a34;
+    --playground-code-number: #8c5a83;
+    --playground-code-comment: #6b778d;
+    --playground-code-type: #2f7a78;
+}
+
+/* Closed, the page is the plain tutorial; open, the editor takes the place of "On this page". */
+.playground {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-sizing: border-box;
+}
+
+:root[data-playground='open'] .playground {
+    display: flex;
+}
+
+:root[data-playground='open'] .playground-open,
+:root[data-playground='open'] .playground-toc .right-sidebar-panel {
+    display: none;
+}
+
+.playground-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--sl-color-accent);
+    border-radius: 0.25rem;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.playground-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.playground-title {
+    margin: 0;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-h5);
+    font-weight: 600;
+}
+
+/* Icon buttons that fold a side panel away. */
+.playground-close,
+.tutorial-layout-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+}
+
+.playground-close:hover,
+.tutorial-layout-toggle:hover {
+    border-color: var(--sl-color-gray-5);
+    color: var(--sl-color-white);
+}
+
+/*
+ * On tutorial pages one side panel shows at a time. Folded, the site navigation leaves a narrow rail
+ * whose toggle at the bottom brings it back and puts the editor away, as dashboards do.
+ */
+.tutorial-layout-toggle {
+    display: none;
+}
+
+@media (min-width: 50rem) {
+    :root[data-tutorial-nav] {
+        --tutorial-rail-width: 3rem;
+    }
+
+    .tutorial-layout-toggle {
+        display: inline-flex;
+        position: fixed;
+        bottom: 0.625rem;
+        left: 0.5rem;
+        z-index: calc(var(--sl-z-index-menu) + 2);
+    }
+
+    /* A footer strip under the navigation holds the toggle, with room kept for the last link. */
+    :root[data-tutorial-nav='open'] .sidebar-content {
+        padding-bottom: 3.5rem;
+    }
+
+    :root[data-tutorial-nav='open'] body::before {
+        content: '';
+        position: fixed;
+        bottom: 0;
+        inset-inline-start: 0;
+        z-index: calc(var(--sl-z-index-menu) + 1);
+        width: var(--sl-sidebar-width);
+        height: 3.25rem;
+        box-sizing: border-box;
+        border-top: 1px solid var(--sl-color-hairline-shade);
+        border-inline-end: 1px solid var(--sl-color-hairline-shade);
+        background-color: var(--sl-color-bg-sidebar);
+    }
+
+    :root[data-tutorial-nav='closed'] .sidebar-pane {
+        display: none;
+    }
+
+    :root[data-tutorial-nav='closed'][data-has-sidebar] {
+        --sl-content-inline-start: var(--tutorial-rail-width);
+    }
+
+    :root[data-tutorial-nav='closed'] body::before {
+        content: '';
+        position: fixed;
+        inset-block: var(--sl-nav-height) 0;
+        inset-inline-start: 0;
+        z-index: var(--sl-z-index-menu);
+        width: var(--tutorial-rail-width);
+        border-inline-end: 1px solid var(--sl-color-hairline-shade);
+        background-color: var(--sl-color-bg-sidebar);
+    }
+}
+
+.playground-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.playground-toolbar button {
+    padding: 0.35rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--sl-color-white);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    cursor: pointer;
+}
+
+.playground-toolbar .playground-run {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent);
+    color: var(--sl-color-black);
+    font-weight: 600;
+}
+
+.playground-toolbar button:disabled {
+    opacity: 0.5;
+    cursor: progress;
+}
+
+.playground-status {
+    margin-left: auto;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    text-align: end;
+}
+
+/* Hidden but still in the layout, so the editor does not jump when loading ends. */
+.playground-progress[data-done='true'] {
+    visibility: hidden;
+}
+
+.playground-progress progress {
+    display: block;
+    width: 100%;
+    height: 0.25rem;
+    border: none;
+    border-radius: 0.125rem;
+    background: var(--sl-color-gray-5);
+    appearance: none;
+}
+
+.playground-progress progress::-webkit-progress-bar {
+    border-radius: 0.125rem;
+    background: var(--sl-color-gray-5);
+}
+
+.playground-progress progress::-webkit-progress-value {
+    border-radius: 0.125rem;
+    background: var(--sl-color-accent);
+    transition: width 0.2s ease-out;
+}
+
+.playground-progress progress::-moz-progress-bar {
+    border-radius: 0.125rem;
+    background: var(--sl-color-accent);
+}
+
+.playground-status-error,
+.playground-output-error {
+    color: var(--sl-color-red-high);
+}
+
+.playground-editor {
+    flex: 1 1 auto;
+    min-height: 8rem;
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.25rem;
+    font-size: var(--sl-text-code);
+}
+
+/* Lines the chapter text is talking about stand out; the rest steps back. */
+.playground-editor .cm-line {
+    transition: opacity 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.playground-editor .cm-playground-dim {
+    opacity: 0.4;
+}
+
+.playground-editor .cm-playground-focus {
+    background-color: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+    box-shadow: inset 3px 0 0 var(--sl-color-accent);
+}
+
+/* The snippet in the text that the editor is highlighting. */
+.sl-markdown-content .expressive-code {
+    transition: box-shadow 0.2s ease-out;
+}
+
+.sl-markdown-content .expressive-code.playground-snippet-active {
+    box-shadow: 0 0 0 2px var(--sl-color-accent);
+}
+
+.playground-output {
+    flex: 0 0 auto;
+    min-height: 4rem;
+    max-height: 30%;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    overflow: auto;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.25rem;
+    background: var(--playground-code-bg);
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-code);
+    white-space: pre-wrap;
+}
+
+/* Wide screens: the editor fills the right sidebar, widened from its table-of-contents size. */
+@media (min-width: 72rem) {
+    :root[data-playground='open'] {
+        --playground-width: clamp(28rem, 40vw, 48rem);
+    }
+
+    :root[data-playground='open'] .right-sidebar-container {
+        flex: none;
+        width: var(--playground-width);
+    }
+
+    /* Starlight sets data-has-sidebar and data-has-toc on <html> itself. */
+    :root[data-playground='open'][data-has-sidebar][data-has-toc] .main-pane {
+        width: calc(100% - var(--playground-width));
+    }
+
+    /* The right sidebar is fixed and as wide as the viewport, so the panel needs its own width. */
+    .playground {
+        width: var(--playground-width);
+        height: calc(100vh - var(--sl-nav-height));
+        padding: 1rem var(--sl-sidebar-pad-x);
+    }
+
+    .playground-open {
+        margin: 1rem var(--sl-sidebar-pad-x) 0;
+    }
+}
+
+/* Narrow screens: the button floats, and the editor opens as a sheet over the lower part of the page. */
+@media (max-width: 71.99rem) {
+    .playground-open {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 20;
+        box-shadow: var(--sl-shadow-md);
+    }
+
+    :root[data-playground='open'] .playground {
+        position: fixed;
+        inset: auto 0 0 0;
+        z-index: 20;
+        height: var(--playground-sheet-height);
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--sl-color-hairline);
+        background: var(--sl-color-bg);
+        box-shadow: var(--sl-shadow-lg);
+    }
+
+    :root[data-playground='open'] body {
+        padding-bottom: var(--playground-sheet-height);
+    }
+}
