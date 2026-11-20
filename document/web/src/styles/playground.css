@@ -228,6 +228,29 @@
     font-size: var(--sl-text-code);
 }
 
+/* Lines the chapter text is talking about stand out; the rest steps back. */
+.playground-editor .cm-line {
+    transition: opacity 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.playground-editor .cm-playground-dim {
+    opacity: 0.4;
+}
+
+.playground-editor .cm-playground-focus {
+    background-color: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+    box-shadow: inset 3px 0 0 var(--sl-color-accent);
+}
+
+/* The snippet in the text that the editor is highlighting. */
+.sl-markdown-content .expressive-code {
+    transition: box-shadow 0.2s ease-out;
+}
+
+.sl-markdown-content .expressive-code.playground-snippet-active {
+    box-shadow: 0 0 0 2px var(--sl-color-accent);
+}
+
 .playground-output {
     flex: 0 0 auto;
     min-height: 4rem;

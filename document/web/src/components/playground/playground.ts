@@ -1,11 +1,12 @@
 import { CodeEditor } from './editor';
 import { Runner, type Diagnostic, type LoadPhase } from './runner';
+import { findSnippet } from './snippets';
 
 const LAYOUT_KEY = 'moderato.tutorial-layout';
 const EDITS_KEY_PREFIX = 'moderato.playground.';
 
 /** Wires the editor, output and runner beside one tutorial chapter. */
-export function mountPlayground(root: HTMLElement): void {
+export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
     const chapter = root.dataset.chapter!;
     const original: string = JSON.parse(root.querySelector('[data-playground-code]')!.textContent!);
     const runButton = root.querySelector<HTMLButtonElement>('[data-playground-run]')!;
@@ -55,9 +56,13 @@ export function mountPlayground(root: HTMLElement): void {
         });
     };
 
+    // Set after the editor exists; the editor reports its first content before that.
+    let snippets: ReturnType<typeof followSnippets> | undefined;
     const editor = new CodeEditor({
         parent: root.querySelector<HTMLElement>('[data-playground-editor]')!,
         onChange(code) {
+            // Any edit already cleared the editor's highlight; only the marker in the text is left.
+            snippets?.forget();
             store(EDITS_KEY_PREFIX + chapter, code === original ? null : code);
             if (runner?.ready) runner.compileSoon(code);
         },
@@ -65,6 +70,7 @@ export function mountPlayground(root: HTMLElement): void {
     });
     // Edits survive moving between chapters for the rest of the browser session.
     editor.code = load('session', EDITS_KEY_PREFIX + chapter) ?? original;
+    snippets = followSnippets(text, editor, isOpen);
 
     async function run() {
         if (!runner) return;
@@ -110,7 +116,13 @@ export function mountPlayground(root: HTMLElement): void {
         root.dataset.playground = open ? 'open' : 'closed';
         root.dataset.tutorialNav = open ? 'closed' : 'open';
         store(LAYOUT_KEY, open ? 'playground' : 'navigation', 'local');
-        if (open) ensureRunner();
+        if (open) {
+            ensureRunner();
+            snippets?.refresh();
+        } else {
+            editor.focus([]);
+            snippets?.forget();
+        }
     }
 
     for (const button of document.querySelectorAll('[data-playground-open]')) button.addEventListener('click', () => setOpen(true));
@@ -152,6 +164,62 @@ function store(key: string, value: string | null, kind: StorageKind = 'session')
     } catch {
         // Not remembering is acceptable.
     }
+}
+
+// The band of the viewport where a snippet counts as the one being read: from 30% to 50% down.
+const READING_BAND = '-30% 0px -50% 0px';
+
+/**
+ * Highlights in the editor the lines that the C# snippet being read refers to, as the reader
+ * scrolls the chapter text or points at a snippet.
+ */
+function followSnippets(text: HTMLElement, editor: CodeEditor, isOpen: () => boolean) {
+    // "Try it" asks the reader to change the code, so from there on nothing is highlighted.
+    const blocks = [...text.querySelectorAll<HTMLElement>('.expressive-code, h2#try-it')]
+        .filter((block) => block.matches('h2') || block.querySelector('pre[data-language="csharp"]'));
+    const inBand = new Set<Element>();
+    let active: HTMLElement | undefined;
+
+    const forget = () => {
+        active?.classList.remove('playground-snippet-active');
+        active = undefined;
+    };
+
+    const activate = (block: HTMLElement) => {
+        if (block === active || !isOpen()) return;
+        forget();
+        if (block.matches('h2')) {
+            editor.focus([]);
+            active = block;
+            return;
+        }
+        const snippet = [...block.querySelectorAll('.ec-line')].map((line) => line.textContent ?? '').join('\n');
+        const ranges = findSnippet(editor.code, snippet);
+        editor.focus(ranges);
+        if (ranges.length === 0) return;
+        active = block;
+        block.classList.add('playground-snippet-active');
+    };
+
+    const refresh = () => {
+        const reading = blocks.find((block) => inBand.has(block));
+        if (reading) activate(reading);
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (entry.isIntersecting) inBand.add(entry.target);
+            else inBand.delete(entry.target);
+        }
+        refresh();
+    }, { rootMargin: READING_BAND });
+
+    for (const block of blocks) {
+        observer.observe(block);
+        if (!block.matches('h2')) block.addEventListener('mouseenter', () => activate(block));
+    }
+
+    return { forget, refresh };
 }
 
 const DOWNLOAD_END = 75;

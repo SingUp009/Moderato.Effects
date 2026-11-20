@@ -43,5 +43,6 @@ const { chapter, code } = Astro.props;
     import { mountPlayground } from './playground';
 
     const root = document.querySelector<HTMLElement>('[data-playground-root]');
-    if (root) mountPlayground(root);
+    const text = document.querySelector<HTMLElement>('.sl-markdown-content');
+    if (root && text) mountPlayground(root, text);
 </script>

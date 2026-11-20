@@ -41,6 +41,8 @@ Each tutorial chapter has an editor beside it where the reader edits and runs th
 
 The starting code is `src/content/playground/<id>.cs`, named after the tutorial page; every tutorial chapter needs one, and the build fails without it. Edits last for the browser session; Reset restores the starting code.
 
+As the reader scrolls, the editor highlights the lines that the C# snippet being read shows, and stops at the "Try it" section. Snippets are matched to the editor's code line by line, ignoring indentation and access modifiers, so keep a chapter's `.cs` close to the tutorial's code; a snippet with no match highlights nothing.
+
 The code compiles and runs in a Web Worker on the .NET WebAssembly runtime, built from `document/tour/wasm-runner`. The runtime downloads only when the editor first opens. Build it once before `npm run dev` or `npm run build`; it lands in `public/runner/`, which is not committed:
 
 ```sh
