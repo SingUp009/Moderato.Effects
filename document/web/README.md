@@ -52,6 +52,8 @@ npm run runner
 
 Without it, the pages still build but the editor cannot run code.
 
+`/tutorial/*` and `/runner/*` are served with a Content-Security-Policy. After `astro build`, `scripts/playground-csp.mjs` hashes the inline scripts of the built tutorial pages and appends the policy to `dist/_headers`, so it follows Starlight and Astro updates without editing. Scripts load only from the site itself or by those hashes; `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly. `style-src` keeps `'unsafe-inline'` because Expressive Code colors code with style attributes. `npm run build` checks the policy. To check it in a browser, serve `dist/` with `npx wrangler dev`; `npm run dev` does not apply `_headers`.
+
 ## Agent DX research
 
 `/agent-dx/` uses the existing Starlight layout and a React chart for development comparisons. The build exports the results as `/agent-dx/results.json`. The guide archive contains both 30-file input snapshots and their SHA-256 hashes. Keep that archive intact for reproducing the first evaluation.

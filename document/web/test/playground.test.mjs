@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 // Expressive Code blocks carry raw source in attributes, which a spec-compliant parser is needed to read.
 import { fromHtml } from 'hast-util-from-html';
 import { select, selectAll } from 'hast-util-select';
+import { inlineScriptHashes } from '../scripts/playground-csp.mjs';
 
 const SOURCES = new URL('../src/content/playground/', import.meta.url);
 const DIST = new URL('../dist/', import.meta.url);
@@ -63,4 +65,23 @@ test('build_WithOtherGuides_LeavesThemWithoutAPlayground', () => {
   // Then
   assert.equal(select('[data-playground-root]', page), undefined);
   assert.equal(select('.playground-toc', page), undefined);
+});
+
+test('build_WithTutorialPages_AllowsOnlyTheirOwnInlineScriptsInTheCsp', () => {
+  // Given
+  const expected = inlineScriptHashes(fileURLToPath(DIST));
+
+  // When
+  const headers = readFileSync(new URL('_headers', DIST), 'utf8');
+
+  // Then
+  assert.ok(expected.length > 0);
+  for (const path of ['/tutorial/*', '/runner/*']) {
+    const rule = new RegExp(`^${path.replace(/[/*]/g, '\\$&')}\\r?\\n\\s+Content-Security-Policy: (.+)$`, 'm').exec(headers);
+    assert.ok(rule, `no CSP rule for ${path}`);
+    const scriptSrc = rule[1].split('; ').find((directive) => directive.startsWith('script-src ')).split(' ');
+    assert.deepEqual(scriptSrc.filter((source) => source.startsWith("'sha256-")), expected, path);
+    assert.ok(scriptSrc.includes("'wasm-unsafe-eval'"), path);
+    assert.ok(!scriptSrc.includes("'unsafe-inline'") && !scriptSrc.includes("'unsafe-eval'"), path);
+  }
 });

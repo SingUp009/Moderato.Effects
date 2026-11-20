@@ -3,6 +3,13 @@ import starlight from '@astrojs/starlight';
 import starlightThemeNord from 'starlight-theme-nord';
 import react from '@astrojs/react';
 import pandacss from '@pandacss/vite';
+import { fileURLToPath } from 'node:url';
+import { writePlaygroundCsp } from './scripts/playground-csp.mjs';
+
+const playgroundCsp = {
+  name: 'playground-csp',
+  hooks: { 'astro:build:done': ({ dir }) => writePlaygroundCsp(fileURLToPath(dir)) },
+};
 
 export default defineConfig({
   site: 'https://moderato-effects.009singup.workers.dev',
@@ -35,5 +42,5 @@ export default defineConfig({
       { label: 'Integrate and diagnose', items: ['hosting', 'http', 'entity-framework-core', 'effect-tracker', 'opentelemetry', 'analyzers', 'caveats'] },
       { label: 'Coding agents', items: ['agents', 'agent-guide', { label: 'Agent DX Research', link: 'https://moderato-effects-agent-dx.009singup.workers.dev/' }] },
     ],
-  }), react()],
+  }), react(), playgroundCsp],
 });
