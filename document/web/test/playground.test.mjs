@@ -36,7 +36,6 @@ test('build_WithTutorialChapters_PutsThePlaygroundWithTheChapterCodeOnEachPage',
     const playground = select('[data-playground-root]', page);
     assert.ok(playground, id);
     assert.equal(playground.properties.dataChapter, id);
-    assert.equal(playground.properties.dataRunner, '/runner/worker.js');
     assert.equal(JSON.parse(textOf(select('script[data-playground-code]', playground))), code, id);
     assert.ok(select('[data-playground-open]', page), id);
   }
@@ -76,7 +75,7 @@ test('build_WithTutorialPages_AllowsOnlyTheirOwnInlineScriptsInTheCsp', () => {
 
   // Then
   assert.ok(expected.length > 0);
-  for (const path of ['/tutorial/*', '/runner/*']) {
+  for (const path of ['/tutorial/*', '/_astro/*']) {
     const rule = new RegExp(`^${path.replace(/[/*]/g, '\\$&')}\\r?\\n\\s+Content-Security-Policy: (.+)$`, 'm').exec(headers);
     assert.ok(rule, `no CSP rule for ${path}`);
     const scriptSrc = rule[1].split('; ').find((directive) => directive.startsWith('script-src ')).split(' ');

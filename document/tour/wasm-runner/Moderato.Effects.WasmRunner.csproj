@@ -17,6 +17,8 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
     <ProjectReference Include="../../../src/Moderato.Effects/Moderato.Effects.csproj" />
     <ProjectReference Include="../../../src/Moderato.Effects.SourceGenerator/Moderato.Effects.SourceGenerator.csproj" />
+    <!-- The runner itself is written with Moderato.Effects, so its MEFF diagnostics check this code too. -->
+    <Analyzer Include="../../../src/Moderato.Effects.SourceGenerator/bin/$(Configuration)/netstandard2.0/Moderato.Effects.SourceGenerator.dll" />
   </ItemGroup>
 
   <!-- User code compiles against these assemblies, so they ship inside the runner as resources. -->

@@ -1,25 +1,7 @@
-export interface Diagnostic {
-    id: string;
-    severity: 'Error' | 'Warning';
-    message: string;
-    path: string;
-    line: number;
-    column: number;
-}
+import { Deferred, Effect, Fiber } from 'effect';
+import type { CompileResult, LoadPhase, MemoryDiagnostics, RunDone, WorkerReply, WorkerRequest } from './protocol';
 
-export interface CompileResult {
-    success: boolean;
-    diagnostics: Diagnostic[];
-}
-
-export interface RunResult {
-    success: boolean;
-    hit: boolean;
-    compile: number;
-    execute: number;
-}
-
-export type LoadPhase = 'download' | 'start' | 'warmup';
+export type { CompileResult, Diagnostic, LoadPhase, RunDone, RunOutcome } from './protocol';
 
 export interface RunnerEvents {
     loading(phase: LoadPhase, loaded?: number, total?: number): void;
@@ -29,20 +11,20 @@ export interface RunnerEvents {
     failed(message: string): void;
 }
 
-const IDLE_COMPILE_MS = 300;
+const IDLE_COMPILE = '300 millis';
 
-/** Owns the Web Worker that compiles and runs C#, restarting it when a run has to be stopped. */
+type Reply<T extends WorkerReply['type']> = Extract<WorkerReply, { type: T }>;
+
+/** Owns the Web Worker that compiles and runs C#, and restarts it when a run is interrupted. */
 export class Runner {
     private worker!: Worker;
     private nextId = 1;
-    private idle: ReturnType<typeof setTimeout> | undefined;
-    private pendingRun: { id: number; resolve(result: RunResult): void } | undefined;
     private isReady = false;
+    private idle: Fiber.Fiber<void> | undefined;
+    // Replies a caller is waiting for, by request id; a new worker abandons them all.
+    private readonly waiting = new Map<number, Deferred.Deferred<WorkerReply>>();
 
-    constructor(
-        private readonly url: string,
-        private readonly events: RunnerEvents,
-    ) {
+    constructor(private readonly events: RunnerEvents) {
         this.start();
     }
 
@@ -51,61 +33,93 @@ export class Runner {
     }
 
     /** Compiles in the background once typing pauses, so a later run only has to execute. */
-    compileSoon(code: string, delay = IDLE_COMPILE_MS): void {
-        clearTimeout(this.idle);
-        this.idle = setTimeout(() => this.post('compile', code), delay);
+    compileSoon(code: string, delay: Parameters<typeof Effect.sleep>[0] = IDLE_COMPILE): void {
+        this.cancelIdle();
+        this.idle = Effect.runFork(
+            Effect.sleep(delay).pipe(Effect.andThen(Effect.sync(() => this.send({ type: 'compile', id: this.nextId++, code })))),
+        );
     }
 
-    run(code: string): Promise<RunResult> {
-        clearTimeout(this.idle);
-        return new Promise((resolve) => {
-            this.pendingRun = { id: this.post('run', code), resolve };
-        });
+    /**
+     * Compiles if needed and runs `code`. Interrupting the effect stops the program the only reliable
+     * way, by replacing the worker, since user code that never yields cannot be stopped from inside.
+     */
+    run(code: string): Effect.Effect<RunDone> {
+        return Effect.suspend(() => {
+            this.cancelIdle();
+            return this.request<'done'>({ type: 'run', id: this.nextId++, code });
+        }).pipe(Effect.onInterrupt(() => Effect.sync(() => this.restart())));
     }
 
-    /** Terminates the worker, which is the only way to stop user code that never yields. */
-    restart(): void {
+    /** Memory figures after a full collection, for measuring growth over many runs. */
+    diagnostics(): Effect.Effect<MemoryDiagnostics> {
+        return Effect.suspend(() => this.request<'diagnostics'>({ type: 'diagnostics', id: this.nextId++ }));
+    }
+
+    /** Compiles `code` now and waits for the result. */
+    compile(code: string): Effect.Effect<Reply<'compiled'>> {
+        return Effect.suspend(() => this.request<'compiled'>({ type: 'compile', id: this.nextId++, code }));
+    }
+
+    private request<T extends 'done' | 'diagnostics' | 'compiled'>(request: WorkerRequest): Effect.Effect<Reply<T>> {
+        return Effect.gen({ self: this }, function* () {
+            const reply = yield* Deferred.make<WorkerReply>();
+            this.waiting.set(request.id, reply);
+            this.send(request);
+            return (yield* Deferred.await(reply)) as Reply<T>;
+        }).pipe(Effect.ensuring(Effect.sync(() => this.waiting.delete(request.id))));
+    }
+
+    private cancelIdle(): void {
+        if (this.idle) Effect.runFork(Fiber.interrupt(this.idle));
+        this.idle = undefined;
+    }
+
+    private send(request: WorkerRequest): void {
+        this.worker.postMessage(request);
+    }
+
+    private restart(): void {
         this.worker.terminate();
-        this.pendingRun = undefined;
+        // Nothing will answer the old worker's requests, so their callers stop waiting.
+        for (const waiting of this.waiting.values()) Effect.runSync(Deferred.interrupt(waiting));
+        this.waiting.clear();
         this.start();
-    }
-
-    private post(type: 'compile' | 'run', code: string): number {
-        const id = this.nextId++;
-        this.worker.postMessage({ type, id, code });
-        return id;
     }
 
     private start(): void {
         this.isReady = false;
-        this.worker = new Worker(this.url, { type: 'module' });
+        this.worker = new Worker(new URL('./runner.worker.ts', import.meta.url), { type: 'module' });
         this.worker.onerror = (event) => this.events.failed(event.message || 'The C# runtime failed to load.');
-        this.worker.onmessage = ({ data }) => {
+        this.worker.onmessage = ({ data }: MessageEvent<WorkerReply>) => {
             switch (data.type) {
                 case 'progress':
                     this.events.loading(data.phase, data.loaded, data.total);
                     break;
                 case 'ready':
                     this.isReady = true;
-                    if (data.timings.warmupSuccess) this.events.ready();
-                    else this.events.failed('The C# compiler failed its warm-up compilation.');
-                    break;
-                case 'compiled':
-                    this.events.compiled(data.result);
+                    this.events.ready();
                     break;
                 case 'output':
                     this.events.output(data.text, data.isError);
                     break;
-                case 'done':
-                    if (this.pendingRun?.id === data.id) {
-                        this.pendingRun.resolve(data);
-                        this.pendingRun = undefined;
-                    }
-                    break;
                 case 'error':
                     this.events.failed(data.message);
                     break;
+                case 'compiled':
+                    this.events.compiled(data.result);
+                    this.reply(data.id, data);
+                    break;
+                case 'done':
+                case 'diagnostics':
+                    this.reply(data.id, data);
+                    break;
             }
         };
+    }
+
+    private reply(id: number, data: WorkerReply): void {
+        const waiting = this.waiting.get(id);
+        if (waiting) Effect.runSync(Deferred.succeed(waiting, data));
     }
 }

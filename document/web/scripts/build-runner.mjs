@@ -19,7 +19,6 @@ try {
     recursive: true,
     filter: (source) => !/\.(br|gz)$/.test(source),
   });
-  cpSync(join(wwwroot, 'worker.js'), join(target, 'worker.js'));
 } finally {
   rmSync(published, { recursive: true, force: true });
 }

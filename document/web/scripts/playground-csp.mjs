@@ -6,9 +6,10 @@ import { selectAll } from 'hast-util-select';
 
 const EXECUTABLE_TYPES = new Set(['', 'module', 'text/javascript', 'application/javascript']);
 
-// Tutorial pages carry the playground; /runner/ serves its worker, which gets the same policy.
+// Tutorial pages carry the playground. Its worker is bundled into /_astro/ and takes its policy from
+// its own response, so it gets the same one; on other bundled files the header has no effect.
 const PAGES = 'tutorial/**/index.html';
-const PATHS = ['/tutorial/*', '/runner/*'];
+const PATHS = ['/tutorial/*', '/_astro/*'];
 
 function textOf(node) {
   if (node.type === 'text') return node.value;

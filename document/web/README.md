@@ -43,7 +43,7 @@ The starting code is `src/content/playground/<id>.cs`, named after the tutorial 
 
 As the reader scrolls, the editor highlights the lines that the C# snippet being read shows, and stops at the "Try it" section. Snippets are matched to the editor's code line by line, ignoring indentation and access modifiers, so keep a chapter's `.cs` close to the tutorial's code; a snippet with no match highlights nothing.
 
-The code compiles and runs in a Web Worker on the .NET WebAssembly runtime, built from `document/tour/wasm-runner`. The runtime downloads only when the editor first opens. Build it once before `npm run dev` or `npm run build`; it lands in `public/runner/`, which is not committed:
+The code compiles and runs in a Web Worker on the .NET WebAssembly runtime. The C# side, `document/tour/wasm-runner`, is written with Moderato.Effects; the TypeScript side, `src/components/playground/runner.worker.ts` and `runner.ts`, with [Effect](https://effect.website/). Stopping a run interrupts its effect, which replaces the worker. The runtime downloads only when the editor first opens. Build it once before `npm run dev` or `npm run build`; it lands in `public/runner/`, which is not committed:
 
 ```sh
 dotnet workload install wasm-tools
@@ -52,7 +52,9 @@ npm run runner
 
 Without it, the pages still build but the editor cannot run code.
 
-`/tutorial/*` and `/runner/*` are served with a Content-Security-Policy. After `astro build`, `scripts/playground-csp.mjs` hashes the inline scripts of the built tutorial pages and appends the policy to `dist/_headers`, so it follows Starlight and Astro updates without editing. Scripts load only from the site itself or by those hashes; `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly. `style-src` keeps `'unsafe-inline'` because Expressive Code colors code with style attributes. `npm run build` checks the policy. To check it in a browser, serve `dist/` with `npx wrangler dev`; `npm run dev` does not apply `_headers`. `public/_headers` lets browsers keep the runner's hashed files for good; `dotnet.js` is revalidated because it names the files of the current build.
+Each run keeps its assembly loaded in the worker, about 400 KB of runtime memory apiece, since the browser runtime cannot unload it; a new page starts a new worker. During `npm run dev`, `playgroundBench.runs()` and `playgroundBench.compiles()` in the browser console measure that growth on a tutorial page.
+
+`/tutorial/*` and `/_astro/*`, where the bundled worker is served from, get a Content-Security-Policy. After `astro build`, `scripts/playground-csp.mjs` hashes the inline scripts of the built tutorial pages and appends the policy to `dist/_headers`, so it follows Starlight and Astro updates without editing. Scripts load only from the site itself or by those hashes; `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly. `style-src` keeps `'unsafe-inline'` because Expressive Code colors code with style attributes. `npm run build` checks the policy. To check it in a browser, serve `dist/` with `npx wrangler dev`; `npm run dev` does not apply `_headers`. `public/_headers` lets browsers keep the runner's hashed files for good; `dotnet.js` is revalidated because it names the files of the current build.
 
 ## Agent DX research
 

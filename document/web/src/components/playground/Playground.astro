@@ -19,7 +19,7 @@ const { chapter, code } = Astro.props;
 <button type="button" class="playground-open" data-playground-open>
     <span aria-hidden="true">▶</span> Try it in your browser
 </button>
-<section class="playground" data-playground-root data-chapter={chapter} data-runner="/runner/worker.js" aria-label="Code playground">
+<section class="playground" data-playground-root data-chapter={chapter} aria-label="Code playground">
     <div class="playground-header">
         <h2 class="playground-title">Try it in your browser</h2>
         <button type="button" class="playground-close" data-playground-close aria-label="Hide the editor" title="Hide the editor">
