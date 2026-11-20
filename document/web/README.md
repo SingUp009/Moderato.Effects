@@ -52,7 +52,7 @@ npm run runner
 
 Without it, the pages still build but the editor cannot run code.
 
-`/tutorial/*` and `/runner/*` are served with a Content-Security-Policy. After `astro build`, `scripts/playground-csp.mjs` hashes the inline scripts of the built tutorial pages and appends the policy to `dist/_headers`, so it follows Starlight and Astro updates without editing. Scripts load only from the site itself or by those hashes; `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly. `style-src` keeps `'unsafe-inline'` because Expressive Code colors code with style attributes. `npm run build` checks the policy. To check it in a browser, serve `dist/` with `npx wrangler dev`; `npm run dev` does not apply `_headers`.
+`/tutorial/*` and `/runner/*` are served with a Content-Security-Policy. After `astro build`, `scripts/playground-csp.mjs` hashes the inline scripts of the built tutorial pages and appends the policy to `dist/_headers`, so it follows Starlight and Astro updates without editing. Scripts load only from the site itself or by those hashes; `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly. `style-src` keeps `'unsafe-inline'` because Expressive Code colors code with style attributes. `npm run build` checks the policy. To check it in a browser, serve `dist/` with `npx wrangler dev`; `npm run dev` does not apply `_headers`. `public/_headers` lets browsers keep the runner's hashed files for good; `dotnet.js` is revalidated because it names the files of the current build.
 
 ## Agent DX research
 

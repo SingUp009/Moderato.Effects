@@ -1,3 +1,12 @@
 /*.md
   Content-Type: text/markdown; charset=utf-8
   X-Robots-Tag: noindex
+
+# Runner files carry a content hash in their names, so a browser can keep them for good.
+/runner/_framework/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# dotnet.js has no hash and names the hashed files of the current build, so it must be revalidated.
+/runner/_framework/dotnet.js
+  ! Cache-Control
+  Cache-Control: public, max-age=0, must-revalidate
