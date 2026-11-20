@@ -1,3 +1,4 @@
+import { Effect, Fiber } from 'effect';
 import { CodeEditor } from './editor';
 import { Runner, type Diagnostic, type LoadPhase } from './runner';
 import { findSnippet } from './snippets';
@@ -14,7 +15,6 @@ export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
     const status = root.querySelector<HTMLElement>('[data-playground-status]')!;
     const output = root.querySelector<HTMLElement>('[data-playground-output]')!;
 
-    let running = false;
     let diagnostics: Diagnostic[] = [];
     let runner: Runner | undefined;
 
@@ -27,7 +27,7 @@ export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
 
     // The compiler is about 10 MB, so it starts only once someone opens the editor; closing keeps it warm.
     const ensureRunner = () => {
-        runner ??= new Runner(root.dataset.runner!, {
+        runner ??= new Runner({
             loading: progress.update,
             ready() {
                 progress.finish();
@@ -48,8 +48,6 @@ export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
             },
             failed(message) {
                 progress.finish();
-                running = false;
-                runButton.textContent = 'Run';
                 runButton.disabled = false;
                 setStatus(message, true);
             },
@@ -66,44 +64,58 @@ export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
             store(EDITS_KEY_PREFIX + chapter, code === original ? null : code);
             if (runner?.ready) runner.compileSoon(code);
         },
-        onRun: () => void run(),
+        onRun: () => run(),
     });
     // Edits survive moving between chapters for the rest of the browser session.
     editor.code = load('session', EDITS_KEY_PREFIX + chapter) ?? original;
     snippets = followSnippets(text, editor, isOpen);
 
-    async function run() {
+    let running: Fiber.Fiber<void> | undefined;
+
+    function run() {
         if (!runner) return;
         if (running) {
-            // A second press stops the program: terminating the worker is the only reliable way.
-            progress.reset();
-            runner.restart();
-            running = false;
-            runButton.textContent = 'Run';
-            runButton.disabled = true;
+            // A second press stops the program: interrupting the run replaces the worker.
+            Effect.runFork(Fiber.interrupt(running));
             return;
         }
         if (!runner.ready) return;
 
-        running = true;
-        runButton.textContent = 'Stop';
-        output.replaceChildren();
-        output.classList.remove('playground-output-error');
-        setStatus('Running…');
         const started = performance.now();
-        const result = await runner.run(editor.code);
-        if (!running) return;
-        running = false;
-        runButton.textContent = 'Run';
-        if (!result.success) {
-            output.textContent = diagnostics
-                .filter((d) => d.severity === 'Error')
-                .map((d) => `${d.path ? `${d.path}(${d.line},${d.column}): ` : ''}${d.id}: ${d.message}`)
-                .join('\n');
-            output.classList.add('playground-output-error');
-        }
-        const elapsed = Math.round(performance.now() - started);
-        setStatus(result.success ? `Finished in ${elapsed} ms` : describe(diagnostics), !result.success);
+        const program = Effect.gen(function* () {
+            runButton.textContent = 'Stop';
+            output.replaceChildren();
+            output.classList.remove('playground-output-error');
+            setStatus('Running…');
+            const done = yield* runner!.run(editor.code);
+            const elapsed = Math.round(performance.now() - started);
+            if (!done.compiled) {
+                output.textContent = diagnostics
+                    .filter((d) => d.severity === 'Error')
+                    .map((d) => `${d.path ? `${d.path}(${d.line},${d.column}): ` : ''}${d.id}: ${d.message}`)
+                    .join('\n');
+                output.classList.add('playground-output-error');
+                setStatus(describe(diagnostics), true);
+            } else if (done.outcome?.success) {
+                setStatus(`Finished in ${elapsed} ms`);
+            } else {
+                setStatus(done.outcome?.error === 'programFailed' ? 'The program threw an exception' : 'The program could not run', true);
+            }
+        }).pipe(
+            Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                    progress.reset();
+                    runButton.disabled = true;
+                }),
+            ),
+            Effect.ensuring(
+                Effect.sync(() => {
+                    running = undefined;
+                    runButton.textContent = 'Run';
+                }),
+            ),
+        );
+        running = Effect.runFork(program);
     }
 
     function isOpen() {
@@ -132,13 +144,18 @@ export function mountPlayground(root: HTMLElement, text: HTMLElement): void {
         document.body.append(button);
         button.addEventListener('click', () => setOpen(!isOpen()));
     }
-    runButton.addEventListener('click', () => void run());
+    runButton.addEventListener('click', () => run());
     resetButton.addEventListener('click', () => {
         editor.code = original;
         if (runner?.ready) runner.compileSoon(editor.code, 0);
     });
 
     if (isOpen()) ensureRunner();
+
+    if (import.meta.env.DEV) {
+        // Measurement hooks for the browser console during development; see bench.ts.
+        void import('./bench').then(({ installBench }) => installBench(() => (ensureRunner(), runner!), () => editor.code));
+    }
 }
 
 type StorageKind = 'local' | 'session';
