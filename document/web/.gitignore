@@ -6,3 +6,6 @@ dist/
 styled-system/
 
 .wrangler/
+
+# Built by npm run tour:runner from document/tour/wasm-runner.
+public/tour/runner/
