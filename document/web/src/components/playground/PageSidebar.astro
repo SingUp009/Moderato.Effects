@@ -1,0 +1,37 @@
+---
+import Default from '@astrojs/starlight/components/PageSidebar.astro';
+import Playground from './Playground.astro';
+
+// A tutorial chapter with starting code in src/content/playground/<id>.cs gets an editor in place of "On this page".
+const TUTORIAL_PREFIX = 'tutorial/';
+const sources = import.meta.glob<string>('/src/content/playground/*.cs', { query: '?raw', import: 'default', eager: true });
+const id = Astro.locals.starlightRoute.id;
+const chapter = id.startsWith(TUTORIAL_PREFIX) ? id.slice(TUTORIAL_PREFIX.length) : undefined;
+const code = chapter === undefined ? undefined : sources[`/src/content/playground/${chapter}.cs`];
+if (chapter !== undefined && code === undefined) {
+    throw new Error(`Tutorial chapter ${chapter} has no src/content/playground/${chapter}.cs`);
+}
+---
+
+{chapter !== undefined && code !== undefined ? (
+    <>
+        <script is:inline>
+            // Set before the layout is painted, so it does not jump between the editor and the navigation.
+            // One side panel shows at a time: the editor with the site navigation folded, or the reverse.
+            (() => {
+                let saved = null;
+                try {
+                    saved = window.localStorage.getItem('moderato.tutorial-layout');
+                } catch {}
+                const layout = saved ?? (matchMedia('(min-width: 72rem)').matches ? 'playground' : 'navigation');
+                const root = document.documentElement;
+                root.dataset.playground = layout === 'playground' ? 'open' : 'closed';
+                root.dataset.tutorialNav = layout === 'playground' ? 'closed' : 'open';
+            })();
+        </script>
+        <Playground chapter={chapter} code={code} />
+        <div class="playground-toc"><Default /></div>
+    </>
+) : (
+    <Default />
+)}

@@ -18,7 +18,11 @@ export default defineConfig({
       { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://moderato-effects.009singup.workers.dev/ogp.jpg' } },
     ],
     customCss: ['./src/styles/panda.css'],
-    components: { Hero: './src/components/LandingHero.astro', Footer: './src/components/Footer.astro' },
+    components: {
+      Hero: './src/components/LandingHero.astro',
+      Footer: './src/components/Footer.astro',
+      PageSidebar: './src/components/playground/PageSidebar.astro',
+    },
     title: 'Moderato.Effects',
     description: 'Typed errors, explicit dependencies, and managed resources for C#.',
     social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/SingUp009/Moderato.Effects' }],

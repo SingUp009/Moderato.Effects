@@ -10,7 +10,7 @@
     "astro": "astro",
     "prepare": "panda codegen",
     "deploy": "npm run build && wrangler deploy",
-    "tour:runner": "node scripts/build-tour-runner.mjs"
+    "runner": "node scripts/build-runner.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.4",
@@ -36,6 +36,9 @@
     "@pandacss/preset-base": "^2.5.0",
     "@pandacss/preset-panda": "^2.5.0",
     "@pandacss/vite": "^2.5.0",
+    "hast-util-from-html": "^2.1.0",
+    "hast-util-select": "^6.0.4",
+    "hast-util-to-html": "^9.0.6",
     "ultrahtml": "^1.7.0",
     "wrangler": "^4.158.0"
   }

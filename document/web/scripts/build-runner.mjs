@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const web = fileURLToPath(new URL('..', import.meta.url));
 const project = join(web, '..', 'tour', 'wasm-runner');
-const target = join(web, 'public', 'tour', 'runner');
-const published = mkdtempSync(join(tmpdir(), 'tour-runner-'));
+const target = join(web, 'public', 'runner');
+const published = mkdtempSync(join(tmpdir(), 'runner-'));
 
 try {
   execFileSync('dotnet', ['publish', project, '-c', 'Release', '-o', published], { stdio: 'inherit' });

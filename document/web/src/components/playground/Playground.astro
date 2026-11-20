@@ -1,0 +1,47 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import '../../styles/playground.css';
+
+interface Props {
+    chapter: string;
+    code: string;
+}
+
+const { chapter, code } = Astro.props;
+---
+
+<button type="button" class="tutorial-layout-toggle" data-playground-toggle aria-label="Switch between the editor and the site navigation" title="Switch between the editor and the site navigation">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2.5"></rect>
+        <path d="M9 4v16"></path>
+    </svg>
+</button>
+<button type="button" class="playground-open" data-playground-open>
+    <span aria-hidden="true">▶</span> Try it in your browser
+</button>
+<section class="playground" data-playground-root data-chapter={chapter} data-runner="/runner/worker.js" aria-label="Code playground">
+    <div class="playground-header">
+        <h2 class="playground-title">Try it in your browser</h2>
+        <button type="button" class="playground-close" data-playground-close aria-label="Hide the editor" title="Hide the editor">
+            <Icon name="right-caret" size="1.25rem" />
+        </button>
+    </div>
+    <div class="playground-progress" data-playground-progress data-done="true">
+        <progress max="100" value="0" aria-label="Loading the C# compiler"></progress>
+    </div>
+    <div class="playground-toolbar">
+        <button type="button" class="playground-run" data-playground-run disabled>Run</button>
+        <button type="button" class="playground-reset" data-playground-reset>Reset</button>
+        <span class="playground-status" data-playground-status role="status"></span>
+    </div>
+    <div class="playground-editor" data-playground-editor></div>
+    <pre class="playground-output" data-playground-output aria-live="polite"></pre>
+    <script type="application/json" data-playground-code set:html={JSON.stringify(code).replace(/</g, '\\u003c')} />
+</section>
+
+<script>
+    import { mountPlayground } from './playground';
+
+    const root = document.querySelector<HTMLElement>('[data-playground-root]');
+    if (root) mountPlayground(root);
+</script>

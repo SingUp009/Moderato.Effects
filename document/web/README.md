@@ -35,6 +35,21 @@ curl https://moderato-effects.009singup.workers.dev/getting-started.md
 
 HTML URLs are indexable. Workers serves each Markdown asset as `text/markdown` with `X-Robots-Tag: noindex` so it stays readable without competing with its HTML counterpart in search. The crawl policy allows access to the Markdown and to `/llms.txt`. `npm run build` checks the generated Markdown index and its targets.
 
+## Tutorial playground
+
+Each tutorial chapter has an editor beside it where the reader edits and runs the chapter's code. One side panel shows at a time, so the text keeps its room: with the editor open, it takes the place of "On this page" and the site navigation folds to a narrow rail; with it closed, the page is the plain tutorial. A sidebar button at the bottom left switches between the two. Wide screens start with the editor, narrow ones with the navigation, where the editor opens as a sheet over the lower part of the page, and the browser remembers the reader's choice. `src/components/playground/PageSidebar.astro` overrides Starlight's `PageSidebar` to add it.
+
+The starting code is `src/content/playground/<id>.cs`, named after the tutorial page; every tutorial chapter needs one, and the build fails without it. Edits last for the browser session; Reset restores the starting code.
+
+The code compiles and runs in a Web Worker on the .NET WebAssembly runtime, built from `document/tour/wasm-runner`. The runtime downloads only when the editor first opens. Build it once before `npm run dev` or `npm run build`; it lands in `public/runner/`, which is not committed:
+
+```sh
+dotnet workload install wasm-tools
+npm run runner
+```
+
+Without it, the pages still build but the editor cannot run code.
+
 ## Agent DX research
 
 `/agent-dx/` uses the existing Starlight layout and a React chart for development comparisons. The build exports the results as `/agent-dx/results.json`. The guide archive contains both 30-file input snapshots and their SHA-256 hashes. Keep that archive intact for reproducing the first evaluation.
